@@ -156,6 +156,19 @@ export default function HomePage() {
         </button>
       </header>
 
+      {/* ナビゲーションタブ (対局一覧 / 成績集計) */}
+      <nav className="grid grid-cols-2 gap-2 bg-neutral-900 p-1.5 rounded-xl border border-neutral-800">
+        <div className="py-2 text-center text-xs font-bold bg-neutral-800 text-amber-300 rounded-lg shadow-xs">
+          対局一覧 ({games.length})
+        </div>
+        <Link
+          href="/stats"
+          className="py-2 text-center text-xs font-bold text-neutral-400 hover:text-white rounded-lg transition-colors"
+        >
+          成績集計・ランキング →
+        </Link>
+      </nav>
+
       {/* 進行中・過去の対局一覧 */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-bold text-neutral-300 flex items-center justify-between">
