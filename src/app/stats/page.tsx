@@ -170,29 +170,29 @@ export default function StatsPage() {
   });
 
   return (
-    <main className="min-h-screen bg-black text-white max-w-md mx-auto p-4 flex flex-col gap-5">
+    <main className="min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-5">
       {/* ヘッダー */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-            <span>📊</span> 成績集計・ランキング
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            成績集計・ランキング
           </h1>
-          <p className="text-xs text-neutral-400 mt-0.5">
+          <p className="text-xs text-neutral-400 mt-0.5 font-bold">
             クラウド同期データ（全{stats.reduce((s, p) => s + p.gamesCount, 0) / 4}対局）
           </p>
         </div>
 
         <Link
           href="/"
-          className="text-xs text-neutral-400 hover:text-white font-semibold py-1.5 px-3 rounded-lg bg-neutral-900 border border-neutral-800"
+          className="text-xs text-neutral-300 hover:text-white font-bold py-2 px-3 rounded-xl bg-neutral-900 border border-neutral-800 transition-colors"
         >
-          ← 対局一覧
+          &larr; ホームへ戻る
         </Link>
       </header>
 
       {/* ソートセレクター */}
       <div className="flex items-center gap-2 bg-neutral-900 p-1.5 rounded-xl border border-neutral-800">
-        <span className="text-[11px] font-bold text-neutral-400 pl-2">並び順:</span>
+        <span className="text-xs font-black text-neutral-400 pl-2">並び順:</span>
         <div className="grid grid-cols-3 gap-1 flex-1">
           {[
             { id: 'point', label: '通算pt順' },
@@ -203,7 +203,7 @@ export default function StatsPage() {
               key={item.id}
               type="button"
               onClick={() => setSortBy(item.id as any)}
-              className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`py-2 rounded-lg text-xs font-black transition-all ${
                 sortBy === item.id
                   ? 'bg-amber-500 text-black shadow-xs'
                   : 'text-neutral-400 hover:text-white'
@@ -217,11 +217,11 @@ export default function StatsPage() {
 
       {/* ランキング一覧 */}
       {loading ? (
-        <div className="p-8 text-center text-neutral-500 text-xs">
+        <div className="p-8 text-center text-neutral-500 text-xs font-bold">
           集計中...
         </div>
       ) : sortedStats.length === 0 ? (
-        <div className="p-8 text-center text-neutral-500 text-xs bg-neutral-900 rounded-xl border border-neutral-800">
+        <div className="p-8 text-center text-neutral-500 text-xs font-bold bg-neutral-900 rounded-xl border border-neutral-800">
           対局データがありません
         </div>
       ) : (
@@ -235,17 +235,21 @@ export default function StatsPage() {
               p.gamesCount > 0
                 ? Math.round(((p.ranks[0] + p.ranks[1]) / p.gamesCount) * 1000) / 10
                 : 0;
+            const lastAvoidRate =
+              p.gamesCount > 0
+                ? Math.round(((p.gamesCount - p.ranks[3]) / p.gamesCount) * 1000) / 10
+                : 0;
 
             return (
               <div
                 key={p.playerName}
-                className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex flex-col gap-2.5 shadow-xs"
+                className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex flex-col gap-3 shadow-xs"
               >
                 {/* プレイヤー名 ＆ 通算pt */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black ${
                         idx === 0
                           ? 'bg-amber-400 text-black'
                           : idx === 1
@@ -257,79 +261,111 @@ export default function StatsPage() {
                     >
                       {idx + 1}
                     </span>
-                    <span className="font-bold text-base text-white">
+                    <span className="font-black text-base sm:text-lg text-white">
                       {p.playerName}
                     </span>
-                    <span className="text-[11px] text-neutral-500">
+                    <span className="text-xs font-bold text-neutral-400">
                       ({p.gamesCount}戦)
                     </span>
                   </div>
 
                   <span
-                    className={`text-lg font-black ${
+                    className={`text-xl font-black ${
                       p.totalPoint > 0
-                        ? 'text-emerald-400'
+                        ? 'text-cyan-400'
                         : p.totalPoint < 0
-                        ? 'text-red-400'
+                        ? 'text-rose-500'
                         : 'text-neutral-300'
                     }`}
                   >
-                    {p.totalPoint > 0 ? `+${p.totalPoint}` : p.totalPoint} pt
+                    {p.totalPoint > 0 ? `+${p.totalPoint.toFixed(1)}` : p.totalPoint.toFixed(1)} pt
                   </span>
                 </div>
 
                 {/* 順位分布バー */}
-                <div className="flex flex-col gap-1">
-                  <div className="h-2 w-full rounded-full bg-neutral-800 overflow-hidden flex">
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-3 w-full rounded-full bg-neutral-800 overflow-hidden flex">
                     <div
                       style={{ width: `${(p.ranks[0] / p.gamesCount) * 100}%` }}
                       className="bg-amber-400"
+                      title={`1位: ${p.ranks[0]}回`}
                     ></div>
                     <div
                       style={{ width: `${(p.ranks[1] / p.gamesCount) * 100}%` }}
-                      className="bg-blue-400"
+                      className="bg-cyan-500"
+                      title={`2位: ${p.ranks[1]}回`}
                     ></div>
                     <div
                       style={{ width: `${(p.ranks[2] / p.gamesCount) * 100}%` }}
-                      className="bg-neutral-400"
+                      className="bg-neutral-500"
+                      title={`3位: ${p.ranks[2]}回`}
                     ></div>
                     <div
                       style={{ width: `${(p.ranks[3] / p.gamesCount) * 100}%` }}
-                      className="bg-red-500"
+                      className="bg-rose-600"
+                      title={`4位: ${p.ranks[3]}回`}
                     ></div>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-neutral-400 px-0.5">
-                    <span>1位: {p.ranks[0]}</span>
-                    <span>2位: {p.ranks[1]}</span>
-                    <span>3位: {p.ranks[2]}</span>
-                    <span>4位: {p.ranks[3]}</span>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-neutral-400 px-0.5">
+                    <span className="text-amber-300">1位: {p.ranks[0]}</span>
+                    <span className="text-cyan-300">2位: {p.ranks[1]}</span>
+                    <span className="text-neutral-300">3位: {p.ranks[2]}</span>
+                    <span className="text-rose-400">4位: {p.ranks[3]}</span>
                   </div>
                 </div>
 
-                {/* 詳細スタッツ指標グリッド */}
-                <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-neutral-800/80 text-center">
-                  <div className="bg-neutral-950/60 p-1.5 rounded-lg border border-neutral-800/50">
-                    <span className="text-[10px] text-neutral-500 block">平均順位</span>
-                    <span className="text-xs font-bold text-neutral-200">
+                {/* 指標グリッド (2段表示) */}
+                <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-neutral-800 text-center">
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">平均順位</span>
+                    <span className="text-sm font-black text-neutral-200">
                       {p.avgRank.toFixed(2)}
                     </span>
                   </div>
-                  <div className="bg-neutral-950/60 p-1.5 rounded-lg border border-neutral-800/50">
-                    <span className="text-[10px] text-neutral-500 block">トップ率</span>
-                    <span className="text-xs font-bold text-amber-300">
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">トップ率</span>
+                    <span className="text-sm font-black text-amber-300">
                       {topRate}%
                     </span>
                   </div>
-                  <div className="bg-neutral-950/60 p-1.5 rounded-lg border border-neutral-800/50">
-                    <span className="text-[10px] text-neutral-500 block">連対率</span>
-                    <span className="text-xs font-bold text-neutral-200">
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">連対率</span>
+                    <span className="text-sm font-black text-cyan-300">
                       {renchanRate}%
                     </span>
                   </div>
-                  <div className="bg-neutral-950/60 p-1.5 rounded-lg border border-neutral-800/50">
-                    <span className="text-[10px] text-neutral-500 block">平均素点</span>
-                    <span className="text-xs font-bold text-neutral-200">
-                      {p.avgScore.toLocaleString()}
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">ラス回避率</span>
+                    <span className="text-sm font-black text-neutral-200">
+                      {lastAvoidRate}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 和了・放銃・立直・平均素点 */}
+                <div className="grid grid-cols-4 gap-1.5 text-center">
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">和了率</span>
+                    <span className="text-xs font-black text-rose-400">
+                      {p.agariRate}%
+                    </span>
+                  </div>
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">放銃率</span>
+                    <span className="text-xs font-black text-neutral-300">
+                      {p.houjuRate}%
+                    </span>
+                  </div>
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">立直率</span>
+                    <span className="text-xs font-black text-amber-400">
+                      {p.riichiRate}%
+                    </span>
+                  </div>
+                  <div className="bg-neutral-950 p-2 rounded-lg border border-neutral-800">
+                    <span className="text-[10px] font-bold text-neutral-500 block">平均素点</span>
+                    <span className="text-xs font-black text-neutral-200">
+                      {Math.round(p.avgScore).toLocaleString()}
                     </span>
                   </div>
                 </div>

@@ -225,8 +225,8 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/stats"
-            className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-neutral-200 font-bold text-sm transition-all flex items-center justify-center shadow-xs"
+            href="/manage"
+            className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
             グループ・ルール管理
           </Link>
