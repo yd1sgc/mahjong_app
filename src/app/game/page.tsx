@@ -31,6 +31,7 @@ function GameContent() {
     draft,
     updateDraft,
     transferRecorder,
+    toggleFuro,
     declareRiichi,
     commitRound,
     undoRound,
@@ -75,7 +76,7 @@ function GameContent() {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
         <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-neutral-400 text-sm mt-3">対局データを読込中...</p>
+        <p className="text-neutral-400 text-sm mt-3 font-bold">対局データを読込中...</p>
       </div>
     );
   }
@@ -95,42 +96,42 @@ function GameContent() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex flex-col justify-between max-w-md mx-auto p-3 select-none touch-manipulation">
+    <main className="h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden">
       {/* 上部ヘッダー */}
-      <header className="flex items-center justify-between py-1.5 border-b border-neutral-800/80 mb-2">
+      <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0">
         <Link
           href="/"
-          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-semibold"
+          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-bold"
         >
-          ← 戻る
+          &larr; 戻る
         </Link>
         <div className="text-center">
-          <h1 className="text-xs font-bold text-neutral-200">
+          <h1 className="text-sm font-black text-neutral-100">
             {game?.rule_name_snapshot || '対局'}
           </h1>
-          <span className="text-[10px] text-neutral-500">
+          <span className="text-[10px] text-neutral-500 font-semibold">
             {game?.played_at?.slice(0, 16) || ''}
           </span>
         </div>
-        <span className="text-[10px] font-mono text-neutral-500 uppercase">
-          {gameId.slice(0, 6)}
+        <span className="text-[11px] font-mono font-bold text-neutral-400 uppercase">
+          ID: {gameId.slice(0, 6)}
         </span>
       </header>
 
       {/* 終局・サドンデス・飛び通知バナー */}
       {gameEndReason && (
-        <div className="mb-2 p-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-center font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm">
-          <span>⚠️</span>
-          <span>{gameEndReason}</span>
+        <div className="my-1 p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-center font-black text-xs shrink-0">
+          [終局条件] {gameEndReason}
         </div>
       )}
 
-      {/* スコアボード */}
-      <div className="flex-1 flex flex-col justify-center my-1">
+      {/* スコアボード (中央メイン・4行リスト) */}
+      <div className="flex-1 flex flex-col justify-center my-auto overflow-hidden">
         <ScoreBoard
           players={players}
           gameState={gameState}
           onRiichiClick={declareRiichi}
+          onFuroClick={toggleFuro}
           isRecorder={isRecorder}
         />
       </div>

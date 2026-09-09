@@ -57,8 +57,10 @@ export default function HomePage() {
         if (grpData && grpData.length > 0) {
           setGroups(grpData);
           // 親族麻雀を優先、なければ先頭
-          const defaultGrp = grpData.find((g: any) => g.group_name.includes('親族')) || grpData[0];
-          setSelectedGroupId(defaultGrp.group_id);
+          const defaultGrp: any = grpData.find((g: any) => g.group_name.includes('親族')) || grpData[0];
+          if (defaultGrp?.group_id) {
+            setSelectedGroupId(defaultGrp.group_id);
+          }
         }
 
         // (4) ルールテンプレート取得

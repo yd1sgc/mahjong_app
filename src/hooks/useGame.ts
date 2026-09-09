@@ -50,8 +50,10 @@ export function useGame(gameId: string) {
   // LocalStorage 下書き状態
   const [draft, setDraft] = useState<RoundInputDraft>(DEFAULT_DRAFT);
   const [hasDraftToRestore, setHasDraftToRestore] = useState(false);
+  const [furoDeclared, setFuroDeclared] = useState<string[]>([]);
 
   const draftKey = `mahjong_draft_${gameId}`;
+  const furoKey = `mahjong_furo_${gameId}`;
   const recorderTokenKey = `mahjong_recorder_${gameId}`;
 
   // 1. 対局データの初回読み込み
@@ -155,7 +157,8 @@ export function useGame(gameId: string) {
 
       setIsRecorder(Boolean(isCurrentRecorder));
 
-      // (5) LocalStorage 下書きチェック
+      // (5) LocalStorage 下書き & 副露チェック
+      let activeFuro: string[] = [];
       if (typeof window !== 'undefined') {
         const savedDraft = localStorage.getItem(draftKey);
         if (savedDraft) {
@@ -167,13 +170,28 @@ export function useGame(gameId: string) {
             // パース失敗時は無視
           }
         }
+
+        const savedFuro = localStorage.getItem(furoKey);
+        if (savedFuro) {
+          try {
+            activeFuro = JSON.parse(savedFuro);
+            setFuroDeclared(activeFuro);
+          } catch {
+            // パース失敗時は無視
+          }
+        }
       }
+
+      setGameState({
+        ...computed,
+        furoDeclared: activeFuro,
+      });
     } catch (e: any) {
       setError(e.message || 'データ読み込みに失敗しました');
     } finally {
       setLoading(false);
     }
-  }, [gameId, draftKey, recorderTokenKey]);
+  }, [gameId, draftKey, furoKey, recorderTokenKey]);
 
   useEffect(() => {
     fetchGameData();
@@ -273,11 +291,38 @@ export function useGame(gameId: string) {
     [game, gameId, recorderTokenKey]
   );
 
-  // 5. リーチ宣言（0ms 楽観的UI更新）
+  // 5. 副露（鳴き）トグル
+  const toggleFuro = useCallback(
+    (player: string) => {
+      if (!gameState || !isRecorder) return;
+      // 立直済みのプレイヤーは副露不可
+      if (gameState.riichiDeclared.includes(player)) return;
+
+      setFuroDeclared((prev) => {
+        const next = prev.includes(player)
+          ? prev.filter((p) => p !== player)
+          : [...prev, player];
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(furoKey, JSON.stringify(next));
+        }
+
+        setGameState((current) =>
+          current ? { ...current, furoDeclared: next } : null
+        );
+        return next;
+      });
+    },
+    [gameState, isRecorder, furoKey]
+  );
+
+  // 6. リーチ宣言（0ms 楽観的UI更新）
   const declareRiichi = useCallback(
     (player: string) => {
       if (!gameState || !isRecorder) return;
       if (gameState.riichiDeclared.includes(player)) return;
+      // 副露中のプレイヤーは立直不可
+      if (furoDeclared.includes(player)) return;
 
       const nextRiichi = [...gameState.riichiDeclared, player];
       // 0msで画面先行更新
@@ -288,9 +333,12 @@ export function useGame(gameId: string) {
         gameState.roundHistory,
         nextRiichi
       );
-      setGameState(updated);
+      setGameState({
+        ...updated,
+        furoDeclared,
+      });
     },
-    [gameState, isRecorder, players, ruleConfig]
+    [gameState, isRecorder, furoDeclared, players, ruleConfig]
   );
 
   // 6. 局結果の確定（コミット）
@@ -350,8 +398,12 @@ export function useGame(gameId: string) {
 
         if (sErr) throw new Error(sErr.message);
 
-        // (3) 下書きを消去
+        // (3) 下書きおよび副露状態を消去
         clearDraft();
+        setFuroDeclared([]);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(furoKey);
+        }
 
         // (4) 最新データを再取得して画面反映
         await fetchGameData();
@@ -363,7 +415,7 @@ export function useGame(gameId: string) {
         setLoading(false);
       }
     },
-    [gameState, game, isRecorder, gameId, players, clearDraft, fetchGameData]
+    [gameState, game, isRecorder, gameId, players, furoKey, clearDraft, fetchGameData]
   );
 
   // 7. 1局巻き戻し（Undo）
@@ -385,6 +437,11 @@ export function useGame(gameId: string) {
 
       if (delErr) throw new Error(delErr.message);
 
+      setFuroDeclared([]);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(furoKey);
+      }
+
       await fetchGameData();
       return true;
     } catch (e: any) {
@@ -393,7 +450,7 @@ export function useGame(gameId: string) {
     } finally {
       setLoading(false);
     }
-  }, [gameState, isRecorder, gameId, fetchGameData]);
+  }, [gameState, isRecorder, gameId, furoKey, fetchGameData]);
 
   return {
     loading,
@@ -409,6 +466,7 @@ export function useGame(gameId: string) {
     clearDraft,
     hasDraftToRestore,
     transferRecorder,
+    toggleFuro,
     declareRiichi,
     commitRound,
     undoRound,
