@@ -52,15 +52,26 @@
   - `src/lib/mahjong/rules.ts`（局進行、連荘、ノーテン罰符、チョンボ、ダブロン、トビ・サドンデス判定）
   - `src/lib/mahjong/index.ts`（公開エントリポイント）
   - `tests/calc.test.ts`, `tests/rules.test.ts`（単体テスト全41件 ALL PASS）
+- **Phase 2完了（Supabaseクライアント & V2型定義配備 & 突合検証完了）:**
+  - `src/types/database.ts`（全8テーブル + RPC型定義）
+  - `src/lib/supabase.ts`（静的SPA/テストセーフなクライアント初期化）
+  - `.env.example`（接続設定テンプレート配備）
+  - `next build`（静的SPA HTML出力確認完了）
+  - **クラウドデータ移行・突合検証 100% PASS:**
+    - PCローカルDB（`local_mahjong_v2_new.db`）のオンライン同期対象（`sync_target = 1`）27対局（300局・参加者108名）を新Supabase（`bhwbqxftifxxfmwinchx`）へ一括インポート。
+    - 27対局の総素点（2,700,000点）、総ポイント（0.0pt）、全13名のプレイヤー別対局数・合計pt・素点合計がSQLiteとSupabase間で1pt・0.1%の狂いもなく完全一致することを確認済み。
+
 
 ---
 
-# TODO (Next Actions: Phase 2)
+# TODO (Next Actions: Phase 3)
 
 次のチャットセッションで直ちに着手するタスク：
 
-- [ ] **Phase 2: Supabaseクライアント・型定義の配備**
-  - [ ] `src/types/database.ts`（`DETAILED_DESIGN.md` 第7項準拠のテーブル型定義）
-  - [ ] `src/lib/supabase.ts`（ブラウザ直接通信クライアント初期化）
-  - [ ] `.env.example` の配備
+- [ ] **Phase 3: Web対局コア画面 & 状態管理フック構築**
+  - [ ] `src/hooks/useGame.ts`（LocalStorage下書き復元、対局状態管理、4桁PIN引き継ぎ）
+  - [ ] `src/components/ScoreBoard.tsx`（4名のスコアボード、点差、順位表示）
+  - [ ] `src/components/ActionPanel.tsx`（記録係専用: リーチ、ロン、ツモ、流局、チョンボ、Undoボタン）
+  - [ ] `src/components/RoundInputModal.tsx`（和了・流局入力モーダル、LocalStorage即時ドラフト保存）
+
 
