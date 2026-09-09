@@ -273,6 +273,26 @@ export interface Database {
           is_tenpai?: number;
         };
       };
+      drafts: {
+        Row: {
+          id: string;
+          state_json: Json;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          state_json: Json;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          state_json?: Json;
+          updated_at?: string;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
     };
     Functions: {
       transfer_recorder: {
@@ -282,6 +302,12 @@ export interface Database {
         };
         Returns: boolean;
       };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

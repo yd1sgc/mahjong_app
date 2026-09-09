@@ -62,16 +62,26 @@
     - 27対局の総素点（2,700,000点）、総ポイント（0.0pt）、全13名のプレイヤー別対局数・合計pt・素点合計がSQLiteとSupabase間で1pt・0.1%の狂いもなく完全一致することを確認済み。
 
 
+- **Phase 3完了（Web対局コア画面 & 状態管理フック構築）:**
+  - `src/hooks/useGame.ts`（LocalStorage下書き復元、対局状態管理、Realtime自動購読、4桁PIN引き継ぎ、0ms楽観的更新）
+  - `src/components/ScoreBoard.tsx`（4名スコアボード、親マーク、点差、本場、供託）
+  - `src/components/ActionPanel.tsx`（記録係専用操作ボタン、閲覧モード表示、PIN交代導線）
+  - `src/components/RoundInputModal.tsx`（和了・流局入力モーダル、即時下書き保存、二重送信防止）
+  - `src/components/PinTransferModal.tsx`（4桁PIN入力モーダル）
+  - `src/app/game/page.tsx`（静的SPA完全対応の1画面スクロールレス対局画面）
+  - `src/app/page.tsx`（対局一覧＆新規対局開始モーダル）
+  - `next build`（静的SPA `/game.html`, `/index.html` 出力確認完了）
+
 ---
 
-# TODO (Next Actions: Phase 3)
+# TODO (Next Actions: Phase 4)
 
 次のチャットセッションで直ちに着手するタスク：
 
-- [ ] **Phase 3: Web対局コア画面 & 状態管理フック構築**
-  - [ ] `src/hooks/useGame.ts`（LocalStorage下書き復元、対局状態管理、4桁PIN引き継ぎ）
-  - [ ] `src/components/ScoreBoard.tsx`（4名のスコアボード、点差、順位表示）
-  - [ ] `src/components/ActionPanel.tsx`（記録係専用: リーチ、ロン、ツモ、流局、チョンボ、Undoボタン）
-  - [ ] `src/components/RoundInputModal.tsx`（和了・流局入力モーダル、LocalStorage即時ドラフト保存）
+- [ ] **Phase 4: 個人・グループ・ルール別成績集計UI & デプロイ設定**
+  - [ ] `src/app/stats/page.tsx`（個人成績・順位率・和了率・放銃率集計画面）
+  - [ ] GitHub Actions による Supabase スリープ防止 cron ワークフロー配備（`.github/workflows/supabase_keepalive.yml`）
+  - [ ] Cloudflare Pages 静的ホスティング向け設定確認
+
 
 
