@@ -61,28 +61,20 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* 記録係専用ボタン群 */}
       {isRecorder ? (
         <div className="flex flex-col gap-2.5">
-          {/* メインアクション (ロン / ツモ / 流局) */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* メインアクション (和了 / 流局) */}
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={() => onOpenWinModal('ron')}
-              className="h-14 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-black text-lg shadow-sm transition-all flex items-center justify-center border border-red-500/40 touch-manipulation"
+              className="h-14 sm:h-16 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white font-black text-xl shadow-md transition-all flex items-center justify-center border border-rose-500/50 touch-manipulation"
             >
-              ロン和了
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenWinModal('tsumo')}
-              className="h-14 rounded-xl bg-orange-600 hover:bg-orange-500 active:scale-[0.98] text-white font-black text-lg shadow-sm transition-all flex items-center justify-center border border-orange-500/40 touch-manipulation"
-            >
-              ツモ和了
+              和了
             </button>
 
             <button
               type="button"
               onClick={onOpenRyukyokuModal}
-              className="h-14 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-[0.98] text-white font-bold text-base shadow-sm transition-all flex items-center justify-center border border-neutral-700 touch-manipulation"
+              className="h-14 sm:h-16 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:scale-[0.98] text-neutral-100 font-black text-lg shadow-sm transition-all flex items-center justify-center border border-neutral-700 touch-manipulation"
             >
               流局
             </button>

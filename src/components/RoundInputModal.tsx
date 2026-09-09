@@ -1,5 +1,6 @@
 /**
  * 局結果入力モーダルコンポーネント
+ * mahjong_personal 準拠：ステップ式ウィザード（誰が和了 → ロン/ツモ → 点数プリセット → 放銃者）
  * LocalStorage即時下書き保存 ＋ 二重送信物理防止（disabled）
  */
 
@@ -25,6 +26,76 @@ interface RoundInputModalProps {
   initialWinType: WinType;
 }
 
+// 主要点数プリセット
+const KO_RON_PRESETS = [
+  { label: '1,000 (1翻30符)', pts: 1000, han: 1, fu: 30 },
+  { label: '1,300 (1翻40符)', pts: 1300, han: 1, fu: 40 },
+  { label: '1,600 (1翻50符)', pts: 1600, han: 1, fu: 50 },
+  { label: '2,000 (2翻30符)', pts: 2000, han: 2, fu: 30 },
+  { label: '2,600 (2翻40符)', pts: 2600, han: 2, fu: 40 },
+  { label: '3,200 (2翻50符)', pts: 3200, han: 2, fu: 50 },
+  { label: '3,900 (3翻30符)', pts: 3900, han: 3, fu: 30 },
+  { label: '5,200 (3翻40符)', pts: 5200, han: 3, fu: 40 },
+  { label: '6,400 (3翻50符)', pts: 6400, han: 3, fu: 50 },
+  { label: '7,700 (4翻30符)', pts: 7700, han: 4, fu: 30 },
+  { label: '8,000 (満貫)', pts: 8000, han: 4, fu: 40 },
+  { label: '12,000 (跳満)', pts: 12000, han: 6, fu: 30 },
+  { label: '16,000 (倍満)', pts: 16000, han: 8, fu: 30 },
+  { label: '24,000 (三倍満)', pts: 24000, han: 11, fu: 30 },
+  { label: '32,000 (役満)', pts: 32000, han: 13, fu: 30 },
+];
+
+const OYA_RON_PRESETS = [
+  { label: '1,500 (1翻30符)', pts: 1500, han: 1, fu: 30 },
+  { label: '2,000 (1翻40符)', pts: 2000, han: 1, fu: 40 },
+  { label: '2,400 (1翻50符)', pts: 2400, han: 1, fu: 50 },
+  { label: '2,900 (2翻30符)', pts: 2900, han: 2, fu: 30 },
+  { label: '3,900 (2翻40符)', pts: 3900, han: 2, fu: 40 },
+  { label: '4,800 (2翻50符)', pts: 4800, han: 2, fu: 50 },
+  { label: '5,800 (3翻30符)', pts: 5800, han: 3, fu: 30 },
+  { label: '7,700 (3翻40符)', pts: 7700, han: 3, fu: 40 },
+  { label: '9,600 (3翻50符)', pts: 9600, han: 3, fu: 50 },
+  { label: '11,600 (4翻30符)', pts: 11600, han: 4, fu: 30 },
+  { label: '12,000 (満貫)', pts: 12000, han: 4, fu: 40 },
+  { label: '18,000 (跳満)', pts: 18000, han: 6, fu: 30 },
+  { label: '24,000 (倍満)', pts: 24000, han: 8, fu: 30 },
+  { label: '36,000 (三倍満)', pts: 36000, han: 11, fu: 30 },
+  { label: '48,000 (役満)', pts: 48000, han: 13, fu: 30 },
+];
+
+const KO_TSUMO_PRESETS = [
+  { label: '300 / 500 (1翻30符)', pts: 1100, han: 1, fu: 30 },
+  { label: '400 / 700 (1翻40符)', pts: 1500, han: 1, fu: 40 },
+  { label: '400 / 800 (1翻50符)', pts: 1600, han: 1, fu: 50 },
+  { label: '500 / 1,000 (2翻30符)', pts: 2000, han: 2, fu: 30 },
+  { label: '700 / 1,300 (2翻40符)', pts: 2700, han: 2, fu: 40 },
+  { label: '800 / 1,600 (2翻50符)', pts: 3200, han: 2, fu: 50 },
+  { label: '1,000 / 2,000 (3翻30符)', pts: 4000, han: 3, fu: 30 },
+  { label: '1,300 / 2,600 (3翻40符)', pts: 5200, han: 3, fu: 40 },
+  { label: '2,000 / 3,900 (4翻30符)', pts: 7900, han: 4, fu: 30 },
+  { label: '2,000 / 4,000 (満貫)', pts: 8000, han: 4, fu: 40 },
+  { label: '3,000 / 6,000 (跳満)', pts: 12000, han: 6, fu: 30 },
+  { label: '4,000 / 8,000 (倍満)', pts: 16000, han: 8, fu: 30 },
+  { label: '6,000 / 12,000 (三倍満)', pts: 24000, han: 11, fu: 30 },
+  { label: '8,000 / 16,000 (役満)', pts: 32000, han: 13, fu: 30 },
+];
+
+const OYA_TSUMO_PRESETS = [
+  { label: '500オール (1翻30符)', pts: 1500, han: 1, fu: 30 },
+  { label: '700オール (1翻40符)', pts: 2100, han: 1, fu: 40 },
+  { label: '1,000オール (2翻30符)', pts: 3000, han: 2, fu: 30 },
+  { label: '1,300オール (2翻40符)', pts: 3900, han: 2, fu: 40 },
+  { label: '1,500オール (2翻50符)', pts: 4500, han: 2, fu: 50 },
+  { label: '2,000オール (3翻30符)', pts: 6000, han: 3, fu: 30 },
+  { label: '2,600オール (3翻40符)', pts: 7800, han: 3, fu: 40 },
+  { label: '3,900オール (4翻30符)', pts: 11700, han: 4, fu: 30 },
+  { label: '4,000オール (満貫)', pts: 12000, han: 4, fu: 40 },
+  { label: '6,000オール (跳満)', pts: 18000, han: 6, fu: 30 },
+  { label: '8,000オール (倍満)', pts: 24000, han: 8, fu: 30 },
+  { label: '12,000オール (三倍満)', pts: 36000, han: 11, fu: 30 },
+  { label: '16,000オール (役満)', pts: 48000, han: 13, fu: 30 },
+];
+
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 11, 13];
 const FU_OPTIONS = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
 
@@ -42,61 +113,50 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
   initialWinType,
 }) => {
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(0); // 0: 和了者, 1: ロン/ツモ, 2: 点数, 3: 放銃者, 4: 確認
+  const [showCustomCalc, setShowCustomCalc] = useState(false);
+  const [customHan, setCustomHan] = useState(draft.han || 1);
+  const [customFu, setCustomFu] = useState(draft.fu || 30);
+
   const currentDealer = getDealer(players, roundIdx);
   const roundName = getRoundName(roundIdx);
 
   useEffect(() => {
     if (isOpen) {
       updateDraft({ winType: initialWinType });
+      // 流局やチョンボの場合は即座に入力可能
+      if (initialWinType === 'ryukyoku' || initialWinType === 'chombo') {
+        setStep(0);
+      } else {
+        // 和了開始
+        setStep(0);
+      }
     }
   }, [isOpen, initialWinType, updateDraft]);
 
   if (!isOpen) return null;
 
   const { winType, winner, loser, han, fu, tenpai, chomboPlayer } = draft;
+  const isDealerWinner = winner === currentDealer;
 
   // 点数プレビュー計算
-  let previewTotal = 0;
+  let baseScore = 0;
   if (winType === 'ron' || winType === 'tsumo') {
-    const isDealer = winner === currentDealer;
     const isTsumo = winType === 'tsumo';
-    const scoreRes = calculateScore(han, fu, isDealer, isTsumo);
-    const honbaPt = (ruleConfig.detail?.honba_pt ?? 300) * honba;
-    const riichiPt = (ruleConfig.detail?.riichi_pt ?? 1000) * riichiSticks;
-    previewTotal = scoreRes.total + honbaPt + riichiPt;
+    const scoreRes = calculateScore(han || 1, fu || 30, isDealerWinner, isTsumo);
+    baseScore = scoreRes.total;
   }
+  const honbaPt = (ruleConfig.detail?.honba_pt ?? 300) * honba;
+  const riichiPt = (ruleConfig.detail?.riichi_pt ?? 1000) * riichiSticks;
+  const totalReceive = baseScore + honbaPt + riichiPt;
 
-  // 確定ボタン活性判定
-  const canSubmit = (() => {
-    if (submitting) return false;
-    if (winType === 'ron') {
-      return Boolean(winner && loser && winner !== loser && han && fu);
-    }
-    if (winType === 'tsumo') {
-      return Boolean(winner && han && fu);
-    }
-    if (winType === 'ryukyoku') {
-      return true; // テンパイ0人〜4人いずれも可
-    }
-    if (winType === 'chombo') {
-      return Boolean(chomboPlayer);
-    }
-    return false;
-  })();
-
-  // 確定処理
-  const handleSubmit = async () => {
-    if (!canSubmit || submitting) return;
+  // 確定コミット処理
+  const handleFinalCommit = async () => {
+    if (submitting) return;
     setSubmitting(true);
 
     try {
       let record: RoundRecord;
-      const isDealer = winner === currentDealer;
-      const isTsumo = winType === 'tsumo';
-      const baseScore =
-        winType === 'ron' || winType === 'tsumo'
-          ? calculateScore(han, fu, isDealer, isTsumo).total
-          : 0;
 
       if (winType === 'ron' || winType === 'tsumo') {
         record = {
@@ -139,149 +199,322 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
     }
   };
 
+  // プリセット点数選択時の処理
+  const handleSelectPreset = (p: { pts: number; han: number; fu: number }) => {
+    updateDraft({ han: p.han, fu: p.fu });
+    if (winType === 'tsumo') {
+      // ツモの場合は放銃者選択がないので確認画面（Step 4）へ
+      setStep(4);
+    } else {
+      // ロンの場合は放銃者選択（Step 3）へ
+      setStep(3);
+    }
+  };
+
+  // 翻符手動計算適用
+  const handleApplyCustomCalc = () => {
+    updateDraft({ han: customHan, fu: customFu });
+    if (winType === 'tsumo') {
+      setStep(4);
+    } else {
+      setStep(3);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/75 backdrop-blur-xs">
-      <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs">
+      <div className="w-full max-w-lg bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl flex flex-col gap-3.5 max-h-[92dvh] overflow-y-auto">
         {/* モーダルヘッダー */}
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-          <div>
-            <span className="text-base font-bold text-white">
-              {winType === 'ron' && 'ロン和了 入力'}
-              {winType === 'tsumo' && 'ツモ和了 入力'}
-              {winType === 'ryukyoku' && '流局 入力'}
-              {winType === 'chombo' && 'チョンボ 入力'}
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-black text-white">
+              {winType === 'ron' || winType === 'tsumo'
+                ? '和了入力'
+                : winType === 'ryukyoku'
+                ? '流局入力'
+                : 'チョンボ入力'}
             </span>
-            <span className="text-xs text-neutral-400 ml-2">
-              {roundName} {honba}本場
+            <span className="text-xs font-bold text-neutral-400">
+              {roundName} {honba}本場 (供託{riichiSticks}本)
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* ロン / ツモ 入力フォーム */}
+        {/* ─── 和了フロー ─── */}
         {(winType === 'ron' || winType === 'tsumo') && (
-          <div className="flex flex-col gap-3.5">
-            {/* 和了者選択 */}
-            <div>
-              <label className="text-xs font-bold text-neutral-300 block mb-1.5">
-                和了者 (アガリ)
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {players.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => updateDraft({ winner: p })}
-                    className={`h-11 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
-                      winner === p
-                        ? 'bg-red-600 text-white shadow-md'
-                        : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 放銃者選択 (ロン時のみ) */}
-            {winType === 'ron' && (
-              <div>
-                <label className="text-xs font-bold text-neutral-300 block mb-1.5">
-                  放銃者 (ロンされた人)
-                </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {players.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      disabled={p === winner}
-                      onClick={() => updateDraft({ loser: p })}
-                      className={`h-11 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
-                        p === winner
-                          ? 'opacity-30 cursor-not-allowed bg-neutral-900 text-neutral-600'
-                          : loser === p
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
+          <div className="flex flex-col gap-3">
+            {/* Step 0: 誰が和了？ */}
+            {step === 0 && (
+              <div className="flex flex-col gap-2.5">
+                <p className="text-sm font-black text-neutral-200">
+                  Step 1/3: 誰が和了？
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {players.map((p) => {
+                    const isDealer = p === currentDealer;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          updateDraft({ winner: p });
+                          setStep(1);
+                        }}
+                        className="h-16 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:bg-neutral-700 border border-neutral-700 text-white font-black text-base flex items-center justify-center gap-2 touch-manipulation transition-all"
+                      >
+                        <span>{p}</span>
+                        {isDealer && (
+                          <span className="px-1.5 py-0.5 rounded bg-rose-700 text-white font-black text-[10px]">
+                            親
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* 翻数選択 */}
-            <div>
-              <label className="text-xs font-bold text-neutral-300 block mb-1.5">
-                翻数 (Han)
-              </label>
-              <div className="grid grid-cols-5 gap-1.5">
-                {HAN_OPTIONS.map((h) => (
+            {/* Step 1: ロン？ ツモ？ */}
+            {step === 1 && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-neutral-200">
+                    Step 2/3: 和了方式を選択 ({winner})
+                  </p>
                   <button
-                    key={h}
                     type="button"
-                    onClick={() => updateDraft({ han: h })}
-                    className={`h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
-                      han === h
-                        ? 'bg-amber-500 text-black shadow-md'
-                        : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                    }`}
+                    onClick={() => setStep(0)}
+                    className="text-xs text-neutral-400 hover:text-white underline font-bold"
                   >
-                    {h >= 13 ? '役満' : `${h}翻`}
+                    和了者を変更
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 符数選択 */}
-            <div>
-              <label className="text-xs font-bold text-neutral-300 block mb-1.5">
-                符数 (Fu)
-              </label>
-              <div className="grid grid-cols-6 gap-1.5">
-                {FU_OPTIONS.map((f) => (
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <button
-                    key={f}
                     type="button"
-                    onClick={() => updateDraft({ fu: f })}
-                    className={`h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
-                      fu === f
-                        ? 'bg-amber-500 text-black shadow-md'
-                        : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                    }`}
+                    onClick={() => {
+                      updateDraft({ winType: 'ron' });
+                      setStep(2);
+                    }}
+                    className="h-20 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] border border-rose-500/50 text-white font-black text-xl shadow-md flex items-center justify-center touch-manipulation"
                   >
-                    {f}符
+                    ロン和了
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateDraft({ winType: 'tsumo' });
+                      setStep(2);
+                    }}
+                    className="h-20 rounded-2xl bg-amber-600 hover:bg-amber-500 active:scale-[0.98] border border-amber-500/50 text-white font-black text-xl shadow-md flex items-center justify-center touch-manipulation"
+                  >
+                    ツモ和了
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* 獲得点数プレビュー */}
-            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 flex items-center justify-between">
-              <span className="text-xs font-semibold text-neutral-400">
-                受け取り総点 (供託・本場含む)
-              </span>
-              <span className="text-xl font-black text-amber-300">
-                {previewTotal.toLocaleString()} 点
-              </span>
-            </div>
+            {/* Step 2: 点数は？（主要打点ボタングリッド ＋ 翻符アコーディオン） */}
+            {step === 2 && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-neutral-200">
+                    Step 3/3: 点数を選択 ({winner} / {winType === 'ron' ? 'ロン' : 'ツモ'})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="text-xs text-neutral-400 hover:text-white underline font-bold"
+                  >
+                    方式を変更
+                  </button>
+                </div>
+
+                {/* プリセットボタン一覧 */}
+                <div className="grid grid-cols-3 gap-1.5 max-h-[48dvh] overflow-y-auto p-1 bg-neutral-950 rounded-xl border border-neutral-800">
+                  {(winType === 'ron'
+                    ? isDealerWinner
+                      ? OYA_RON_PRESETS
+                      : KO_RON_PRESETS
+                    : isDealerWinner
+                    ? OYA_TSUMO_PRESETS
+                    : KO_TSUMO_PRESETS
+                  ).map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => handleSelectPreset(preset)}
+                      className="min-h-[46px] p-1.5 rounded-lg bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation"
+                    >
+                      <span className="leading-tight">{preset.label.split(' ')[0]}</span>
+                      <span className="text-[10px] font-normal text-neutral-400 mt-0.5">
+                        {preset.label.split(' ')[1] || ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 翻・符 手動計算アコーディオン */}
+                <div className="border border-neutral-800 rounded-xl overflow-hidden bg-neutral-950/60">
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomCalc((prev) => !prev)}
+                    className="w-full px-3 py-2 text-xs font-bold text-neutral-400 hover:text-white flex items-center justify-between"
+                  >
+                    <span>翻・符から手動計算する</span>
+                    <span>{showCustomCalc ? '▲ 閉じる' : '▼ 開く'}</span>
+                  </button>
+
+                  {showCustomCalc && (
+                    <div className="p-3 border-t border-neutral-800 flex flex-col gap-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-bold text-neutral-400 block mb-1">
+                            翻 (Han)
+                          </label>
+                          <select
+                            value={customHan}
+                            onChange={(e) => setCustomHan(Number(e.target.value))}
+                            className="w-full h-10 bg-neutral-900 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                          >
+                            {HAN_OPTIONS.map((h) => (
+                              <option key={h} value={h}>
+                                {h >= 13 ? '13翻 (役満)' : `${h}翻`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-neutral-400 block mb-1">
+                            符 (Fu)
+                          </label>
+                          <select
+                            value={customFu}
+                            onChange={(e) => setCustomFu(Number(e.target.value))}
+                            className="w-full h-10 bg-neutral-900 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                          >
+                            {FU_OPTIONS.map((f) => (
+                              <option key={f} value={f}>
+                                {f}符
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleApplyCustomCalc}
+                        className="w-full h-10 rounded-lg bg-neutral-800 hover:bg-neutral-700 font-bold text-xs text-white border border-neutral-700 transition-colors"
+                      >
+                        この翻・符で決定
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: 放銃者は？（ロン時のみ） */}
+            {step === 3 && winType === 'ron' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-neutral-200">
+                    放銃者を選択 (ロンされた人)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="text-xs text-neutral-400 hover:text-white underline font-bold"
+                  >
+                    点数を変更
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {players
+                    .filter((p) => p !== winner)
+                    .map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          updateDraft({ loser: p });
+                          setStep(4);
+                        }}
+                        className="h-16 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:bg-neutral-700 border border-neutral-700 text-white font-black text-base flex items-center justify-center touch-manipulation"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: 最終確認 ＆ コミット */}
+            {step === 4 && (
+              <div className="flex flex-col gap-3">
+                <div className="p-3.5 bg-neutral-950 rounded-xl border border-neutral-800 flex flex-col gap-2">
+                  <div className="text-xs font-bold text-neutral-400">和了内容の確認</div>
+                  <div className="flex items-center justify-between text-base font-black text-white">
+                    <span>
+                      {winner} {winType === 'ron' ? `(放銃: ${loser})` : '(ツモ)'}
+                    </span>
+                    <span className="text-amber-300">
+                      素点 {baseScore.toLocaleString()}点
+                    </span>
+                  </div>
+                  {(honba > 0 || riichiSticks > 0) && (
+                    <div className="text-xs text-neutral-400 flex items-center justify-between pt-1 border-t border-neutral-850">
+                      <span>本場・供託加算</span>
+                      <span className="text-neutral-200 font-bold">
+                        +{ (honbaPt + riichiPt).toLocaleString() }点
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-lg font-black text-white">
+                    <span>受取総点</span>
+                    <span className="text-xl text-cyan-400 font-black">
+                      {totalReceive.toLocaleString()} 点
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(winType === 'ron' ? 3 : 2)}
+                    className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold text-xs transition-colors"
+                  >
+                    やり直す
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleFinalCommit}
+                    className="flex-2 h-12 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
+                  >
+                    {submitting ? '記録中...' : '和了を確定して次局へ'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 流局 入力フォーム */}
+        {/* ─── 流局フロー ─── */}
         {winType === 'ryukyoku' && (
           <div className="flex flex-col gap-3">
-            <label className="text-xs font-bold text-neutral-300">
-              テンパイしている人を選択 (複数選択可)
-            </label>
+            <p className="text-sm font-black text-neutral-200">
+              テンパイしているプレイヤーを選択 (複数可)
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {players.map((p) => {
                 const isTenpai = tenpai.includes(p);
@@ -295,74 +528,92 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
                         : [...tenpai, p];
                       updateDraft({ tenpai: next });
                     }}
-                    className={`h-14 rounded-xl text-sm font-bold transition-all flex items-center justify-center border ${
+                    className={`h-16 rounded-xl font-black text-base flex items-center justify-center transition-all border ${
                       isTenpai
-                        ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 shadow-md'
-                        : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:bg-neutral-700'
+                        ? 'bg-cyan-600/30 border-cyan-400 text-cyan-300 shadow-sm'
+                        : 'bg-neutral-800 border-neutral-700 text-neutral-300'
                     }`}
                   >
-                    {p} {isTenpai ? '(聴牌)' : '(不聴)'}
+                    <span>{p}</span>
+                    <span className="text-xs ml-1.5 opacity-80">
+                      ({isTenpai ? '聴牌' : '不聴'})
+                    </span>
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-neutral-500 text-center mt-1">
-              ※ テンパイ人数に応じて場3000点が自動分配されます
-            </p>
+
+            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold text-neutral-400 flex items-center justify-between">
+              <span>ノーテン罰符精算</span>
+              <span className="text-neutral-200">
+                {tenpai.length === 0 || tenpai.length === 4
+                  ? '受渡なし (場0点)'
+                  : tenpai.length === 1
+                  ? 'テンパイ +3,000点 / ノーテン -1,000点'
+                  : tenpai.length === 2
+                  ? 'テンパイ +1,500点 / ノーテン -1,500点'
+                  : 'テンパイ +1,000点 / ノーテン -3,000点'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleFinalCommit}
+              className="w-full h-12 rounded-xl bg-neutral-700 hover:bg-neutral-600 active:bg-neutral-500 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
+            >
+              {submitting ? '記録中...' : '流局を確定して次局へ'}
+            </button>
           </div>
         )}
 
-        {/* チョンボ 入力フォーム */}
+        {/* ─── チョンボフロー ─── */}
         {winType === 'chombo' && (
           <div className="flex flex-col gap-3">
-            <label className="text-xs font-bold text-neutral-300">
-              チョンボをした人を選択
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {players.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => updateDraft({ chomboPlayer: p })}
-                  className={`h-14 rounded-xl text-sm font-bold transition-all flex items-center justify-center border ${
-                    chomboPlayer === p
-                      ? 'bg-purple-600/40 border-purple-500 text-purple-200 shadow-md'
-                      : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:bg-neutral-700'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-neutral-500 text-center mt-1">
-              ※ ルール設定（満貫払い）に従って点数が精算されます
+            <p className="text-sm font-black text-neutral-200">
+              チョンボをしたプレイヤーを選択
             </p>
+            <div className="grid grid-cols-2 gap-2">
+              {players.map((p) => {
+                const isSelected = chomboPlayer === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => updateDraft({ chomboPlayer: p })}
+                    className={`h-16 rounded-xl font-black text-base flex items-center justify-center transition-all border ${
+                      isSelected
+                        ? 'bg-rose-600/30 border-rose-500 text-rose-300 shadow-sm'
+                        : 'bg-neutral-800 border-neutral-700 text-neutral-300'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold text-neutral-400 flex items-center justify-between">
+              <span>チョンボ精算</span>
+              <span className="text-neutral-200">
+                満貫払い（親: 子3名へ各4000点 / 子: 親へ4000点・子へ各2000点）
+              </span>
+            </div>
+
+            <button
+              type="button"
+              disabled={!chomboPlayer || submitting}
+              onClick={handleFinalCommit}
+              className={`w-full h-12 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
+                chomboPlayer
+                  ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                  : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+              }`}
+            >
+              {submitting ? '記録中...' : 'チョンボを確定（同局やり直し）'}
+            </button>
           </div>
         )}
-
-        {/* 確定アクションボタン (二重押し物理遮断) */}
-        <div className="pt-2 border-t border-neutral-800 flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-sm transition-colors"
-          >
-            キャンセル
-          </button>
-
-          <button
-            type="button"
-            disabled={!canSubmit}
-            onClick={handleSubmit}
-            className={`flex-2 h-12 rounded-xl font-black text-base shadow-lg transition-all flex items-center justify-center ${
-              canSubmit
-                ? 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white'
-                : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-            }`}
-          >
-            {submitting ? '確定送信中...' : '局結果を確定'}
-          </button>
-        </div>
       </div>
     </div>
   );
