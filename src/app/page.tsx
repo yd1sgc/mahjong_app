@@ -206,84 +206,57 @@ export default function HomePage() {
 
       {/* メインアクションボタン群 */}
       <div className="flex flex-col gap-3">
-        {/* 対局を始める大ボタン */}
+        {/* 1段目: 対局を始める */}
         <button
           type="button"
           onClick={() => setShowNewGameModal(true)}
           className="h-16 sm:h-20 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-black text-lg sm:text-xl shadow-lg border border-rose-500/50 transition-all flex items-center justify-center touch-manipulation"
         >
-          対局を始める（新規）
+          対局を始める
         </button>
 
-        {/* サブメニュー (成績を見る / 管理) */}
+        {/* 2段目: 成績を見る */}
+        <Link
+          href="/stats"
+          className="h-14 sm:h-16 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-100 font-black text-base transition-all flex items-center justify-center shadow-xs"
+        >
+          成績を見る
+        </Link>
+
+        {/* 3段目: 左にルール管理、右にグループ管理 */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
-            href="/stats"
+            href="/manage?tab=rules"
             className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
-            成績を見る・ランキング
+            ルール管理
           </Link>
 
           <Link
-            href="/manage"
+            href="/manage?tab=groups"
             className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
-            グループ・ルール管理
+            グループ管理
+          </Link>
+        </div>
+
+        {/* 4段目: 左にデータ管理、右に合計集計 */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Link
+            href="/manage?tab=system"
+            className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
+          >
+            データ管理
+          </Link>
+
+          <Link
+            href="/aggregate"
+            className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
+          >
+            合計集計
           </Link>
         </div>
       </div>
-
-      {/* 直近の対局一覧 */}
-      <section className="flex flex-col gap-3 pt-2">
-        <h2 className="text-sm font-black text-neutral-300 flex items-center justify-between">
-          <span>対局履歴 ({games.length}件)</span>
-          <span className="text-[11px] font-bold text-neutral-500">クラウド同期済</span>
-        </h2>
-
-        {loading ? (
-          <div className="p-8 text-center text-neutral-500 text-xs font-bold">
-            読み込み中...
-          </div>
-        ) : games.length === 0 ? (
-          <div className="p-8 text-center text-neutral-500 text-xs font-bold bg-neutral-900 rounded-xl border border-neutral-800">
-            対局データがありません。「対局を始める」から開始してください。
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {games.map((g) => (
-              <Link
-                key={g.game_id}
-                href={`/game?id=${g.game_id}`}
-                className="p-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col gap-1 shadow-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-neutral-200">
-                    {g.rule_name_snapshot}
-                  </span>
-                  <span
-                    className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                      g.status === 'in_progress'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        : 'bg-neutral-800 text-neutral-400'
-                    }`}
-                  >
-                    {g.status === 'in_progress' ? '対局中' : '終了'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-neutral-400">
-                  <span className="font-semibold">
-                    {g.played_at?.slice(0, 16).replace('T', ' ')}
-                  </span>
-                  <span className="text-[11px] text-cyan-400 font-bold">
-                    スコアを開く &rarr;
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* 新規対局モーダル */}
       {showNewGameModal && (
