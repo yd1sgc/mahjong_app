@@ -15,11 +15,13 @@ export default function HomePage() {
   const router = useRouter();
   const [games, setGames] = useState<GameRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 新規対局モーダル用状態
   const [showNewGameModal, setShowNewGameModal] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
@@ -46,7 +48,20 @@ export default function HomePage() {
 
         if (mData) setMembers(mData);
 
-        // (3) ルールテンプレート取得
+        // (3) グループ取得
+        const { data: grpData } = await supabase
+          .from('groups')
+          .select('*')
+          .eq('is_archived', 0);
+
+        if (grpData && grpData.length > 0) {
+          setGroups(grpData);
+          // 親族麻雀を優先、なければ先頭
+          const defaultGrp = grpData.find((g: any) => g.group_name.includes('親族')) || grpData[0];
+          setSelectedGroupId(defaultGrp.group_id);
+        }
+
+        // (4) ルールテンプレート取得
         const { data: rData } = await supabase
           .from('rule_templates')
           .select('*')
@@ -73,23 +88,27 @@ export default function HomePage() {
     }
     // 重複チェック
     if (new Set(validMembers).size !== 4) {
-      alert('同じプレイヤーが重複しています');
+      alert('プレイヤーが重複しています。異なる4名を選択してください');
       return;
     }
 
-    setCreating(true);
+    const pin = (document.getElementById('game-pin') as HTMLInputElement)?.value;
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      alert('引き継ぎ用の4桁PIN番号（数字4文字）を入力してください');
+      return;
+    }
+
     try {
+      setCreating(true);
       const gameId = crypto.randomUUID();
-      // ランダム4桁PIN生成
-      const pin = Math.floor(1000 + Math.random() * 9000).toString();
-      const ruleObj = rules.find((r) => r.rule_id === selectedRuleId);
-      const ruleName = ruleObj?.name || '標準ルール';
-      const ruleConfig = ruleObj?.config_json || {};
+      const currentRule = rules.find((r) => r.rule_id === selectedRuleId);
+      const ruleName = currentRule?.name || '標準ルール';
+      const ruleConfig = currentRule?.config_json || {};
 
       // 1. games レコード作成
       const { error: gErr } = await (supabase.from('games') as any).insert({
         game_id: gameId,
-        group_id: 'default_group', // 初期グループ
+        group_id: selectedGroupId || groups[0]?.group_id,
         passcode: pin,
         rule_name_snapshot: ruleName,
         rule_config_snapshot: ruleConfig,
@@ -98,7 +117,10 @@ export default function HomePage() {
         is_synced: 1,
       });
 
-      if (gErr) throw new Error(gErr.message);
+      if (gErr) {
+        console.error('games insert error:', gErr);
+        throw new Error(gErr.message || JSON.stringify(gErr));
+      }
 
       // 2. game_participants 作成
       const participants = validMembers.map((mId, idx) => {
@@ -118,7 +140,10 @@ export default function HomePage() {
         .from('game_participants') as any)
         .insert(participants);
 
-      if (pErr) throw new Error(pErr.message);
+      if (pErr) {
+        console.error('game_participants insert error:', pErr);
+        throw new Error(pErr.message || JSON.stringify(pErr));
+      }
 
       // 3. この端末を記録係としてトークン保存
       if (typeof window !== 'undefined') {
@@ -128,6 +153,7 @@ export default function HomePage() {
       // 対局画面へ遷移
       router.push(`/game?id=${gameId}`);
     } catch (e: any) {
+      console.error(e);
       alert(`対局作成に失敗しました: ${e.message}`);
     } finally {
       setCreating(false);
@@ -234,6 +260,24 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* グループ選択 */}
+            <div>
+              <label className="text-xs font-bold text-neutral-300 block mb-1.5">
+                対局グループ
+              </label>
+              <select
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+                className="w-full h-11 bg-neutral-950 border border-neutral-800 rounded-xl px-3 text-sm text-white font-medium focus:outline-none focus:border-amber-500"
+              >
+                {groups.map((g) => (
+                  <option key={g.group_id} value={g.group_id}>
+                    {g.group_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* ルール選択 */}
             <div>
               <label className="text-xs font-bold text-neutral-300 block mb-1.5">
@@ -250,6 +294,23 @@ export default function HomePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* 4桁PIN入力 */}
+            <div>
+              <label className="text-xs font-bold text-neutral-300 block mb-1.5">
+                引き継ぎ用4桁PIN番号
+              </label>
+              <input
+                id="game-pin"
+                type="text"
+                pattern="[0-9]*"
+                inputMode="numeric"
+                maxLength={4}
+                defaultValue="1234"
+                placeholder="4桁の数字 (例: 1234)"
+                className="w-full h-11 bg-neutral-950 border border-neutral-800 rounded-xl px-3 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-amber-500"
+              />
             </div>
 
             {/* 4名プレイヤー選択 */}
