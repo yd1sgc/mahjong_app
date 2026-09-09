@@ -1,16 +1,46 @@
-# Python キャッシュ
-__pycache__/
-*.pyc
-*.pyo
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# 個人データ（記録しない）
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local databases
 *.db
-*.csv
-*.bak
-
-# 旧バージョン（app.py に一本化）
-main_app.py
-main_app2.py
-
-# パスワード（絶対にGitHubにアップしない）
-.streamlit/secrets.toml
+*.db-journal
+*.sqlite*
