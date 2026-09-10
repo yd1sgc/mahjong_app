@@ -269,6 +269,8 @@ export function calculateRoundStats(
       }))
       .filter((s) => s.name !== '');
 
+    const tenpaiCount = isRyukyoku ? seatsWithNames.filter((s) => s.is_tenpai === 1).length : 0;
+
     for (const s of seatsWithNames) {
       const item = initPlayer(s.name);
       item.kyoku += 1;
@@ -309,17 +311,27 @@ export function calculateRoundStats(
         }
       }
 
-      // 立直・副露・流局テンパイ
+      // 立直・副露
       if (s.is_riichi === 1) item.riichi += 1;
       if (s.is_furo === 1) item.furo += 1;
+
+      // 流局およびノーテン罰符集計
       if (isRyukyoku) {
         item.ryukyoku += 1;
-        if (s.is_tenpai === 1) item.tenpai += 1;
+        if (s.is_tenpai === 1) {
+          item.tenpai += 1;
+          if (tenpaiCount === 1) item.notenBappu += 3000;
+          else if (tenpaiCount === 2) item.notenBappu += 1500;
+          else if (tenpaiCount === 3) item.notenBappu += 1000;
+        } else {
+          if (tenpaiCount === 1) item.notenBappu -= 1000;
+          else if (tenpaiCount === 2) item.notenBappu -= 1500;
+          else if (tenpaiCount === 3) item.notenBappu -= 3000;
+        }
       }
 
-      // 供託収支・ノーテン罰符収支（DB値をそのまま累計）
+      // 供託収支（DB値をそのまま累計）
       item.kyotakuPoint += (s.kyotaku_point || 0);
-      item.notenBappu += (s.penalty_point || 0);
     }
   }
 

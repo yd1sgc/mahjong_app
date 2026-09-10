@@ -76,15 +76,7 @@ export const GameStatsTable: React.FC<GameStatsTableProps> = ({
                   >
                     {s.totalPt.toFixed(1)}
                   </td>
-                  <td
-                    className={`py-2.5 px-2.5 text-right font-bold font-mono ${
-                      s.okaNashiPt > 0
-                        ? 'text-cyan-400'
-                        : s.okaNashiPt < 0
-                        ? 'text-rose-500'
-                        : 'text-neutral-400'
-                    }`}
-                  >
+                  <td className="py-2.5 px-2.5 text-right font-bold font-mono text-neutral-300">
                     {s.okaNashiPt.toFixed(1)}
                   </td>
                   <td className="py-2.5 px-2 text-center font-bold text-neutral-200">
@@ -96,16 +88,16 @@ export const GameStatsTable: React.FC<GameStatsTableProps> = ({
                   <td className="py-2.5 px-2 text-center font-bold text-neutral-300">
                     {s.rasuAvoidRate.toFixed(1)}%
                   </td>
-                  <td className="py-2.5 px-2 text-center font-bold text-amber-300">
+                  <td className="py-2.5 px-2 text-center font-bold text-neutral-300">
                     {s.rank1Rate.toFixed(1)}%
                   </td>
-                  <td className="py-2.5 px-2 text-center font-bold text-cyan-300">
+                  <td className="py-2.5 px-2 text-center font-bold text-neutral-300">
                     {s.rank2Rate.toFixed(1)}%
                   </td>
                   <td className="py-2.5 px-2 text-center font-bold text-neutral-300">
                     {s.rank3Rate.toFixed(1)}%
                   </td>
-                  <td className="py-2.5 px-2 text-center font-bold text-rose-400">
+                  <td className="py-2.5 px-2 text-center font-bold text-neutral-300">
                     {s.rank4Rate.toFixed(1)}%
                   </td>
                 </tr>
