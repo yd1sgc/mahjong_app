@@ -56,7 +56,7 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
                     p.point > 0 ? 'text-cyan-400' : p.point < 0 ? 'text-rose-500' : 'text-neutral-300'
                   }`}
                 >
-                  {p.point > 0 ? `+${p.point.toFixed(1)}` : p.point.toFixed(1)} pt
+                  {p.point.toFixed(1)} pt
                 </span>
               </div>
             ))}

@@ -96,7 +96,7 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
                             : 'text-neutral-400'
                         }`}
                       >
-                        {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)}
+                        {diff.toFixed(1)}
                       </td>
                     );
                   })}

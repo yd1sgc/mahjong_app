@@ -65,16 +65,16 @@ export const GameHistoryTable: React.FC<GameHistoryTableProps> = ({
                       {g.played_at ? g.played_at.slice(0, 10) : '日付不明'}
                     </td>
                     <td className="py-2.5 px-2.5 font-black text-amber-300">
-                      {p1 ? `${p1.name} (${p1.point > 0 ? '+' : ''}${p1.point.toFixed(1)})` : '-'}
+                      {p1 ? `${p1.name} (${p1.point.toFixed(1)})` : '-'}
                     </td>
                     <td className="py-2.5 px-2.5 font-bold text-cyan-300">
-                      {p2 ? `${p2.name} (${p2.point > 0 ? '+' : ''}${p2.point.toFixed(1)})` : '-'}
+                      {p2 ? `${p2.name} (${p2.point.toFixed(1)})` : '-'}
                     </td>
                     <td className="py-2.5 px-2.5 font-bold text-neutral-300">
-                      {p3 ? `${p3.name} (${p3.point > 0 ? '+' : ''}${p3.point.toFixed(1)})` : '-'}
+                      {p3 ? `${p3.name} (${p3.point.toFixed(1)})` : '-'}
                     </td>
                     <td className="py-2.5 px-2.5 font-bold text-rose-400">
-                      {p4 ? `${p4.name} (${p4.point > 0 ? '+' : ''}${p4.point.toFixed(1)})` : '-'}
+                      {p4 ? `${p4.name} (${p4.point.toFixed(1)})` : '-'}
                     </td>
                     <td className="py-2.5 px-2 text-center">
                       <button

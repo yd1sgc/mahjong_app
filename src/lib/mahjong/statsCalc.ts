@@ -29,6 +29,7 @@ export interface RoundSeatItem {
   score_delta: number;
   base_point: number;
   honba_point: number;
+  kyotaku_point: number;
   is_winner: number;
   is_loser: number;
   is_riichi: number;
@@ -70,6 +71,7 @@ export interface RoundStatsRow {
   agariHoujuDiff: number;
   tenpaiRate: number;
   notenBappu: number;
+  kyotakuPoint: number;
   avgAgari: number;
   riichiAvgAgari: number;
   furoAvgAgari: number;
@@ -203,6 +205,7 @@ export function calculateRoundStats(
     ryukyoku: number;
     tenpai: number;
     notenBappu: number;
+    kyotakuPoint: number;
   }>();
 
   const gPlayerNames = new Map<string, Map<string, string>>();
@@ -240,6 +243,7 @@ export function calculateRoundStats(
         ryukyoku: 0,
         tenpai: 0,
         notenBappu: 0,
+        kyotakuPoint: 0,
       });
     }
     return pMap.get(name)!;
@@ -261,7 +265,10 @@ export function calculateRoundStats(
     for (const s of seatsWithNames) {
       const item = initPlayer(s.name);
       item.kyoku += 1;
-      if (s.is_riichi === 1) item.riichi += 1;
+      if (s.is_riichi === 1) {
+        item.riichi += 1;
+        item.kyotakuPoint -= 1000;
+      }
       if (s.is_furo === 1) item.furo += 1;
       if (isRyukyoku) {
         item.ryukyoku += 1;
@@ -287,6 +294,9 @@ export function calculateRoundStats(
         wItem.agari += 1;
         const score = winnerSeat.score_delta > 0 ? winnerSeat.score_delta : (winnerSeat.base_point + winnerSeat.honba_point);
         wItem.agariPt += score;
+        if (winnerSeat.kyotaku_point > 0) {
+          wItem.kyotakuPoint += winnerSeat.kyotaku_point;
+        }
 
         const isTsumo = r.result_type === 'tsumo' || !loserSeat;
         if (isTsumo) wItem.tsumo += 1;
@@ -346,6 +356,7 @@ export function calculateRoundStats(
       agariHoujuDiff: k > 0 ? Math.round(((w - h) / k) * 1000) / 10 : 0,
       tenpaiRate: d.ryukyoku > 0 ? Math.round((d.tenpai / d.ryukyoku) * 1000) / 10 : 0,
       notenBappu: d.notenBappu,
+      kyotakuPoint: d.kyotakuPoint,
       avgAgari,
       riichiAvgAgari: d.riichiAgari > 0 ? Math.round(d.riichiAgariPt / d.riichiAgari) : 0,
       furoAvgAgari: d.furoAgari > 0 ? Math.round(d.furoAgariPt / d.furoAgari) : 0,

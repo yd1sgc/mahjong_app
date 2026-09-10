@@ -74,7 +74,7 @@ export const GameStatsTable: React.FC<GameStatsTableProps> = ({
                         : 'text-neutral-300'
                     }`}
                   >
-                    {s.totalPt > 0 ? `+${s.totalPt.toFixed(1)}` : s.totalPt.toFixed(1)}
+                    {s.totalPt.toFixed(1)}
                   </td>
                   <td
                     className={`py-2.5 px-2.5 text-right font-bold font-mono ${
@@ -85,7 +85,7 @@ export const GameStatsTable: React.FC<GameStatsTableProps> = ({
                         : 'text-neutral-400'
                     }`}
                   >
-                    {s.okaNashiPt > 0 ? `+${s.okaNashiPt.toFixed(1)}` : s.okaNashiPt.toFixed(1)}
+                    {s.okaNashiPt.toFixed(1)}
                   </td>
                   <td className="py-2.5 px-2 text-center font-bold text-neutral-200">
                     {s.avgRank.toFixed(2)}

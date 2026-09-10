@@ -98,7 +98,7 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
 
             {/* 軸ラベル */}
             <text x={padding.left - 6} y={getY(maxPt) + 4} textAnchor="end" fill="#737373" fontSize="10" fontWeight="bold">
-              {maxPt > 0 ? `+${maxPt.toFixed(0)}` : maxPt.toFixed(0)}
+              {maxPt.toFixed(0)}
             </text>
             <text x={padding.left - 6} y={zeroY + 4} textAnchor="end" fill="#a3a3a3" fontSize="10" fontWeight="bold">
               0
@@ -145,7 +145,7 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
                   <span className="text-white">{m}</span>
                   <span className={lastVal > 0 ? 'text-cyan-400' : lastVal < 0 ? 'text-rose-400' : 'text-neutral-400'}>
-                    ({lastVal > 0 ? `+${lastVal.toFixed(1)}` : lastVal.toFixed(1)})
+                    ({lastVal.toFixed(1)})
                   </span>
                 </div>
               );

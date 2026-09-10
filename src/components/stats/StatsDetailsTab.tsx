@@ -71,6 +71,7 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                     <th className="py-2.5 px-2 text-center">和銃差</th>
                     <th className="py-2.5 px-2 text-center">テンパイ率</th>
                     <th className="py-2.5 px-2.5 text-right">ノーテン罰符</th>
+                    <th className="py-2.5 px-2.5 text-right">供託収支</th>
                   </>
                 )}
                 {activeDetailTab === 'datan' && (
@@ -79,7 +80,7 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                     <th className="py-2.5 px-2.5 text-right">立直平均打点</th>
                     <th className="py-2.5 px-2.5 text-right">副露平均打点</th>
                     <th className="py-2.5 px-2.5 text-right">ダマ平均打点</th>
-                    <th className="py-2.5 px-2 text-center text-cyan-300">打点効率</th>
+                    <th className="py-2.5 px-2.5 text-center text-cyan-300">打点効率</th>
                   </>
                 )}
                 {activeDetailTab === 'syubi' && (
@@ -121,13 +122,18 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                       <td className={`py-2.5 px-2 text-center font-black font-mono ${
                         r.agariHoujuDiff > 0 ? 'text-cyan-400' : r.agariHoujuDiff < 0 ? 'text-rose-400' : 'text-neutral-300'
                       }`}>
-                        {r.agariHoujuDiff > 0 ? `+${r.agariHoujuDiff.toFixed(1)}%` : `${r.agariHoujuDiff.toFixed(1)}%`}
+                        {`${r.agariHoujuDiff.toFixed(1)}%`}
                       </td>
                       <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.tenpaiRate.toFixed(1)}%</td>
                       <td className={`py-2.5 px-2.5 text-right font-mono font-bold ${
                         r.notenBappu > 0 ? 'text-cyan-400' : r.notenBappu < 0 ? 'text-rose-400' : 'text-neutral-400'
                       }`}>
-                        {r.notenBappu > 0 ? `+${r.notenBappu}` : r.notenBappu}
+                        {r.notenBappu}
+                      </td>
+                      <td className={`py-2.5 px-2.5 text-right font-mono font-bold ${
+                        r.kyotakuPoint > 0 ? 'text-cyan-400' : r.kyotakuPoint < 0 ? 'text-rose-400' : 'text-neutral-400'
+                      }`}>
+                        {r.kyotakuPoint}
                       </td>
                     </>
                   )}

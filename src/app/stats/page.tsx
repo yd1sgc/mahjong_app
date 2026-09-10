@@ -150,6 +150,7 @@ export default function StatsPage() {
               score_delta: s.score_delta,
               base_point: s.base_point,
               honba_point: s.honba_point,
+              kyotaku_point: s.kyotaku_point || 0,
               is_winner: s.is_winner,
               is_loser: s.is_loser,
               is_riichi: s.is_riichi,
