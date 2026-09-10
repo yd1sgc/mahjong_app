@@ -7,7 +7,7 @@
 
 import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useGame } from '@/hooks/useGame';
 import { ScoreBoard } from '@/components/ScoreBoard';
 import { ActionPanel } from '@/components/ActionPanel';
@@ -16,6 +16,7 @@ import { PinTransferModal } from '@/components/PinTransferModal';
 import { WinType } from '@/types/mahjong';
 
 function GameContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const gameId = searchParams.get('id') || '';
 
@@ -26,6 +27,7 @@ function GameContent() {
     players,
     ruleConfig,
     gameState,
+    settlement,
     isRecorder,
     gameEndReason,
     draft,
@@ -35,11 +37,15 @@ function GameContent() {
     declareRiichi,
     commitRound,
     undoRound,
+    finishGame,
+    abortGame,
   } = useGame(gameId);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalWinType, setModalWinType] = useState<WinType>('ron');
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleOpenWinModal = (type: 'ron' | 'tsumo') => {
     setModalWinType(type);
@@ -54,6 +60,35 @@ function GameContent() {
   const handleOpenChomboModal = () => {
     setModalWinType('chombo');
     setModalOpen(true);
+  };
+
+  const handleConfirmFinish = async () => {
+    try {
+      setSubmitting(true);
+      const ok = await finishGame();
+      if (ok) {
+        setSettleModalOpen(false);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmAbort = async () => {
+    const ok = window.confirm(
+      '【警告】この対局データを完全に削除しますか？\n入力したすべての局記録が消去され、戦績には残りません。'
+    );
+    if (!ok) return;
+
+    try {
+      setSubmitting(true);
+      const res = await abortGame();
+      if (res) {
+        router.push('/');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!gameId) {
@@ -101,9 +136,9 @@ function GameContent() {
       <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0">
         <Link
           href="/"
-          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-bold"
+          className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-bold py-1 px-1.5 rounded-lg hover:bg-neutral-900 transition-colors"
         >
-          &larr; 戻る
+          &larr; 中断
         </Link>
         <div className="text-center">
           <h1 className="text-sm font-black text-neutral-100">
@@ -113,15 +148,36 @@ function GameContent() {
             {game?.played_at?.slice(0, 16) || ''}
           </span>
         </div>
-        <span className="text-[11px] font-mono font-bold text-neutral-400 uppercase">
-          ID: {gameId.slice(0, 6)}
-        </span>
+
+        {/* ヘッダー右上：記録係かつ未完了なら「精算・終了」ボタン */}
+        {isRecorder && game?.status !== 'completed' ? (
+          <button
+            type="button"
+            onClick={() => setSettleModalOpen(true)}
+            className="text-xs font-black px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-amber-500/40 transition-colors shadow-sm"
+          >
+            精算・終了
+          </button>
+        ) : (
+          <span className="text-[11px] font-mono font-bold text-neutral-500 uppercase">
+            ID: {gameId.slice(0, 6)}
+          </span>
+        )}
       </header>
 
       {/* 終局・サドンデス・飛び通知バナー */}
-      {gameEndReason && (
-        <div className="my-1 p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-center font-black text-xs shrink-0">
-          [終局条件] {gameEndReason}
+      {gameEndReason && game?.status !== 'completed' && (
+        <div className="my-1 p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-between px-3 shrink-0">
+          <span className="font-black text-xs">[終局条件] {gameEndReason}</span>
+          {isRecorder && (
+            <button
+              type="button"
+              onClick={() => setSettleModalOpen(true)}
+              className="text-xs font-black px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black shadow transition-all"
+            >
+              精算へ進む &rarr;
+            </button>
+          )}
         </div>
       )}
 
@@ -132,22 +188,44 @@ function GameContent() {
           gameState={gameState}
           onRiichiClick={declareRiichi}
           onFuroClick={toggleFuro}
-          isRecorder={isRecorder}
+          isRecorder={isRecorder && game?.status !== 'completed'}
         />
       </div>
 
-      {/* 下部操作パネル */}
+      {/* 下部パネル（対局完了時と進行中で分岐） */}
       <footer className="mt-2">
-        <ActionPanel
-          isRecorder={isRecorder}
-          passcode={game?.passcode || '0000'}
-          onOpenWinModal={handleOpenWinModal}
-          onOpenRyukyokuModal={handleOpenRyukyokuModal}
-          onOpenChomboModal={handleOpenChomboModal}
-          onUndoClick={undoRound}
-          onOpenTransferModal={() => setPinModalOpen(true)}
-          canUndo={(gameState?.roundHistory.length ?? 0) > 0}
-        />
+        {game?.status === 'completed' ? (
+          <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-md text-center">
+            <div className="text-xs font-bold text-emerald-400">
+              対局終了・成績確定済み
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/"
+                className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs flex items-center justify-center border border-neutral-700 transition-colors"
+              >
+                ホームへ戻る
+              </Link>
+              <Link
+                href="/stats"
+                className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs flex items-center justify-center transition-colors shadow"
+              >
+                成績集計を見る &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <ActionPanel
+            isRecorder={isRecorder}
+            passcode={game?.passcode || '0000'}
+            onOpenWinModal={handleOpenWinModal}
+            onOpenRyukyokuModal={handleOpenRyukyokuModal}
+            onOpenChomboModal={handleOpenChomboModal}
+            onUndoClick={undoRound}
+            onOpenTransferModal={() => setPinModalOpen(true)}
+            canUndo={(gameState?.roundHistory.length ?? 0) > 0}
+          />
+        )}
       </footer>
 
       {/* 入力モーダル */}
@@ -171,6 +249,112 @@ function GameContent() {
         onClose={() => setPinModalOpen(false)}
         onTransfer={transferRecorder}
       />
+
+      {/* 対局終了・精算確認モーダル */}
+      {settleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+          <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md rounded-2xl p-4 shadow-2xl flex flex-col gap-3 text-white">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <h2 className="text-base font-black text-white">
+                対局終了・精算確認
+              </h2>
+              <button
+                type="button"
+                onClick={() => setSettleModalOpen(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold leading-none p-1"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              現在の素点およびウマオカ計算結果です。確定すると戦績（/stats）に公式反映されます。
+            </p>
+
+            {/* 成績プレビューリスト */}
+            <div className="flex flex-col gap-1.5 bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
+              {settlement?.map((s) => (
+                <div
+                  key={s.player}
+                  className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-neutral-900/60 border border-neutral-800/80 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-5 h-5 rounded-md flex items-center justify-center font-black text-[11px] ${
+                        s.rank === 1
+                          ? 'bg-amber-400 text-black'
+                          : s.rank === 2
+                          ? 'bg-neutral-300 text-black'
+                          : s.rank === 3
+                          ? 'bg-amber-800 text-amber-100'
+                          : 'bg-neutral-800 text-neutral-400'
+                      }`}
+                    >
+                      {s.rank}
+                    </span>
+                    <span className="font-black text-neutral-200">
+                      {s.player}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-neutral-400 font-mono">
+                      {s.finalScore.toLocaleString()}点
+                    </span>
+                    <span
+                      className={`font-black font-mono w-14 text-right ${
+                        s.point > 0
+                          ? 'text-cyan-400'
+                          : s.point < 0
+                          ? 'text-rose-400'
+                          : 'text-neutral-400'
+                      }`}
+                    >
+                      {s.point > 0 ? `+${s.point.toFixed(1)}` : s.point.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              <div className="text-[11px] font-mono text-neutral-500 text-right pt-1 border-t border-neutral-800">
+                合計pt検算: {settlement?.reduce((acc, r) => acc + r.point, 0).toFixed(1)}pt (ゼロ和)
+              </div>
+            </div>
+
+            {/* ボタン群 */}
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleConfirmFinish}
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-black text-sm shadow transition-all flex items-center justify-center disabled:opacity-50"
+              >
+                {submitting ? '保存中...' : '成績を確定して保存'}
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setSettleModalOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold text-xs transition-colors"
+              >
+                対局に戻る
+              </button>
+
+              <div className="pt-2 border-t border-neutral-800/80 text-center">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={handleConfirmAbort}
+                  className="text-xs text-rose-400 hover:text-rose-300 hover:underline py-1"
+                >
+                  この対局を破棄（データを残さず削除）
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

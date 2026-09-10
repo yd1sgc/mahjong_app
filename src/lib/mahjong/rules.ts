@@ -10,7 +10,7 @@ import {
   RoundRecord,
   RuleConfig,
 } from '@/types/mahjong';
-import { roundUp100 } from './calc';
+import { roundUp100, calcPoint } from './calc';
 
 /**
  * 局インデックスから現在の親プレイヤーを取得
@@ -401,4 +401,79 @@ export function checkGameEnd(
   }
 
   return null;
+}
+
+export interface SettlementPlayerResult {
+  player: string;
+  seat: number; // 1:東, 2:南, 3:西, 4:北
+  finalScore: number; // 供託加算後の最終素点
+  rawScore: number; // 供託加算前の素点
+  rank: number; // 1〜4
+  point: number; // ウマオカ計算後の確定pt (例: 58.0)
+}
+
+/**
+ * 終局時の精算計算を行う純粋関数
+ * 1. 供託リーチ棒のトップ加算
+ * 2. 素点降順・同点起家優先による順位決定 (1〜4位)
+ * 3. calcPoint によるウマオカポイント算出
+ * 4. 合計0.0ptにするための端数（0.1pt）ゼロサム調整（トップで吸収）
+ */
+export function calculateGameSettlement(
+  players: string[],
+  scores: Record<string, number>,
+  ruleConfig: RuleConfig = {},
+  remainingRiichiSticks: number = 0
+): SettlementPlayerResult[] {
+  const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
+  const stickBonus = remainingRiichiSticks * riichiPt;
+
+  // 1. 各プレイヤーの生スコアを整理
+  const rawList = players.map((p, idx) => ({
+    player: p,
+    seat: idx + 1,
+    rawScore: scores[p] ?? 25000,
+    finalScore: scores[p] ?? 25000,
+  }));
+
+  // 2. 暫定順位決定（素点降順、同点は起家・座順優先）
+  rawList.sort((a, b) => {
+    if (b.rawScore !== a.rawScore) {
+      return b.rawScore - a.rawScore;
+    }
+    return a.seat - b.seat;
+  });
+
+  // 3. トップ（1位）に供託リーチ棒を加算
+  if (stickBonus > 0 && rawList.length > 0) {
+    rawList[0].finalScore += stickBonus;
+  }
+
+  // 供託加算後に再ソート
+  rawList.sort((a, b) => {
+    if (b.finalScore !== a.finalScore) {
+      return b.finalScore - a.finalScore;
+    }
+    return a.seat - b.seat;
+  });
+
+  // 4. ポイント計算
+  const results: SettlementPlayerResult[] = rawList.map((item, idx) => {
+    const rank = idx + 1;
+    const pt = calcPoint(item.finalScore, rank, ruleConfig);
+    return {
+      ...item,
+      rank,
+      point: pt,
+    };
+  });
+
+  // 5. ゼロ和検算（端数調整）
+  const totalPt = results.reduce((sum, r) => sum + r.point, 0);
+  const roundedDiff = Math.round(totalPt * 10) / 10;
+  if (Math.abs(roundedDiff) > 0.0001 && results.length > 0) {
+    results[0].point = Math.round((results[0].point - roundedDiff) * 10) / 10;
+  }
+
+  return results;
 }

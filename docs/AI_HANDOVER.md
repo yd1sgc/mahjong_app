@@ -82,12 +82,32 @@
   - **デザイン規律**: 絵文字の完全排除、太字・大文字・高コントラスト・PC中央配置（`max-w-xl`）の統一。
   - `next build` による全静的ルート（`/`, `/game`, `/manage`, `/stats`）の正常出力確認完了。
 
+- **Phase 3.6完了（P0課題解消: 終局確定精算サイクル & 局確定データ不整合修正 & 対局破棄機能）:**
+  - **純粋精算ドメイン関数（`src/lib/mahjong/rules.ts`）**:
+    - `calculateGameSettlement` を新設。供託リーチ棒のトップ加算、同点時の起家（東家→南家→西家→北家）優先順位判定、`calcPoint` によるウマオカ計算、端数ゼロサム調整（4名の合計が厳密に 0.0pt になることを保証）。
+    - `tests/rules.test.ts` にテストを追加し、Vitest全44件 ALL PASS。
+  - **局コミットデータ完全化（`src/hooks/useGame.ts`）**:
+    - `round_seats` の `member_id` に正規のUUIDを紐付け。
+    - `score_delta`（前局からの差分）、`honba_point`、`kyotaku_point`、`base_point` を純粋関数に基づき正確に格納。
+    - `is_furo` を画面の副露状態から `round_seats` へ永続化（副露率集計の正常化）。
+  - **対局終了・精算 & 破棄アクション新設（`useGame.ts`, `src/app/game/page.tsx`）**:
+    - `finishGame`: `games.status = 'completed'` への更新および `game_participants`（4名）の `final_score`, `rank`, `point` 確定保存。
+    - `abortGame`: 誤作成・テスト対局をDB（CASCADE完全削除）およびLocalStorageから消去する破棄機能。
+    - ヘッダー右上への `[精算・終了]` ボタン配備（記録係のみ）、終局バナーからの導線新設。
+    - 「対局終了・精算確認モーダル」新設（1〜4位プレビュー、確定保存、対局へ戻る、完全削除）。
+    - 完了後の対局画面における結果サマリー・成績集計導線表示。
+  - `next build` による全静的ルートの正常出力確認完了。
+
 ---
 
-# TODO (Next Actions: Phase 4)
+# TODO (Next Actions)
 
 次のチャットセッションで直ちに着手するタスク：
 
+- [ ] **P1課題: 保守性・構造リファクタリング**
+  - [ ] `src/app/stats/page.tsx`（1,580行）のコンポーネント・ロジック分割（集計計算、推移グラフ、相性表、タブUI）
+  - [ ] `src/components/RoundInputModal.tsx`（621行）の点数プリセット定数分離
+  - [ ] `useGame.ts` および各ページの `as any` 排除と型安全性強化
 - [ ] **Phase 4: クラウド運用自動化 & デプロイ配備**
   - [ ] GitHub Actions による Supabase スリープ防止 cron ワークフロー配備（`.github/workflows/supabase_keepalive.yml`）
   - [ ] Cloudflare Pages 静的ホスティング向けデプロイ設定確認（カスタムドメイン/環境変数等）

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   checkGameEnd,
   recalculateState,
+  calculateGameSettlement,
 } from '../src/lib/mahjong/rules';
 import { RoundRecord, RuleConfig } from '../src/types/mahjong';
 
@@ -336,5 +337,74 @@ describe('rules: checkGameEnd (対局終了・トビ・サドンデス判定)', 
     const resEnd = checkGameEnd(scores32k, 8, players, baseRule, historyWithWest);
     expect(resEnd).not.toBeNull();
     expect(resEnd).toContain('サドンデス終了');
+  });
+});
+
+describe('rules: calculateGameSettlement (終局時精算・順位・ウマオカ・ゼロサム検算)', () => {
+  const defaultRule: RuleConfig = {
+    basic: { init_score: 25000, return_score: 30000, uma: [50, 10, -10, -30] },
+    detail: { riichi_pt: 1000 },
+  };
+  const players = ['P1', 'P2', 'P3', 'P4'];
+
+  it('通常精算: 供託なし、点差明確な場合', () => {
+    const scores = { P1: 38000, P2: 27000, P3: 21000, P4: 14000 };
+    const results = calculateGameSettlement(players, scores, defaultRule, 0);
+
+    expect(results).toHaveLength(4);
+    // 1位: P1 (38000点 -> (38-30)+50 = +58.0pt)
+    expect(results[0].player).toBe('P1');
+    expect(results[0].rank).toBe(1);
+    expect(results[0].finalScore).toBe(38000);
+    expect(results[0].point).toBe(58.0);
+
+    // 2位: P2 (27000点 -> (27-30)+10 = +7.0pt)
+    expect(results[1].player).toBe('P2');
+    expect(results[1].rank).toBe(2);
+    expect(results[1].finalScore).toBe(27000);
+    expect(results[1].point).toBe(7.0);
+
+    // 3位: P3 (21000点 -> (21-30)-10 = -19.0pt)
+    expect(results[2].player).toBe('P3');
+    expect(results[2].rank).toBe(3);
+    expect(results[2].finalScore).toBe(21000);
+    expect(results[2].point).toBe(-19.0);
+
+    // 4位: P4 (14000点 -> (14-30)-30 = -46.0pt)
+    expect(results[3].player).toBe('P4');
+    expect(results[3].rank).toBe(4);
+    expect(results[3].finalScore).toBe(14000);
+    expect(results[3].point).toBe(-46.0);
+
+    // 合計が完全に 0.0pt になっていること
+    const sumPt = results.reduce((acc, r) => acc + r.point, 0);
+    expect(Math.round(sumPt * 10) / 10).toBe(0.0);
+  });
+
+  it('供託リーチ棒のトップ加算: 供託2本（2000点）が1位に加算されること', () => {
+    const scores = { P1: 36000, P2: 27000, P3: 21000, P4: 14000 };
+    const results = calculateGameSettlement(players, scores, defaultRule, 2);
+
+    expect(results[0].player).toBe('P1');
+    expect(results[0].rawScore).toBe(36000);
+    expect(results[0].finalScore).toBe(38000); // 36000 + 2000
+    expect(results[0].point).toBe(58.0);
+  });
+
+  it('同点時の起家優先ルール: P1(東家)とP2(南家)が同点ならP1が上位', () => {
+    const scores = { P1: 25000, P2: 25000, P3: 25000, P4: 25000 };
+    const results = calculateGameSettlement(players, scores, defaultRule, 0);
+
+    expect(results[0].player).toBe('P1');
+    expect(results[0].rank).toBe(1);
+    expect(results[1].player).toBe('P2');
+    expect(results[1].rank).toBe(2);
+    expect(results[2].player).toBe('P3');
+    expect(results[2].rank).toBe(3);
+    expect(results[3].player).toBe('P4');
+    expect(results[3].rank).toBe(4);
+
+    const sumPt = results.reduce((acc, r) => acc + r.point, 0);
+    expect(Math.round(sumPt * 10) / 10).toBe(0.0);
   });
 });

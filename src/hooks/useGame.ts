@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabase';
 import {
   checkGameEnd,
   recalculateState,
+  calculateGameSettlement,
+  SettlementPlayerResult,
 } from '@/lib/mahjong/rules';
 import {
   GameStateSnapshot,
@@ -15,7 +17,7 @@ import {
   RuleConfig,
   WinType,
 } from '@/types/mahjong';
-import { GameRow, MemberRow } from '@/types/database';
+import { GameRow, MemberRow, GameParticipantRow } from '@/types/database';
 
 export interface RoundInputDraft {
   winType: WinType;
@@ -42,8 +44,10 @@ export function useGame(gameId: string) {
   const [error, setError] = useState<string | null>(null);
   const [game, setGame] = useState<GameRow | null>(null);
   const [players, setPlayers] = useState<string[]>([]);
+  const [participants, setParticipants] = useState<GameParticipantRow[]>([]);
   const [ruleConfig, setRuleConfig] = useState<RuleConfig>({});
   const [gameState, setGameState] = useState<GameStateSnapshot | null>(null);
+  const [settlement, setSettlement] = useState<SettlementPlayerResult[] | null>(null);
   const [isRecorder, setIsRecorder] = useState(false);
   const [gameEndReason, setGameEndReason] = useState<string | null>(null);
 
@@ -89,7 +93,9 @@ export function useGame(gameId: string) {
         throw new Error(partErr.message);
       }
 
-      const playerList = ((partData as any[]) || []).map((p) => p.player_name_snapshot);
+      const partList = ((partData as any[]) || []) as GameParticipantRow[];
+      setParticipants(partList);
+      const playerList = partList.map((p) => p.player_name_snapshot);
       setPlayers(playerList);
 
       // (3) 局データ（rounds, round_seats）取得
@@ -141,6 +147,15 @@ export function useGame(gameId: string) {
         history
       );
       setGameEndReason(endReason);
+
+      // 精算プレビュー計算（供託加算・ウマオカ・0.0ptゼロ和）
+      const currentSettlement = calculateGameSettlement(
+        playerList,
+        computed.scores,
+        parsedRule,
+        computed.riichiStick
+      );
+      setSettlement(currentSettlement);
 
       // (4) 記録係判定
       // ログインユーザーのID一致、またはLocalStorageに保存されたトークン一致
@@ -351,6 +366,16 @@ export function useGame(gameId: string) {
         const roundId = crypto.randomUUID();
         const roundIndex = gameState.roundHistory.length;
 
+        // 確定前後の差分を純粋関数で計算
+        const currentScores = gameState.scores;
+        const tempHistory = [...gameState.roundHistory, newRound];
+        const nextSnapshot = recalculateState(
+          players,
+          ruleConfig.basic?.init_score ?? 25000,
+          ruleConfig,
+          tempHistory
+        );
+
         // (1) rounds テーブルへINSERT
         const { error: rErr } = await (supabase.from('rounds') as any).insert({
           round_id: roundId,
@@ -365,29 +390,70 @@ export function useGame(gameId: string) {
         if (rErr) throw new Error(rErr.message);
 
         // (2) round_seats テーブルへ座席データINSERT
+        const honbaPt = ruleConfig.detail?.honba_pt ?? 300;
+        const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
+
         const seatPayloads = players.map((p, idx) => {
           const seat = idx + 1;
+          const part = participants.find((pt) => pt.seat === seat);
+          const memberId = part?.member_id || p;
+
           const isWinner = newRound.winner === p ? 1 : 0;
           const isLoser = newRound.loser === p ? 1 : 0;
           const isRiichi = newRound.riichi.includes(p) ? 1 : 0;
           const isTenpai = (newRound.tenpai || []).includes(p) ? 1 : 0;
+          const isFuro = furoDeclared.includes(p) ? 1 : 0;
+
+          // score_delta は純粋関数で計算された持ち点の変動量
+          const scoreDelta = (nextSnapshot.scores[p] ?? 0) - (currentScores[p] ?? 0);
+
+          let basePoint = 0;
+          let honbaPoint = 0;
+          let kyotakuPoint = 0;
+
+          if (newRound.win_type === 'ron') {
+            if (isWinner) {
+              basePoint = newRound.score;
+              honbaPoint = gameState.honba * honbaPt;
+              kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+            } else if (isLoser) {
+              basePoint = -newRound.score;
+              honbaPoint = -gameState.honba * honbaPt;
+            }
+          } else if (newRound.win_type === 'tsumo') {
+            if (isWinner) {
+              basePoint = newRound.score;
+              honbaPoint = gameState.honba * honbaPt;
+              kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+            } else {
+              const riichiDeduct = isRiichi ? -riichiPt : 0;
+              const payTotal = scoreDelta - riichiDeduct;
+              const honbaEach = -gameState.honba * Math.floor(honbaPt / 3);
+              honbaPoint = honbaEach;
+              basePoint = payTotal - honbaEach;
+            }
+          } else if (newRound.win_type === 'chombo') {
+            basePoint = scoreDelta;
+          } else if (newRound.win_type === 'ryukyoku') {
+            basePoint = scoreDelta;
+          }
 
           return {
             round_id: roundId,
             seat,
-            member_id: p, // member_id または snapshot
-            base_point: isWinner ? newRound.score : isLoser ? -newRound.score : 0,
-            honba_point: 0,
-            kyotaku_point: 0,
+            member_id: memberId,
+            base_point: basePoint,
+            honba_point: honbaPoint,
+            kyotaku_point: kyotakuPoint,
             penalty_point: 0,
-            score_delta: 0,
+            score_delta: scoreDelta,
             chip_delta: 0,
             han: isWinner ? han ?? null : null,
             fu: isWinner ? fu ?? null : null,
             is_winner: isWinner,
             is_loser: isLoser,
             is_riichi: isRiichi,
-            is_furo: 0,
+            is_furo: isFuro,
             is_tenpai: isTenpai,
           };
         });
@@ -415,7 +481,19 @@ export function useGame(gameId: string) {
         setLoading(false);
       }
     },
-    [gameState, game, isRecorder, gameId, players, furoKey, clearDraft, fetchGameData]
+    [
+      gameState,
+      game,
+      isRecorder,
+      gameId,
+      players,
+      participants,
+      furoDeclared,
+      ruleConfig,
+      furoKey,
+      clearDraft,
+      fetchGameData,
+    ]
   );
 
   // 7. 1局巻き戻し（Undo）
@@ -452,13 +530,109 @@ export function useGame(gameId: string) {
     }
   }, [gameState, isRecorder, gameId, furoKey, fetchGameData]);
 
+  // 8. 対局の確定・精算終了
+  const finishGame = useCallback(async (): Promise<boolean> => {
+    if (!gameState || !game || !isRecorder) return false;
+
+    try {
+      setLoading(true);
+      // 精算計算
+      const settlements = calculateGameSettlement(
+        players,
+        gameState.scores,
+        ruleConfig,
+        gameState.riichiStick
+      );
+
+      // games の status を completed に更新
+      const { error: gErr } = await (supabase.from('games') as any)
+        .update({
+          status: 'completed',
+          ended_at: new Date().toISOString(),
+        })
+        .eq('game_id', gameId);
+
+      if (gErr) throw new Error(gErr.message);
+
+      // game_participants を更新
+      for (const s of settlements) {
+        const { error: pErr } = await (supabase.from('game_participants') as any)
+          .update({
+            final_score: s.finalScore,
+            rank: s.rank,
+            point: s.point,
+          })
+          .eq('game_id', gameId)
+          .eq('seat', s.seat);
+
+        if (pErr) throw new Error(pErr.message);
+      }
+
+      clearDraft();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(furoKey);
+      }
+
+      await fetchGameData();
+      return true;
+    } catch (e: any) {
+      setError(e.message || '対局終了処理に失敗しました');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    gameState,
+    game,
+    isRecorder,
+    players,
+    ruleConfig,
+    gameId,
+    clearDraft,
+    draftKey,
+    furoKey,
+    fetchGameData,
+  ]);
+
+  // 9. 対局の破棄（完全削除）
+  const abortGame = useCallback(async (): Promise<boolean> => {
+    if (!game || !isRecorder) return false;
+
+    try {
+      setLoading(true);
+      // CASCADE により games 削除で rounds, round_seats, game_participants も自動削除
+      const { error: delErr } = await (supabase.from('games') as any)
+        .delete()
+        .eq('game_id', gameId);
+
+      if (delErr) throw new Error(delErr.message);
+
+      clearDraft();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(furoKey);
+        localStorage.removeItem(recorderTokenKey);
+      }
+
+      return true;
+    } catch (e: any) {
+      setError(e.message || '対局破棄に失敗しました');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [game, isRecorder, gameId, clearDraft, draftKey, furoKey, recorderTokenKey]);
+
   return {
     loading,
     error,
     game,
     players,
+    participants,
     ruleConfig,
     gameState,
+    settlement,
     isRecorder,
     gameEndReason,
     draft,
@@ -470,6 +644,8 @@ export function useGame(gameId: string) {
     declareRiichi,
     commitRound,
     undoRound,
+    finishGame,
+    abortGame,
     refetch: fetchGameData,
   };
 }
