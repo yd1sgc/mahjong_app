@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 合計集計画面（/aggregate）
  * 選択試合の合計ポイント計算、直近N試合選択、ゼロ和検算（合計0.0pt確認）特化UI
  */
@@ -150,7 +150,7 @@ export default function AggregatePage() {
   const isZeroSumValid = Math.abs(totalPtSum) < 0.05;
 
   return (
-    <main className="min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-4">
+    <main className="w-full min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-4">
       {/* ヘッダー */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
         <div>

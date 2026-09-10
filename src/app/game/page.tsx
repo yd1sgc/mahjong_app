@@ -167,7 +167,7 @@ function GameContent() {
   }
 
   return (
-    <main className="h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden">
+    <main className="w-full h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden">
       {/* 上部ヘッダー */}
       <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0">
         <Link

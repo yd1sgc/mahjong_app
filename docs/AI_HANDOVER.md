@@ -179,6 +179,15 @@
   - `npx vitest run`: 全44件 ALL PASS。
   - `next build`: 全11ルート正常出力確認完了。
 
+- **Phase 5-G完了（全画面 w-full 適用 & モバイル左右余白・バランス調整）:**
+  - **全画面コンテナ横幅100%化（`w-full` 統一適用）**:
+    - `src/app/page.tsx`, `src/app/game/page.tsx`, `src/app/stats/page.tsx`, `src/app/manage/groups/page.tsx`, `src/app/manage/rules/page.tsx`, `src/app/manage/system/page.tsx`, `src/app/aggregate/page.tsx` の全画面 `<main>` タグに `w-full` を付与。
+    - iOS Safari（WebKit）環境で、Flexbox直下要素の横幅が縮んで左右に黒い余白が生じる現象を根本解消。
+  - **ホーム画面レイアウトのバランス最適化**:
+    - 余計な要素を追加せずシンプルさを維持したまま、パディング（`px-4 py-6`）および間隔（`gap-6`）を整え、スマホ画面幅いっぱいに自然にフィットするよう調整。
+  - `npx vitest run`: 全44件 ALL PASS。
+  - `next build`: 全11ルート正常出力確認完了。
+
 ---
 
 # TODO (Next Actions)

@@ -270,7 +270,7 @@ export default function StatsPage() {
   }, [modalGameId, rounds]);
 
   return (
-    <main className="min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-5 pb-16">
+    <main className="w-full min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-5 pb-16">
       {/* ─── ヘッダー ─── */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
         <div>
