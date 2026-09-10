@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { GameRow, MemberRow, RuleTemplateRow } from '@/types/database';
+import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 
 export default function HomePage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function HomePage() {
 
   // 新規対局モーダル用状態
   const [showNewGameModal, setShowNewGameModal] = useState(false);
+  const [showSimpleModal, setShowSimpleModal] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
@@ -84,18 +86,30 @@ export default function HomePage() {
   // 進行中の対局を検知
   const activeGame = games.find((g) => g.status === 'in_progress');
 
-  // 新規対局作成処理
-  const handleCreateGame = async () => {
+  // プレイヤー選択の検証
+  const validateSelectedPlayers = (): boolean => {
     const validMembers = selectedMembers.filter(Boolean);
     if (validMembers.length !== 4) {
       alert('4名のプレイヤーを選択してください');
-      return;
+      return false;
     }
-    // 重複チェック
     if (new Set(validMembers).size !== 4) {
       alert('プレイヤーが重複しています。異なる4名を選択してください');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  // 結果のみ入力モード開始
+  const handleStartSimpleGame = () => {
+    if (!validateSelectedPlayers()) return;
+    setShowNewGameModal(false);
+    setShowSimpleModal(true);
+  };
+
+  // 新規対局作成処理（詳細入力）
+  const handleCreateGame = async () => {
+    if (!validateSelectedPlayers()) return;
 
     const pin = (document.getElementById('game-pin') as HTMLInputElement)?.value;
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
@@ -128,7 +142,7 @@ export default function HomePage() {
       }
 
       // 2. game_participants 作成
-      const participants = validMembers.map((mId, idx) => {
+      const participants = selectedMembers.map((mId, idx) => {
         const mem = members.find((m) => m.member_id === mId);
         return {
           game_id: gameId,
@@ -362,26 +376,52 @@ export default function HomePage() {
               ※ 作成した端末が最初の「記録係」になります。他端末へは画面上の4桁PINでいつでも交代できます。
             </p>
 
-            <div className="flex gap-2 pt-2 border-t border-neutral-800">
+            <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleStartSimpleGame}
+                  className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:scale-[0.98] border border-amber-500/60 text-amber-300 text-xs font-black transition-all shadow-xs"
+                >
+                  結果のみ入力
+                </button>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={handleCreateGame}
+                  className="flex-2 h-12 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white text-xs font-black shadow-md transition-all"
+                >
+                  {creating ? '作成中...' : '対局を作成して開始'}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowNewGameModal(false)}
-                className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-colors"
+                className="w-full h-10 rounded-xl bg-neutral-950 hover:bg-neutral-850 text-neutral-400 text-xs font-bold transition-colors"
               >
                 キャンセル
-              </button>
-              <button
-                type="button"
-                disabled={creating}
-                onClick={handleCreateGame}
-                className="flex-2 h-12 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md transition-all"
-              >
-                {creating ? '作成中...' : '対局を作成して開始'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 結果のみ入力モーダル */}
+      <SimpleGameInputModal
+        isOpen={showSimpleModal}
+        onClose={() => setShowSimpleModal(false)}
+        groupId={selectedGroupId || groups[0]?.group_id}
+        ruleName={rules.find((r) => r.rule_id === selectedRuleId)?.name || '標準ルール'}
+        ruleConfig={(rules.find((r) => r.rule_id === selectedRuleId)?.config_json as any) || {}}
+        players={selectedMembers.map((mId, idx) => {
+          const mem = members.find((m) => m.member_id === mId);
+          return {
+            seat: idx + 1,
+            memberId: mId,
+            playerName: mem?.member_name || `P${idx + 1}`,
+          };
+        })}
+      />
     </main>
   );
 }
