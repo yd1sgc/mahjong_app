@@ -30,6 +30,7 @@ export interface RoundSeatItem {
   base_point: number;
   honba_point: number;
   kyotaku_point: number;
+  penalty_point: number;
   is_winner: number;
   is_loser: number;
   is_riichi: number;
@@ -182,30 +183,31 @@ export function calculateRoundStats(
   const targetRounds = rounds.filter((r) => gameIdsSet.has(r.game_id));
   const detailedGameIds = new Set(targetRounds.map((r) => r.game_id));
 
+  // プレイヤー別集計用マップ
   const pMap = new Map<string, {
     kyoku: number;
     agari: number;
     tsumo: number;
     houju: number;
-    furo: number;
     riichi: number;
+    furo: number;
+    ryukyoku: number;
+    tenpai: number;
     riichiAgari: number;
     riichiHouju: number;
     furoAgari: number;
     furoHouju: number;
     damaAgari: number;
-    riichiAgariPt: number;
-    furoAgariPt: number;
-    damaAgariPt: number;
+    agariPtSum: number;
+    houjuPtSum: number;
+    riichiAgariPtSum: number;
+    furoAgariPtSum: number;
+    damaAgariPtSum: number;
     beRiichiHouju: number;
     beFuroHouju: number;
     beDamaHouju: number;
-    agariPt: number;
-    houjuPt: number;
-    ryukyoku: number;
-    tenpai: number;
-    notenBappu: number;
     kyotakuPoint: number;
+    notenBappu: number;
   }>();
 
   const gPlayerNames = new Map<string, Map<string, string>>();
@@ -225,25 +227,25 @@ export function calculateRoundStats(
         agari: 0,
         tsumo: 0,
         houju: 0,
-        furo: 0,
         riichi: 0,
+        furo: 0,
+        ryukyoku: 0,
+        tenpai: 0,
         riichiAgari: 0,
         riichiHouju: 0,
         furoAgari: 0,
         furoHouju: 0,
         damaAgari: 0,
-        riichiAgariPt: 0,
-        furoAgariPt: 0,
-        damaAgariPt: 0,
+        agariPtSum: 0,
+        houjuPtSum: 0,
+        riichiAgariPtSum: 0,
+        furoAgariPtSum: 0,
+        damaAgariPtSum: 0,
         beRiichiHouju: 0,
         beFuroHouju: 0,
         beDamaHouju: 0,
-        agariPt: 0,
-        houjuPt: 0,
-        ryukyoku: 0,
-        tenpai: 0,
-        notenBappu: 0,
         kyotakuPoint: 0,
+        notenBappu: 0,
       });
     }
     return pMap.get(name)!;
@@ -254,85 +256,70 @@ export function calculateRoundStats(
     if (!pmap) continue;
 
     const isRyukyoku = r.result_type === 'ryukyoku';
-    const winnerSeat = r.seats.find((s) => s.is_winner === 1);
-    const loserSeat = r.seats.find((s) => s.is_loser === 1);
+    const isTsumo = r.result_type === 'tsumo';
 
-    const seatsWithNames = r.seats.map((s) => ({
-      ...s,
-      name: pmap.get(s.member_id) || pmap.get(String(s.seat)) || '',
-    })).filter((s) => s.name !== '');
+    // 局コンテキスト（局内に立直者・副露者がいたか判定）
+    const hasRiichiInRound = r.seats.some((s) => s.is_riichi === 1);
+    const hasFuroInRound = r.seats.some((s) => s.is_furo === 1);
+
+    const seatsWithNames = r.seats
+      .map((s) => ({
+        ...s,
+        name: pmap.get(s.member_id) || pmap.get(String(s.seat)) || '',
+      }))
+      .filter((s) => s.name !== '');
 
     for (const s of seatsWithNames) {
       const item = initPlayer(s.name);
       item.kyoku += 1;
-      if (s.is_riichi === 1) {
-        item.riichi += 1;
-        item.kyotakuPoint -= 1000;
+
+      // 和了集計 (base_point を使用)
+      if (s.is_winner === 1) {
+        item.agari += 1;
+        if (isTsumo) item.tsumo += 1;
+        const bPt = s.base_point || 0;
+        item.agariPtSum += bPt;
+
+        if (s.is_riichi === 1) {
+          item.riichiAgari += 1;
+          item.riichiAgariPtSum += bPt;
+        } else if (s.is_furo === 1) {
+          item.furoAgari += 1;
+          item.furoAgariPtSum += bPt;
+        } else {
+          item.damaAgari += 1;
+          item.damaAgariPtSum += bPt;
+        }
       }
+
+      // 放銃集計 (ABS(base_point) を使用)
+      if (s.is_loser === 1) {
+        item.houju += 1;
+        item.houjuPtSum += Math.abs(s.base_point || 0);
+
+        if (s.is_riichi === 1) item.riichiHouju += 1;
+        if (s.is_furo === 1) item.furoHouju += 1;
+
+        if (hasRiichiInRound) {
+          item.beRiichiHouju += 1;
+        } else if (hasFuroInRound) {
+          item.beFuroHouju += 1;
+        } else {
+          item.beDamaHouju += 1;
+        }
+      }
+
+      // 立直・副露・流局テンパイ
+      if (s.is_riichi === 1) item.riichi += 1;
       if (s.is_furo === 1) item.furo += 1;
       if (isRyukyoku) {
         item.ryukyoku += 1;
         if (s.is_tenpai === 1) item.tenpai += 1;
       }
-    }
 
-    if (isRyukyoku) {
-      const tenpaiSeats = seatsWithNames.filter((s) => s.is_tenpai === 1);
-      const notenSeats = seatsWithNames.filter((s) => s.is_tenpai !== 1);
-      if (tenpaiSeats.length > 0 && tenpaiSeats.length < 4) {
-        const getPt = Math.floor(3000 / tenpaiSeats.length);
-        const payPt = Math.floor(3000 / notenSeats.length);
-        tenpaiSeats.forEach((s) => { initPlayer(s.name).notenBappu += getPt; });
-        notenSeats.forEach((s) => { initPlayer(s.name).notenBappu -= payPt; });
-      }
-    }
-
-    if (winnerSeat) {
-      const wName = pmap.get(winnerSeat.member_id) || pmap.get(String(winnerSeat.seat));
-      if (wName) {
-        const wItem = initPlayer(wName);
-        wItem.agari += 1;
-        const score = winnerSeat.score_delta > 0 ? winnerSeat.score_delta : (winnerSeat.base_point + winnerSeat.honba_point);
-        wItem.agariPt += score;
-        if (winnerSeat.kyotaku_point > 0) {
-          wItem.kyotakuPoint += winnerSeat.kyotaku_point;
-        }
-
-        const isTsumo = r.result_type === 'tsumo' || !loserSeat;
-        if (isTsumo) wItem.tsumo += 1;
-
-        if (winnerSeat.is_riichi === 1) {
-          wItem.riichiAgari += 1;
-          wItem.riichiAgariPt += score;
-        } else if (winnerSeat.is_furo === 1) {
-          wItem.furoAgari += 1;
-          wItem.furoAgariPt += score;
-        } else {
-          wItem.damaAgari += 1;
-          wItem.damaAgariPt += score;
-        }
-      }
-    }
-
-    if (loserSeat && winnerSeat) {
-      const lName = pmap.get(loserSeat.member_id) || pmap.get(String(loserSeat.seat));
-      if (lName) {
-        const lItem = initPlayer(lName);
-        lItem.houju += 1;
-        const loseScore = Math.abs(loserSeat.score_delta) || (winnerSeat.base_point + winnerSeat.honba_point);
-        lItem.houjuPt += loseScore;
-
-        if (loserSeat.is_riichi === 1) lItem.riichiHouju += 1;
-        if (loserSeat.is_furo === 1) lItem.furoHouju += 1;
-
-        if (winnerSeat.is_riichi === 1) {
-          lItem.beRiichiHouju += 1;
-        } else if (winnerSeat.is_furo === 1) {
-          lItem.beFuroHouju += 1;
-        } else {
-          lItem.beDamaHouju += 1;
-        }
-      }
+      // 供託収支・ノーテン罰符収支（DB値をそのまま累計）
+      item.kyotakuPoint += (s.kyotaku_point || 0);
+      item.notenBappu += (s.penalty_point || 0);
     }
   }
 
@@ -343,8 +330,8 @@ export function calculateRoundStats(
     const rCount = d.riichi;
     const fCount = d.furo;
 
-    const avgAgari = w > 0 ? Math.round(d.agariPt / w) : 0;
-    const avgHouju = h > 0 ? Math.round(d.houjuPt / h) : 0;
+    const avgAgari = w > 0 ? Math.round(d.agariPtSum / w) : 0;
+    const avgHouju = h > 0 ? Math.round(d.houjuPtSum / h) : 0;
     const efficiency = (avgAgari > 0 && avgHouju > 0) ? Math.round((avgAgari / avgHouju) * 100) / 100 : 0;
 
     return {
@@ -358,9 +345,9 @@ export function calculateRoundStats(
       notenBappu: d.notenBappu,
       kyotakuPoint: d.kyotakuPoint,
       avgAgari,
-      riichiAvgAgari: d.riichiAgari > 0 ? Math.round(d.riichiAgariPt / d.riichiAgari) : 0,
-      furoAvgAgari: d.furoAgari > 0 ? Math.round(d.furoAgariPt / d.furoAgari) : 0,
-      damaAvgAgari: d.damaAgari > 0 ? Math.round(d.damaAgariPt / d.damaAgari) : 0,
+      riichiAvgAgari: d.riichiAgari > 0 ? Math.round(d.riichiAgariPtSum / d.riichiAgari) : 0,
+      furoAvgAgari: d.furoAgari > 0 ? Math.round(d.furoAgariPtSum / d.furoAgari) : 0,
+      damaAvgAgari: d.damaAgari > 0 ? Math.round(d.damaAgariPtSum / d.damaAgari) : 0,
       efficiency,
       riichiHoujuRate: h > 0 ? Math.round((d.beRiichiHouju / h) * 1000) / 10 : 0,
       furoHoujuRate: h > 0 ? Math.round((d.beFuroHouju / h) * 1000) / 10 : 0,
