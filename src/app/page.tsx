@@ -226,24 +226,24 @@ export default function HomePage() {
         {/* 3段目: 左にルール管理、右にグループ管理 */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
-            href="/manage?tab=rules"
+            href="/manage/rules"
             className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
             ルール管理
           </Link>
 
           <Link
-            href="/manage?tab=groups"
+            href="/manage/groups"
             className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
-            グループ管理
+            グループ・メンバー
           </Link>
         </div>
 
         {/* 4段目: 左にデータ管理、右に合計集計 */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
-            href="/manage?tab=system"
+            href="/manage/system"
             className="h-14 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-200 font-black text-sm transition-all flex items-center justify-center shadow-xs"
           >
             データ管理

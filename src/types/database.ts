@@ -1,6 +1,8 @@
 /**
  * Supabase PostgreSQL V2 スキーマ完全準拠の型定義
  * docs/DETAILED_DESIGN.md 第7項に準拠
+ * 
+ * 最新 @supabase/supabase-js 型定義要件（GenericTable: Relationships 配列必須）準拠
  */
 
 export type Json =
@@ -39,6 +41,7 @@ export interface Database {
           is_archived?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       groups: {
         Row: {
@@ -65,6 +68,7 @@ export interface Database {
           is_archived?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       group_memberships: {
         Row: {
@@ -79,6 +83,7 @@ export interface Database {
           group_id?: string;
           member_id?: string;
         };
+        Relationships: [];
       };
       rule_templates: {
         Row: {
@@ -93,7 +98,7 @@ export interface Database {
         Insert: {
           rule_id: string;
           name: string;
-          kind: 'official' | 'custom' | string;
+          kind?: 'official' | 'custom' | string;
           version?: number;
           config_json: Json;
           is_archived?: number;
@@ -108,6 +113,7 @@ export interface Database {
           is_archived?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       games: {
         Row: {
@@ -152,6 +158,7 @@ export interface Database {
           is_synced?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       game_participants: {
         Row: {
@@ -184,6 +191,7 @@ export interface Database {
           point?: number;
           was_group_member?: number;
         };
+        Relationships: [];
       };
       rounds: {
         Row: {
@@ -216,6 +224,7 @@ export interface Database {
           result_type?: 'ron' | 'tsumo' | 'ryukyoku' | 'chombo' | 'multi_ron' | 'mid_ryukyoku' | string;
           created_at?: string;
         };
+        Relationships: [];
       };
       round_seats: {
         Row: {
@@ -272,6 +281,7 @@ export interface Database {
           is_furo?: number;
           is_tenpai?: number;
         };
+        Relationships: [];
       };
       drafts: {
         Row: {
@@ -289,6 +299,7 @@ export interface Database {
           state_json?: Json;
           updated_at?: string;
         };
+        Relationships: [];
       };
     };
     Views: {
@@ -301,6 +312,31 @@ export interface Database {
           p_pin: string;
         };
         Returns: boolean;
+      };
+      commit_round_transaction: {
+        Args: {
+          p_game_id: string;
+          p_round_index: number;
+          p_kyoku_name: string;
+          p_honba: number;
+          p_riichi_sticks: number;
+          p_result_type: string;
+          p_seats: Json;
+        };
+        Returns: Json;
+      };
+      settle_game_transaction: {
+        Args: {
+          p_game_id: string;
+          p_settlements: Json;
+        };
+        Returns: Json;
+      };
+      abort_game_transaction: {
+        Args: {
+          p_game_id: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {
@@ -320,3 +356,5 @@ export type GameRow = Database['public']['Tables']['games']['Row'];
 export type GameParticipantRow = Database['public']['Tables']['game_participants']['Row'];
 export type RoundRow = Database['public']['Tables']['rounds']['Row'];
 export type RoundSeatRow = Database['public']['Tables']['round_seats']['Row'];
+export type RoundSeatInsert = Database['public']['Tables']['round_seats']['Insert'];
+export type RoundInsert = Database['public']['Tables']['rounds']['Insert'];

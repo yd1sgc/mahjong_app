@@ -123,16 +123,49 @@
     - 環境変数: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `npx vitest run`: 全44件 ALL PASS。
 
+- **Phase 5-B完了（useGame.ts 責務分割 & as any 排除 & 型厳格化）:**
+  - **`useGame.ts`（652行）を3つの責務別サブフックへ分割し、約100行のクリーンなファサードへ圧縮**:
+    - `src/hooks/useGameDraft.ts`: LocalStorage下書き同期、副露トグル、記録係PIN管理。
+    - `src/hooks/useGameData.ts`: Supabaseデータ取得、Realtime監視、純粋ドメイン再計算、画面復帰（`visibilitychange`）時の自動再同期。
+    - `src/hooks/useGameActions.ts`: 局コミット・精算・破棄（Supabase RPC優先 ＋ フォールバック）、Undo、リーチ宣言。
+  - **型安全性向上**:
+    - `src/types/database.ts`: 最新 `@supabase/supabase-js` 要件に合わせ、全テーブルに `Relationships: []` を配備。RPC関数型定義（`commit_round_transaction`, `settle_game_transaction`, `abort_game_transaction`）を追加。
+    - `useGameActions.ts`, `useGameData.ts` 内の `as any` を全廃し、厳格な `Json` / `RoundSeatInsert` 等を適用。
+  - `npx vitest run`: 全44件 ALL PASS。
+  - `npx tsc --noEmit`: 型エラー 0件。
+  - `next build`: 全静的ルート正常出力確認完了。
+
+- **Phase 5-C完了（管理画面CRUD完全配備 & 目的別専用ページ分割）:**
+  - **無理なタブ統合を廃止し、独立した専用ページへ分割（スマホ操作性・認知的負荷の改善）**:
+    - `src/app/page.tsx`: ホーム画面の導線を `/manage/rules`、`/manage/groups`（「グループ・メンバー」表記）、`/manage/system` へ最適化。
+    - `src/app/manage/groups/page.tsx`: メンバー新規追加モーダル（名前重複バリデーション、ゲストフラグ）、メンバー名変更、論理アーカイブ（`is_archived = 1`）および復元アコーディオン、新規グループ作成（初期ルール指定）。
+    - `src/app/manage/rules/page.tsx`: 公式ルール保護、公式ルールを複製して新規作成モーダル（配給原点、返し点、ウマ4席、連荘条件、飛び賞、サドンデス西入等のカスタム設定）、カスタムルールのアーカイブ・復元。
+    - `src/app/manage/system/page.tsx`: クラウド同期状況、総対局数、総局数、登録メンバー数の統計表示。
+    - `src/app/manage/page.tsx`: `/manage/groups` への即時リダイレクト処理。
+  - `npx vitest run`: 全44件 ALL PASS。
+  - `npx tsc --noEmit`: 型エラー 0件。
+  - `next build`: 全静的ルート正常出力確認完了。
+
+- **Phase 5-A完了（クラウド運用自動化 & PostgreSQL RPCアトミックトランザクション配備）:**
+  - **GitHub Secrets設定完了**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` 登録完了（毎日午前0時のスリープ防止ワークフロー有効化）。
+  - **Supabase RPC配備完了**:
+    - `commit_round_transaction`: 局情報と4席データの不可分コミット（データ不整合リスク完全排除）。
+    - `settle_game_transaction`: 終局精算とステータス更新の不可分コミット。
+    - `abort_game_transaction`: 対局完全CASCADE削除。
+
 ---
 
 # TODO (Next Actions)
 
 今後の運用・改善タスク：
 
-- [ ] **運用・保守タスク**
-  - [ ] GitHub リポジトリの Settings > Secrets and variables > Actions に `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` を登録（Keepalive有効化のため）
-  - [x] Cloudflare への GitHub 連携自動デプロイ設定完了（`https://mahjong-app.yd1sgc.workers.dev`）
-  - [ ] `useGame.ts` および各画面の `as any` 排除と型定義のさらなる厳格化
+- [ ] **本番デプロイ確認**
+  - [ ] Gitコミット & プッシュにより Cloudflare本番環境（`https://mahjong-app.yd1sgc.workers.dev`）へ最新コードを自動反映
+- [ ] **次回開発タスク**
+  - [ ] **Phase 5-E (P3)**: `RoundInputModal.tsx`（556行）のステップコンポーネント分割 & トースト通知（エラーリトライ）導入
+
+
+
 
 
 
