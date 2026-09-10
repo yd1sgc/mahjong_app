@@ -102,6 +102,15 @@ export default function StatsPage() {
         const roundsList = rData || [];
         const seatsList = sData || [];
 
+        // ルールID -> ルール名の正規化マップ作成
+        const ruleMap = new Map<string, string>();
+        if (ruleData) {
+          ruleData.forEach((r: any) => {
+            ruleMap.set(r.rule_id, r.name);
+            ruleMap.set(r.name, r.name);
+          });
+        }
+
         // GameData へマッピング
         const mappedGames: GameData[] = gamesList.map((g: any) => {
           const parts = partList
@@ -116,12 +125,15 @@ export default function StatsPage() {
               point: Number(p.point),
             }));
 
+          const rawRule = g.rule_name_snapshot || '標準ルール';
+          const normalizedRule = ruleMap.get(rawRule) || rawRule;
+
           return {
             game_id: g.game_id,
             played_at: g.played_at || '',
             group_id: g.group_id,
             rule_id: g.rule_id || '',
-            rule_name: g.rule_name_snapshot || '標準ルール',
+            rule_name: normalizedRule,
             rule_config: g.rule_config_snapshot || {},
             participants: parts,
           };
@@ -178,14 +190,19 @@ export default function StatsPage() {
     return Array.from(set).sort().reverse();
   }, [games]);
 
-  // ルール名の選択肢（対局データ内の名称およびテンプレートから集約）
+  // ルール名の選択肢（対局データ内の名称およびテンプレートから集約・正規化）
   const ruleOptions = useMemo(() => {
     const set = new Set<string>();
-    games.forEach((g) => {
-      if (g.rule_name) set.add(g.rule_name);
-    });
+    // テンプレートに登録されている表示名
     rules.forEach((r) => {
       if (r.name) set.add(r.name);
+    });
+    // 既に対局データで正規化されたルール名も追加
+    games.forEach((g) => {
+      if (g.rule_name) {
+        const match = rules.find((r) => r.rule_id === g.rule_name);
+        set.add(match ? match.name : g.rule_name);
+      }
     });
     return Array.from(set).sort();
   }, [games, rules]);
@@ -194,6 +211,20 @@ export default function StatsPage() {
   const handleGroupChange = (groupId: string) => {
     setSelectedGroupId(groupId);
     setSelectedGameIds([]);
+
+    if (groupId === 'all') {
+      setSelectedRuleName('all');
+    } else {
+      // 選択されたグループのデフォルトルールを自動セット
+      const targetGroup = groups.find((g) => g.group_id === groupId);
+      if (targetGroup && targetGroup.default_rule_id) {
+        const defRule = rules.find((r) => r.rule_id === targetGroup.default_rule_id);
+        const defRuleName = defRule ? defRule.name : targetGroup.default_rule_id;
+        setSelectedRuleName(defRuleName);
+      } else {
+        setSelectedRuleName('all');
+      }
+    }
   };
 
   const handleRuleChange = (ruleName: string) => {
