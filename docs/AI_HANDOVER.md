@@ -169,6 +169,16 @@
   - `npx tsc --noEmit`: 型エラー 0件。
   - `next build`: 全静的ルート正常出力確認完了。
 
+- **Phase 5-F完了（過去対局ステータス正常化 & モバイルレイアウトシフト解消/Viewport設定）:**
+  - **過去対局ステータス一括正常化（Supabaseデータ修正）**:
+    - PCローカルDB移行時に未設定で `'in_progress'` のまま保存されていた過去対局全27件の `status` を `'completed'` へ一括更新。
+    - ホーム画面（`/`）で不要な「進行中の対局があります。再開しますか？」バナーが常時表示される不具合を完全解消。
+  - **モバイルレイアウトシフト・ビューポート設定（`src/app/layout.tsx`）**:
+    - Next.js標準の `viewport: Viewport`（`width: "device-width", initialScale: 1`）を定義。
+    - モバイルブラウザでの画面遷移時やボタンタップ時に一瞬縮小描画（980px）されてから広がる現象を抑止。
+  - `npx vitest run`: 全44件 ALL PASS。
+  - `next build`: 全11ルート正常出力確認完了。
+
 ---
 
 # TODO (Next Actions)
