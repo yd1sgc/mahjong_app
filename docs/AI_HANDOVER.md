@@ -113,25 +113,25 @@
   - `npx vitest run`: 全44件 PASS。
   - `next build`: 全静的ルート正常出力確認完了。
 
-- **Phase 4完了（クラウド運用自動化 & デプロイ配備確認）:**
+- **Phase 4完了（クラウド運用自動化 & デプロイ配備完了）:**
   - **GitHub Actions Supabaseスリープ防止cron配備（`.github/workflows/supabase_keepalive.yml`）**:
     - 毎日JST午前0時（UTC 15:00）に定期実行され、無料枠プロジェクトの7日間非アクティブによる一時停止（ポーズ）を自動防止。
-  - **Cloudflare Pages 静的ホスティング検証完了**:
-    - `next.config.ts` で `output: "export"` 設定済み。
-    - ビルドコマンド: `npm run build`
-    - 出力ディレクトリ: `out/`（`index.html`, `game.html`, `stats.html`, `manage.html`, `aggregate.html` が完全出力確認済み）
-    - 環境変数要件: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - **Cloudflare Workers Static Assets 本番デプロイ完了**:
+    - `wrangler.jsonc`: 静的配信ディレクトリ `./out` を指定して設定。
+    - GitHub連携による自動CI/CDパイプライン稼働確認済み（`main` ブランチプッシュで自動更新）。
+    - **本番環境URL (Production)**: `https://mahjong-app.yd1sgc.workers.dev`
+    - 環境変数: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `npx vitest run`: 全44件 ALL PASS。
 
 ---
 
 # TODO (Next Actions)
 
-次のチャットセッションで直ちに着手するタスク：
+今後の運用・改善タスク：
 
 - [ ] **運用・保守タスク**
   - [ ] GitHub リポジトリの Settings > Secrets and variables > Actions に `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` を登録（Keepalive有効化のため）
-  - [ ] Cloudflare Pages への GitHub 連携デプロイ設定
+  - [x] Cloudflare への GitHub 連携自動デプロイ設定完了（`https://mahjong-app.yd1sgc.workers.dev`）
   - [ ] `useGame.ts` および各画面の `as any` 排除と型定義のさらなる厳格化
 
 
