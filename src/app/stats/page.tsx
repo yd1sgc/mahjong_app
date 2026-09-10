@@ -38,7 +38,7 @@ export default function StatsPage() {
 
   // フィルター状態
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
-  const [selectedRuleId, setSelectedRuleId] = useState<string>('all');
+  const [selectedRuleName, setSelectedRuleName] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [includeGuests, setIncludeGuests] = useState<boolean>(true);
 
@@ -178,18 +178,43 @@ export default function StatsPage() {
     return Array.from(set).sort().reverse();
   }, [games]);
 
-  // 第1段階: グループ・ルール・年による基本母集団
+  // ルール名の選択肢（対局データ内の名称およびテンプレートから集約）
+  const ruleOptions = useMemo(() => {
+    const set = new Set<string>();
+    games.forEach((g) => {
+      if (g.rule_name) set.add(g.rule_name);
+    });
+    rules.forEach((r) => {
+      if (r.name) set.add(r.name);
+    });
+    return Array.from(set).sort();
+  }, [games, rules]);
+
+  // フィルター変更ハンドラー（詳細試合ID選択をリセットして不整合を防止）
+  const handleGroupChange = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setSelectedGameIds([]);
+  };
+
+  const handleRuleChange = (ruleName: string) => {
+    setSelectedRuleName(ruleName);
+    setSelectedGameIds([]);
+  };
+
+  const handleYearChange = (year: string) => {
+    setSelectedYear(year);
+    setSelectedGameIds([]);
+  };
+
+  // 第1段階: グループ・ルール名・年による基本母集団
   const baseFilteredGames = useMemo(() => {
     return games.filter((g) => {
       if (selectedGroupId !== 'all' && g.group_id !== selectedGroupId) return false;
-      if (selectedRuleId !== 'all') {
-        const rMatch = rules.find((r) => r.rule_id === selectedRuleId);
-        if (rMatch && g.rule_name !== rMatch.name && g.rule_id !== selectedRuleId) return false;
-      }
+      if (selectedRuleName !== 'all' && g.rule_name !== selectedRuleName) return false;
       if (selectedYear !== 'all' && !g.played_at.startsWith(selectedYear)) return false;
       return true;
     });
-  }, [games, selectedGroupId, selectedRuleId, selectedYear, rules]);
+  }, [games, selectedGroupId, selectedRuleName, selectedYear]);
 
   // 試合ID詳細フィルターで実際に集計対象となる試合群
   const effectiveGames = useMemo(() => {
@@ -218,25 +243,60 @@ export default function StatsPage() {
     );
   };
 
+  // ゲストメンバー名の判定セット
+  const guestNames = useMemo(() => {
+    const set = new Set<string>();
+    members.forEach((m) => {
+      if (m.is_guest === 1) {
+        set.add(m.member_name);
+      }
+    });
+    return set;
+  }, [members]);
+
   // ── 試合成績集計 ──
-  const gameStats = useMemo(() => {
+  const rawGameStats = useMemo(() => {
     return calculateGameStats(effectiveGames, sortBy);
   }, [effectiveGames, sortBy]);
 
-  // 初期グラフ・マトリクス対象プレイヤーの設定
-  useEffect(() => {
-    if (gameStats.length > 0 && chartMembers.length === 0) {
-      setChartMembers(gameStats.slice(0, Math.min(5, gameStats.length)).map((s) => s.name));
-    }
-    if (gameStats.length > 0 && matrixMembers.length === 0) {
-      setMatrixMembers(gameStats.slice(0, Math.min(5, gameStats.length)).map((s) => s.name));
-    }
-  }, [gameStats, chartMembers.length, matrixMembers.length]);
+  const gameStats = useMemo(() => {
+    if (includeGuests) return rawGameStats;
+    return rawGameStats.filter((s) => !guestNames.has(s.name));
+  }, [rawGameStats, includeGuests, guestNames]);
 
   // ── 詳細成績（5タブ用）集計 ──
-  const { roundStats, detailedGameCount } = useMemo(() => {
+  const { roundStats: rawRoundStats, detailedGameCount } = useMemo(() => {
     return calculateRoundStats(effectiveGames, rounds);
   }, [effectiveGames, rounds]);
+
+  const roundStats = useMemo(() => {
+    if (includeGuests) return rawRoundStats;
+    return rawRoundStats.filter((s) => !guestNames.has(s.name));
+  }, [rawRoundStats, includeGuests, guestNames]);
+
+  // 全プレイヤー名リスト（セレクト・グラフ用: ゲスト設定連動）
+  const allPlayerNames = useMemo(() => {
+    return gameStats.map((s) => s.name);
+  }, [gameStats]);
+
+  // グラフ・マトリクス対象プレイヤーの自動同期
+  useEffect(() => {
+    if (allPlayerNames.length === 0) {
+      setChartMembers([]);
+      setMatrixMembers([]);
+      return;
+    }
+    setChartMembers((prev) => {
+      const valid = prev.filter((name) => allPlayerNames.includes(name));
+      if (valid.length > 0) return valid;
+      return allPlayerNames.slice(0, Math.min(5, allPlayerNames.length));
+    });
+    setMatrixMembers((prev) => {
+      const valid = prev.filter((name) => allPlayerNames.includes(name));
+      if (valid.length > 0) return valid;
+      return allPlayerNames.slice(0, Math.min(5, allPlayerNames.length));
+    });
+  }, [allPlayerNames]);
 
   // ── 総合ポイント推移グラフデータ ──
   const chartData = useMemo(() => {
@@ -244,19 +304,23 @@ export default function StatsPage() {
   }, [effectiveGames, chartMembers]);
 
   // ── レコード（最高Top5、最低Top5、連勝記録） ──
-  const records = useMemo(() => {
+  const rawRecords = useMemo(() => {
     return calculateRecords(effectiveGames);
   }, [effectiveGames]);
+
+  const records = useMemo(() => {
+    if (includeGuests) return rawRecords;
+    return {
+      top5: rawRecords.top5.filter((r) => !guestNames.has(r.name)),
+      bottom5: rawRecords.bottom5.filter((r) => !guestNames.has(r.name)),
+      streaks: rawRecords.streaks.filter((r) => !guestNames.has(r.name)),
+    };
+  }, [rawRecords, includeGuests, guestNames]);
 
   // ── 相性マトリクス ──
   const matrixData = useMemo(() => {
     return calculateCompatibilityMatrix(effectiveGames, matrixMembers);
   }, [effectiveGames, matrixMembers]);
-
-  // 全プレイヤー名リスト（セレクト用）
-  const allPlayerNames = useMemo(() => {
-    return gameStats.map((s) => s.name);
-  }, [gameStats]);
 
   // 選択モーダル用のゲーム
   const selectedModalGame = useMemo(() => {
@@ -300,7 +364,7 @@ export default function StatsPage() {
             </label>
             <select
               value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
+              onChange={(e) => handleGroupChange(e.target.value)}
               className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
             >
               <option value="all">全グループ (全体)</option>
@@ -318,14 +382,14 @@ export default function StatsPage() {
               ルール
             </label>
             <select
-              value={selectedRuleId}
-              onChange={(e) => setSelectedRuleId(e.target.value)}
+              value={selectedRuleName}
+              onChange={(e) => handleRuleChange(e.target.value)}
               className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
             >
               <option value="all">全ルール (全体)</option>
-              {rules.map((r) => (
-                <option key={r.rule_id} value={r.rule_id}>
-                  {r.name}
+              {ruleOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -340,7 +404,7 @@ export default function StatsPage() {
             </label>
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              onChange={(e) => handleYearChange(e.target.value)}
               className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
             >
               <option value="all">全期間</option>
