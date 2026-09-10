@@ -98,19 +98,32 @@
     - 完了後の対局画面における結果サマリー・成績集計導線表示。
   - `next build` による全静的ルートの正常出力確認完了。
 
+- **Phase 3.7完了（P1課題解消: コード肥大化解消 & モジュール分割リファクタリング）:**
+  - **`src/components/RoundInputModal.tsx`（621行）の定数分離**:
+    - 点数プリセット配列群を `src/lib/mahjong/presets.ts` に外出しし、静的データとUIロジックを分離。
+  - **`src/app/stats/page.tsx`（1,580行）の構造的分割（1,580行 -> 330行へ圧縮）**:
+    - `src/lib/mahjong/statsCalc.ts`: 試合成績、局詳細、推移グラフ、レコード、相性マトリクスの集計ロジックを純粋関数層へ抽出。
+    - `src/components/stats/ScoreTrendChart.tsx`: 手書きSVG推移グラフ描画コンポーネント。
+    - `src/components/stats/CompatibilityMatrix.tsx`: 相性マトリクス（直接対決pt差）テーブル。
+    - `src/components/stats/GameFilterAccordion.tsx`: 試合ID詳細フィルター（クイック選択・個別選択）。
+    - `src/components/stats/GameDetailModal.tsx`: 対局詳細ポップアップモーダル。
+    - `src/components/stats/StatsRecords.tsx`: 最高/最低スコアTop5、連勝記録コンポーネント。
+    - `src/components/stats/StatsDetailsTab.tsx`: 詳細5タブ（基本・打点・守備・立直・副露）テーブル。
+    - `src/components/stats/GameStatsTable.tsx`: メイン試合成績一覧テーブル。
+  - `npx vitest run`: 全44件 PASS。
+  - `next build`: 全静的ルート正常出力確認完了。
+
 ---
 
 # TODO (Next Actions)
 
 次のチャットセッションで直ちに着手するタスク：
 
-- [ ] **P1課題: 保守性・構造リファクタリング**
-  - [ ] `src/app/stats/page.tsx`（1,580行）のコンポーネント・ロジック分割（集計計算、推移グラフ、相性表、タブUI）
-  - [ ] `src/components/RoundInputModal.tsx`（621行）の点数プリセット定数分離
-  - [ ] `useGame.ts` および各ページの `as any` 排除と型安全性強化
 - [ ] **Phase 4: クラウド運用自動化 & デプロイ配備**
   - [ ] GitHub Actions による Supabase スリープ防止 cron ワークフロー配備（`.github/workflows/supabase_keepalive.yml`）
   - [ ] Cloudflare Pages 静的ホスティング向けデプロイ設定確認（カスタムドメイン/環境変数等）
+- [ ] **残存改善タスク**
+  - [ ] `useGame.ts` および各画面の `as any` 排除と型安全性強化
 
 
 
