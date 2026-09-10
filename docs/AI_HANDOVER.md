@@ -153,6 +153,22 @@
     - `settle_game_transaction`: 終局精算とステータス更新の不可分コミット。
     - `abort_game_transaction`: 対局完全CASCADE削除。
 
+- **Phase 5-E完了（P3課題解消: トースト通知導入 & RoundInputModalステップ分割）:**
+  - **トースト通知システム（`src/components/Toast.tsx`）新設**:
+    - 局確定成功（緑）「局結果を記録しました」、終局確定（緑）「対局を精算・確定しました」、巻き戻し（灰）「直前の局を巻き戻しました」。
+    - 通信エラー時（赤）は画面下部にエラー表示 ＋ 「再試行」ボタンを配置し、電波断からのリカバリ導線を確立。
+  - **`RoundInputModal.tsx`（556行）のステップコンポーネント分割**:
+    - `src/components/round-input/WinnerStep.tsx`: 和了者選択。
+    - `src/components/round-input/WinTypeStep.tsx`: ロン / ツモ 方式選択。
+    - `src/components/round-input/ScoreStep.tsx`: 主要打点プリセットグリッド ＋ 翻符手動計算。
+    - `src/components/round-input/LoserStep.tsx`: 放銃者選択。
+    - `src/components/round-input/ConfirmStep.tsx`: 最終収支確認 ＆ 確定コミット。
+    - `src/components/round-input/RyukyokuStep.tsx`: 流局テンパイ選択 ＆ チョンボ入力。
+    - `RoundInputModal.tsx` 本体を約230行へ半減し、状態管理とUI表示を疎結合化。
+  - `npx vitest run`: 全44件 ALL PASS。
+  - `npx tsc --noEmit`: 型エラー 0件。
+  - `next build`: 全静的ルート正常出力確認完了。
+
 ---
 
 # TODO (Next Actions)
@@ -161,8 +177,9 @@
 
 - [ ] **本番デプロイ確認**
   - [ ] Gitコミット & プッシュにより Cloudflare本番環境（`https://mahjong-app.yd1sgc.workers.dev`）へ最新コードを自動反映
-- [ ] **次回開発タスク**
-  - [ ] **Phase 5-E (P3)**: `RoundInputModal.tsx`（556行）のステップコンポーネント分割 & トースト通知（エラーリトライ）導入
+- [ ] **実戦対局テスト**
+  - [ ] 端末（スマホ等）による実際の対局記録・精算・成績閲覧の通し確認
+
 
 
 

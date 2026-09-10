@@ -13,6 +13,7 @@ import { ScoreBoard } from '@/components/ScoreBoard';
 import { ActionPanel } from '@/components/ActionPanel';
 import { RoundInputModal } from '@/components/RoundInputModal';
 import { PinTransferModal } from '@/components/PinTransferModal';
+import { Toast } from '@/components/Toast';
 import { WinType } from '@/types/mahjong';
 
 function GameContent() {
@@ -46,6 +47,11 @@ function GameContent() {
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    onRetry?: () => void;
+  } | null>(null);
 
   const handleOpenWinModal = (type: 'ron' | 'tsumo') => {
     setModalWinType(type);
@@ -62,12 +68,42 @@ function GameContent() {
     setModalOpen(true);
   };
 
+  const handleCommitRoundWithToast = async (...args: Parameters<typeof commitRound>) => {
+    const ok = await commitRound(...args);
+    if (ok) {
+      setToast({ type: 'success', message: '局結果を記録しました' });
+    } else {
+      setToast({
+        type: 'error',
+        message: '局結果の記録に失敗しました',
+        onRetry: () => handleCommitRoundWithToast(...args),
+      });
+    }
+    return ok;
+  };
+
+  const handleUndoWithToast = async () => {
+    const ok = await undoRound();
+    if (ok) {
+      setToast({ type: 'info', message: '直前の局を巻き戻しました' });
+    } else {
+      setToast({ type: 'error', message: 'Undoに失敗しました' });
+    }
+  };
+
   const handleConfirmFinish = async () => {
     try {
       setSubmitting(true);
       const ok = await finishGame();
       if (ok) {
         setSettleModalOpen(false);
+        setToast({ type: 'success', message: '対局を精算・確定しました' });
+      } else {
+        setToast({
+          type: 'error',
+          message: '対局の終了処理に失敗しました',
+          onRetry: handleConfirmFinish,
+        });
       }
     } finally {
       setSubmitting(false);
@@ -221,7 +257,7 @@ function GameContent() {
             onOpenWinModal={handleOpenWinModal}
             onOpenRyukyokuModal={handleOpenRyukyokuModal}
             onOpenChomboModal={handleOpenChomboModal}
-            onUndoClick={undoRound}
+            onUndoClick={handleUndoWithToast}
             onOpenTransferModal={() => setPinModalOpen(true)}
             canUndo={(gameState?.roundHistory.length ?? 0) > 0}
           />
@@ -239,9 +275,19 @@ function GameContent() {
         ruleConfig={ruleConfig}
         draft={draft}
         updateDraft={updateDraft}
-        onCommit={commitRound}
+        onCommit={handleCommitRoundWithToast}
         initialWinType={modalWinType}
       />
+
+      {/* トースト通知 */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onRetry={toast.onRetry}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       {/* 4桁PIN引き継ぎモーダル */}
       <PinTransferModal
