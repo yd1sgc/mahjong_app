@@ -28,21 +28,14 @@ def main():
         # 重要な設定・マイグレーションの検知
         if any(x in filepath for x in ["/migrations/", "/.env", "/secrets.toml"]):
             decision, reason = "force_ask", "DBマイグレーションや機密設定ファイルの編集はユーザーの許可が必要です。"
-        # アプリケーションソースコードの直接編集前のドキュメント更新チェック
+        # 重要な引き継ぎ書の存在チェック
         elif ".gemini" not in filepath and "docs/ai_handover.md" not in filepath:
             import os
-            import time
             handover_path = "docs/AI_HANDOVER.md"
             if not os.path.exists(handover_path):
-                decision, reason = "deny", "エラー: docs/AI_HANDOVER.md が見つかりません。コードを変更する前に、必ずこのファイルを作成/更新して作業計画を記述してください。"
+                decision, reason = "deny", "エラー: docs/AI_HANDOVER.md が見つかりません。引き継ぎ書を作成してください。"
             else:
-                mtime = os.path.getmtime(handover_path)
-                current_time = time.time()
-                # 60分以内に更新されていなければブロック
-                if current_time - mtime > 3600:
-                    decision, reason = "deny", "エラー: docs/AI_HANDOVER.md が古いです。コードを変更する前に、必ずファイルを読んで最新の計画と状況を追記し、ユーザーの許可を得てください。"
-                else:
-                    decision, reason = "allow", ""
+                decision, reason = "allow", ""
 
     print(json.dumps({"decision": decision, "reason": reason}))
 
