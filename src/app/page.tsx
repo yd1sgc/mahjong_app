@@ -1,6 +1,8 @@
 /**
  * ホーム画面：対局開始・中断再開・成績・管理導線
  * mahjong_personal 準拠：中断対局の自動検知バナー・目的別大ボタン・絵文字なし
+ * 
+ * グループ未選択初期化・フリー対局・ルール自動連動・メンバー絞り込み・重複除外対応
  */
 
 'use client';
@@ -12,18 +14,24 @@ import { supabase } from '@/lib/supabase';
 import { GameRow, MemberRow, RuleTemplateRow } from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 
+interface GroupMembership {
+  group_id: string;
+  member_id: string;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [games, setGames] = useState<GameRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [groupMemberships, setGroupMemberships] = useState<GroupMembership[]>([]);
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // 新規対局モーダル用状態
   const [showNewGameModal, setShowNewGameModal] = useState(false);
   const [showSimpleModal, setShowSimpleModal] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(''); // 初期値: '' (未選択)
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
@@ -56,16 +64,16 @@ export default function HomePage() {
           .select('*')
           .eq('is_archived', 0);
 
-        if (grpData && grpData.length > 0) {
-          setGroups(grpData);
-          const defaultGrp: any =
-            grpData.find((g: any) => g.group_name.includes('親族')) || grpData[0];
-          if (defaultGrp?.group_id) {
-            setSelectedGroupId(defaultGrp.group_id);
-          }
-        }
+        if (grpData) setGroups(grpData);
 
-        // (4) ルールテンプレート取得
+        // (4) グループメンバーシップ取得
+        const { data: gmData } = await supabase
+          .from('group_memberships')
+          .select('group_id, member_id');
+
+        if (gmData) setGroupMemberships(gmData as GroupMembership[]);
+
+        // (5) ルールテンプレート取得
         const { data: rData } = await supabase
           .from('rule_templates')
           .select('*')
@@ -73,7 +81,6 @@ export default function HomePage() {
 
         if (rData && rData.length > 0) {
           setRules(rData as any);
-          setSelectedRuleId((rData as any)[0].rule_id);
         }
       } finally {
         setLoading(false);
@@ -86,8 +93,107 @@ export default function HomePage() {
   // 進行中の対局を検知
   const activeGame = games.find((g) => g.status === 'in_progress');
 
+  // グループ変更ハンドラ (ルール自動反映 ＆ メンバー所属整合性検証)
+  const handleGroupChange = (newGroupId: string) => {
+    setSelectedGroupId(newGroupId);
+
+    if (newGroupId === 'free') {
+      // フリー対局の場合: 先頭の公式ルールを選択
+      if (rules.length > 0) {
+        setSelectedRuleId(rules[0].rule_id);
+      }
+    } else if (newGroupId) {
+      // 特定グループの場合: そのグループの default_rule_id を自動セット
+      const grp = groups.find((g) => g.group_id === newGroupId);
+      if (grp?.default_rule_id && rules.some((r) => r.rule_id === grp.default_rule_id)) {
+        setSelectedRuleId(grp.default_rule_id);
+      } else if (rules.length > 0) {
+        setSelectedRuleId(rules[0].rule_id);
+      }
+
+      // 選択中メンバーの所属チェック: 新グループに所属していない人はクリア
+      const validMemberIds = groupMemberships
+        .filter((gm) => gm.group_id === newGroupId)
+        .map((gm) => gm.member_id);
+
+      setSelectedMembers((prev) =>
+        prev.map((mId) => (mId && validMemberIds.includes(mId) ? mId : ''))
+      );
+    } else {
+      // 未選択に戻した場合
+      setSelectedRuleId('');
+      setSelectedMembers(['', '', '', '']);
+    }
+  };
+
+  // 各座席（Seat 1..4）ごとのドロップダウン選択肢生成 (グループ絞り込み ＋ 重複除外)
+  const getAvailableMembersForSeat = (seatIdx: number) => {
+    if (!selectedGroupId) return [];
+
+    let pool = members;
+
+    // 1. グループ絞り込み (フリー対局以外)
+    if (selectedGroupId !== 'free') {
+      const validMemberIds = groupMemberships
+        .filter((gm) => gm.group_id === selectedGroupId)
+        .map((gm) => gm.member_id);
+      pool = pool.filter((m) => validMemberIds.includes(m.member_id));
+    }
+
+    // 2. 他の席で選ばれている人を除外 (現在の seatIdx で選択中の人は選択肢に残す)
+    const chosenInOtherSeats = selectedMembers.filter(
+      (mId, idx) => idx !== seatIdx && mId !== ''
+    );
+
+    return pool.filter((m) => !chosenInOtherSeats.includes(m.member_id));
+  };
+
+  // フリー対局用の有効な group_id を取得（無ければ自動生成）
+  const getEffectiveGroupId = async (): Promise<string> => {
+    if (selectedGroupId && selectedGroupId !== 'free') {
+      return selectedGroupId;
+    }
+
+    // フリー対局用グループを探索
+    let freeGrp = groups.find(
+      (g) => g.display_id === 'free' || g.group_name === 'フリー対局'
+    );
+
+    if (!freeGrp) {
+      // 存在しなければ自動作成
+      const newId = crypto.randomUUID();
+      const defaultRuleId = rules[0]?.rule_id || '';
+      try {
+        const { data, error } = await (supabase.from('groups') as any)
+          .insert({
+            group_id: newId,
+            display_id: 'free',
+            group_name: 'フリー対局',
+            default_rule_id: defaultRuleId,
+            is_archived: 0,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          setGroups((prev) => [...prev, data]);
+          return data.group_id;
+        }
+      } catch {
+        // フォールバック
+      }
+      return groups[0]?.group_id || newId;
+    }
+
+    return freeGrp.group_id;
+  };
+
   // プレイヤー選択の検証
   const validateSelectedPlayers = (): boolean => {
+    if (!selectedGroupId) {
+      alert('グループを選択してください');
+      return false;
+    }
     const validMembers = selectedMembers.filter(Boolean);
     if (validMembers.length !== 4) {
       alert('4名のプレイヤーを選択してください');
@@ -123,11 +229,12 @@ export default function HomePage() {
       const currentRule = rules.find((r) => r.rule_id === selectedRuleId);
       const ruleName = currentRule?.name || '標準ルール';
       const ruleConfig = currentRule?.config_json || {};
+      const effectiveGroupId = await getEffectiveGroupId();
 
       // 1. games レコード作成
       const { error: gErr } = await (supabase.from('games') as any).insert({
         game_id: gameId,
-        group_id: selectedGroupId || groups[0]?.group_id,
+        group_id: effectiveGroupId,
         passcode: pin,
         rule_name_snapshot: ruleName,
         rule_config_snapshot: ruleConfig,
@@ -179,6 +286,12 @@ export default function HomePage() {
     }
   };
 
+  const isReadyToCreate = Boolean(
+    selectedGroupId &&
+    selectedRuleId &&
+    selectedMembers.filter(Boolean).length === 4
+  );
+
   return (
     <main className="w-full min-h-screen bg-black text-white max-w-lg mx-auto px-4 py-6 flex flex-col gap-6">
       {/* アプリヘッダー */}
@@ -223,7 +336,9 @@ export default function HomePage() {
         {/* 1段目: 対局を始める */}
         <button
           type="button"
-          onClick={() => setShowNewGameModal(true)}
+          onClick={() => {
+            setShowNewGameModal(true);
+          }}
           className="h-16 sm:h-20 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-black text-lg sm:text-xl shadow-lg border border-rose-500/50 transition-all flex items-center justify-center touch-manipulation"
         >
           対局を始める
@@ -287,34 +402,46 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* グループ選択 */}
+            {/* グループ選択 (初期未選択 ＋ フリー対局選択肢) */}
             <div>
               <label className="text-xs font-black text-neutral-300 block mb-1.5">
                 対局グループ
               </label>
               <select
                 value={selectedGroupId}
-                onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="w-full h-11 bg-neutral-950 border border-neutral-800 rounded-xl px-3 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
+                onChange={(e) => handleGroupChange(e.target.value)}
+                className={`w-full h-11 bg-neutral-950 border rounded-xl px-3 text-sm font-bold focus:outline-none focus:border-amber-500 ${
+                  !selectedGroupId
+                    ? 'border-amber-500/60 text-neutral-400'
+                    : 'border-neutral-800 text-white'
+                }`}
               >
+                <option value="">グループを選択してください</option>
                 {groups.map((g) => (
                   <option key={g.group_id} value={g.group_id}>
                     {g.group_name}
                   </option>
                 ))}
+                <option value="free">グループ外対局（フリー対局）</option>
               </select>
             </div>
 
-            {/* ルール選択 */}
+            {/* ルール選択 (グループ選択時に自動セット・変更可能) */}
             <div>
               <label className="text-xs font-black text-neutral-300 block mb-1.5">
                 対局ルール
               </label>
               <select
                 value={selectedRuleId}
+                disabled={!selectedGroupId}
                 onChange={(e) => setSelectedRuleId(e.target.value)}
-                className="w-full h-11 bg-neutral-950 border border-neutral-800 rounded-xl px-3 text-sm text-white font-bold focus:outline-none focus:border-amber-500"
+                className={`w-full h-11 bg-neutral-950 border rounded-xl px-3 text-sm font-bold focus:outline-none focus:border-amber-500 ${
+                  !selectedGroupId
+                    ? 'border-neutral-850 text-neutral-600 cursor-not-allowed'
+                    : 'border-neutral-800 text-white'
+                }`}
               >
+                {!selectedGroupId && <option value="">先にグループを選択してください</option>}
                 {rules.map((r) => (
                   <option key={r.rule_id} value={r.rule_id}>
                     {r.name}
@@ -340,36 +467,63 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 4名プレイヤー選択 */}
+            {/* 4名プレイヤー選択 (グループ絞り込み ＆ 重複除外) */}
             <div>
-              <label className="text-xs font-black text-neutral-300 block mb-1.5">
-                対局者 (東・南・西・北の座順)
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {['東家 (起家)', '南家', '西家', '北家'].map((seatLabel, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <span className="text-[11px] text-neutral-400 font-bold">
-                      {seatLabel}
-                    </span>
-                    <select
-                      value={selectedMembers[idx]}
-                      onChange={(e) => {
-                        const next = [...selectedMembers];
-                        next[idx] = e.target.value;
-                        setSelectedMembers(next);
-                      }}
-                      className="h-11 bg-neutral-950 border border-neutral-800 rounded-lg px-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="">選択してください</option>
-                      {members.map((m) => (
-                        <option key={m.member_id} value={m.member_id}>
-                          {m.member_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-black text-neutral-300">
+                  対局者 (東・南・西・北の座順)
+                </label>
+                {selectedGroupId && selectedGroupId !== 'free' && (
+                  <span className="text-[10px] text-amber-400 font-bold">
+                    ※グループ所属者のみ表示中
+                  </span>
+                )}
+                {selectedGroupId === 'free' && (
+                  <span className="text-[10px] text-cyan-400 font-bold">
+                    ※全メンバー表示中 (フリー対局)
+                  </span>
+                )}
               </div>
+
+              {!selectedGroupId ? (
+                <div className="p-4 bg-neutral-950/60 rounded-xl border border-neutral-850 text-center text-xs text-neutral-500 font-bold">
+                  対局グループを選択すると、メンバー選択肢が表示されます
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {['東家 (起家)', '南家', '西家', '北家'].map((seatLabel, idx) => {
+                    const availableMembers = getAvailableMembersForSeat(idx);
+
+                    return (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <span className="text-[11px] text-neutral-400 font-bold">
+                          {seatLabel}
+                        </span>
+                        <select
+                          value={selectedMembers[idx]}
+                          onChange={(e) => {
+                            const next = [...selectedMembers];
+                            next[idx] = e.target.value;
+                            setSelectedMembers(next);
+                          }}
+                          className={`h-11 bg-neutral-950 border rounded-lg px-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500 ${
+                            selectedMembers[idx]
+                              ? 'border-neutral-700 text-white'
+                              : 'border-neutral-850 text-neutral-400'
+                          }`}
+                        >
+                          <option value="">選択してください</option>
+                          {availableMembers.map((m) => (
+                            <option key={m.member_id} value={m.member_id}>
+                              {m.member_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <p className="text-[11px] font-semibold text-neutral-500">
@@ -380,16 +534,25 @@ export default function HomePage() {
               <div className="flex gap-2">
                 <button
                   type="button"
+                  disabled={!isReadyToCreate}
                   onClick={handleStartSimpleGame}
-                  className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:scale-[0.98] border border-amber-500/60 text-amber-300 text-xs font-black transition-all shadow-xs"
+                  className={`flex-1 h-12 rounded-xl text-xs font-black transition-all shadow-xs border ${
+                    isReadyToCreate
+                      ? 'bg-neutral-800 hover:bg-neutral-750 active:scale-[0.98] border-amber-500/60 text-amber-300'
+                      : 'bg-neutral-950 text-neutral-600 border-neutral-850 cursor-not-allowed'
+                  }`}
                 >
                   結果のみ入力
                 </button>
                 <button
                   type="button"
-                  disabled={creating}
+                  disabled={creating || !isReadyToCreate}
                   onClick={handleCreateGame}
-                  className="flex-2 h-12 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white text-xs font-black shadow-md transition-all"
+                  className={`flex-2 h-12 rounded-xl text-xs font-black shadow-md transition-all ${
+                    isReadyToCreate && !creating
+                      ? 'bg-rose-600 hover:bg-rose-500 active:scale-[0.98] text-white'
+                      : 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-neutral-750'
+                  }`}
                 >
                   {creating ? '作成中...' : '対局を作成して開始'}
                 </button>
@@ -410,7 +573,7 @@ export default function HomePage() {
       <SimpleGameInputModal
         isOpen={showSimpleModal}
         onClose={() => setShowSimpleModal(false)}
-        groupId={selectedGroupId || groups[0]?.group_id}
+        groupId={selectedGroupId === 'free' ? groups.find(g => g.display_id === 'free')?.group_id || groups[0]?.group_id : selectedGroupId}
         ruleName={rules.find((r) => r.rule_id === selectedRuleId)?.name || '標準ルール'}
         ruleConfig={(rules.find((r) => r.rule_id === selectedRuleId)?.config_json as any) || {}}
         players={selectedMembers.map((mId, idx) => {
@@ -425,4 +588,3 @@ export default function HomePage() {
     </main>
   );
 }
-
