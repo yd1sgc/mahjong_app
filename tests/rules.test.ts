@@ -227,6 +227,56 @@ describe('rules: recalculateState (局進行・スコア再計算)', () => {
     expect(s2.roundIdx).toBe(1);
   });
 
+  it('四人リーチ（四家立直）での途中流局と供託・スコア変動の整合性', () => {
+    const historyFourRiichi: RoundRecord[] = [
+      {
+        kyoku_name: '東1局',
+        winner: null,
+        loser: null,
+        win_type: 'mid_ryukyoku',
+        ryukyoku_type: 'four_riichi',
+        score: 0,
+        riichi: [...players], // 4名全員立直
+      },
+    ];
+    const s = recalculateState(players, 25000, defaultRule, historyFourRiichi);
+    // デフォルトでは連荘（東1局1本場）
+    expect(s.roundIdx).toBe(0);
+    expect(s.honba).toBe(1);
+    // 供託棒が4本蓄積
+    expect(s.riichiStick).toBe(4);
+    // 全員リーチ棒1000点拠出で24000点
+    expect(s.scores['P1']).toBe(24000);
+    expect(s.scores['P2']).toBe(24000);
+    expect(s.scores['P3']).toBe(24000);
+    expect(s.scores['P4']).toBe(24000);
+  });
+
+  it('荒廃流局時に立直者が親の場合、テンパイ連荘ルールで連荘となること', () => {
+    const history: RoundRecord[] = [
+      {
+        kyoku_name: '東1局',
+        winner: null,
+        loser: null,
+        win_type: 'ryukyoku',
+        score: 0,
+        riichi: ['P1'], // 親P1が立直
+        tenpai: ['P1'], // 立直者P1は必ず聴牌
+      },
+    ];
+    const s = recalculateState(players, 25000, defaultRule, history);
+    // 親P1がテンパイしているため連荘（東1局1本場）
+    expect(s.roundIdx).toBe(0);
+    expect(s.honba).toBe(1);
+    expect(s.riichiStick).toBe(1);
+    // P1はリーチ棒-1000 + 1人テンパイ料+3000 = +2000 (27000)
+    expect(s.scores['P1']).toBe(27000);
+    // 子P2,P3,P4はノーテン罰符各-1000 = 24000
+    expect(s.scores['P2']).toBe(24000);
+    expect(s.scores['P3']).toBe(24000);
+    expect(s.scores['P4']).toBe(24000);
+  });
+
   it('連荘ルール切替（テンパイ連荘 vs アガリ連荘）', () => {
     const ryukyokuHistory: RoundRecord[] = [
       {

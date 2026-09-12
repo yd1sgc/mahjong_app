@@ -10,6 +10,7 @@ import { RuleConfig } from '@/types/mahjong';
 interface RyukyokuStepProps {
   players: string[];
   tenpai: string[];
+  riichiDeclared?: string[];
   submitting: boolean;
   ruleConfig: RuleConfig;
   allowMidRyukyoku: boolean;
@@ -17,7 +18,7 @@ interface RyukyokuStepProps {
   onSelectMidType: (type: string) => void;
   onToggleTenpai: (player: string) => void;
   onCommitNormal: () => void;
-  onCommitMid: () => void;
+  onCommitMid: (midType: string) => void;
 }
 
 export const MID_RYUKYOKU_TYPES = [
@@ -32,6 +33,7 @@ export const MID_RYUKYOKU_TYPES = [
 export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
   players,
   tenpai,
+  riichiDeclared = [],
   submitting,
   ruleConfig,
   allowMidRyukyoku,
@@ -43,8 +45,9 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
 }) => {
   const [tab, setTab] = useState<'normal' | 'mid'>('normal');
 
+  const effectiveTenpai = Array.from(new Set([...tenpai, ...riichiDeclared]));
   const bappuTotal = ruleConfig.detail?.noten_bappu_pt ?? 3000;
-  const nT = tenpai.length;
+  const nT = effectiveTenpai.length;
   const nN = 4 - nT;
 
   const bappuSummaryText = (() => {
@@ -95,22 +98,32 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             {players.map((p) => {
-              const isTenpai = tenpai.includes(p);
+              const isRiichi = riichiDeclared.includes(p);
+              const isTenpai = isRiichi || tenpai.includes(p);
               return (
                 <button
                   key={p}
                   type="button"
-                  onClick={() => onToggleTenpai(p)}
+                  disabled={isRiichi}
+                  onClick={() => !isRiichi && onToggleTenpai(p)}
                   className={`h-14 rounded-xl font-black text-sm flex items-center justify-center transition-all border touch-manipulation ${
-                    isTenpai
+                    isRiichi
+                      ? 'bg-cyan-900/40 border-cyan-400/80 text-cyan-200 cursor-default shadow-xs'
+                      : isTenpai
                       ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200 shadow-xs'
                       : 'bg-neutral-850 border-neutral-700/80 text-neutral-300'
                   }`}
                 >
                   <span>{p}</span>
-                  <span className="text-xs ml-1.5 opacity-80">
-                    ({isTenpai ? '聴牌' : '不聴'})
-                  </span>
+                  {isRiichi ? (
+                    <span className="text-xs ml-1.5 text-amber-300 font-bold">
+                      (立直・聴牌)
+                    </span>
+                  ) : (
+                    <span className="text-xs ml-1.5 opacity-80">
+                      ({isTenpai ? '聴牌' : '不聴'})
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -174,7 +187,7 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
           <button
             type="button"
             disabled={submitting}
-            onClick={onCommitMid}
+            onClick={() => onCommitMid(selectedMidType)}
             className="w-full h-12 rounded-xl bg-amber-600 hover:bg-amber-500 active:bg-amber-400 disabled:opacity-50 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
           >
             {submitting ? '記録中...' : '途中流局を確定して次局へ'}

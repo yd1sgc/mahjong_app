@@ -32,6 +32,7 @@ interface RoundInputModalProps {
   updateDraft: (updater: Partial<RoundInputDraft> | ((prev: RoundInputDraft) => RoundInputDraft)) => void;
   onCommit: (record: RoundRecord, han?: number, fu?: number) => Promise<boolean>;
   initialWinType: WinType;
+  riichiDeclared?: string[];
 }
 
 export const RoundInputModal: React.FC<RoundInputModalProps> = ({
@@ -46,6 +47,7 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
   updateDraft,
   onCommit,
   initialWinType,
+  riichiDeclared = [],
 }) => {
   const [submitting, setSubmitting] = useState(false);
   // 和了フローのステップ: 0: 関係者, 1: 点数, 2: 確認
@@ -60,13 +62,17 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const isRyukyokuType = initialWinType === 'ryukyoku' || initialWinType === 'mid_ryukyoku';
       updateDraft({
         winType: initialWinType,
         multiWinners: [],
+        tenpai: isRyukyokuType
+          ? Array.from(new Set([...(draft.tenpai || []), ...riichiDeclared]))
+          : (draft.tenpai || []),
       });
       setStep(0);
     }
-  }, [isOpen, initialWinType, updateDraft]);
+  }, [isOpen, initialWinType, updateDraft, riichiDeclared]);
 
   if (!isOpen) return null;
 
@@ -89,80 +95,93 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
   const multiWinNames = multiWinners.map((w) => w.winner);
   const closestWinner = getClosestWinner(players, loser || '', multiWinNames);
 
-  // 確定コミット処理
-  const handleFinalCommit = async () => {
+  // 確定コミット実行ヘルパー
+  const executeCommit = async (record: RoundRecord, hanVal?: number, fuVal?: number) => {
     if (submitting) return;
     setSubmitting(true);
-
     try {
-      let record: RoundRecord;
-
-      if (winType === 'ron' || winType === 'tsumo') {
-        record = {
-          kyoku_name: roundName,
-          winner,
-          loser: winType === 'ron' ? loser : null,
-          win_type: winType,
-          score: baseScore,
-          riichi: [],
-          tenpai: [],
-        };
-      } else if (winType === 'multi_ron') {
-        record = {
-          kyoku_name: roundName,
-          winner: closestWinner || null,
-          loser: loser || null,
-          win_type: 'multi_ron',
-          score: 0,
-          riichi: [],
-          multi_wins: multiWinners.map((w) => ({
-            winner: w.winner,
-            points_data: {
-              total: w.score,
-              han: w.han,
-              fu: w.fu,
-            },
-          })),
-        };
-      } else if (winType === 'ryukyoku') {
-        record = {
-          kyoku_name: roundName,
-          winner: null,
-          loser: null,
-          win_type: 'ryukyoku',
-          score: 0,
-          riichi: [],
-          tenpai,
-        };
-      } else if (winType === 'mid_ryukyoku') {
-        record = {
-          kyoku_name: roundName,
-          winner: null,
-          loser: null,
-          win_type: 'mid_ryukyoku',
-          score: 0,
-          riichi: [],
-          ryukyoku_type: ryukyokuType,
-        };
-      } else {
-        // chombo
-        record = {
-          kyoku_name: roundName,
-          winner: chomboPlayer,
-          loser: null,
-          win_type: 'chombo',
-          score: 0,
-          riichi: [],
-        };
-      }
-
-      const ok = await onCommit(record, han, fu);
+      const ok = await onCommit(record, hanVal, fuVal);
       if (ok) {
         onClose();
       }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // 和了・チョンボ等の確定処理
+  const handleFinalCommit = async () => {
+    let record: RoundRecord;
+
+    if (winType === 'ron' || winType === 'tsumo') {
+      record = {
+        kyoku_name: roundName,
+        winner,
+        loser: winType === 'ron' ? loser : null,
+        win_type: winType,
+        score: baseScore,
+        riichi: [...riichiDeclared],
+        tenpai: [],
+      };
+    } else if (winType === 'multi_ron') {
+      record = {
+        kyoku_name: roundName,
+        winner: closestWinner || null,
+        loser: loser || null,
+        win_type: 'multi_ron',
+        score: 0,
+        riichi: [...riichiDeclared],
+        multi_wins: multiWinners.map((w) => ({
+          winner: w.winner,
+          points_data: {
+            total: w.score,
+            han: w.han,
+            fu: w.fu,
+          },
+        })),
+      };
+    } else {
+      // chombo
+      record = {
+        kyoku_name: roundName,
+        winner: chomboPlayer,
+        loser: null,
+        win_type: 'chombo',
+        score: 0,
+        riichi: [...riichiDeclared],
+      };
+    }
+
+    await executeCommit(record, han, fu);
+  };
+
+  // 荒廃流局（通常流局）確定処理
+  const handleCommitNormalRyukyoku = async () => {
+    const finalTenpai = Array.from(new Set([...tenpai, ...riichiDeclared]));
+    const record: RoundRecord = {
+      kyoku_name: roundName,
+      winner: null,
+      loser: null,
+      win_type: 'ryukyoku',
+      score: 0,
+      riichi: [...riichiDeclared],
+      tenpai: finalTenpai,
+    };
+    await executeCommit(record);
+  };
+
+  // 途中流局確定処理
+  const handleCommitMidRyukyoku = async (midType: string) => {
+    const record: RoundRecord = {
+      kyoku_name: roundName,
+      winner: null,
+      loser: null,
+      win_type: 'mid_ryukyoku',
+      score: 0,
+      riichi: [...riichiDeclared],
+      ryukyoku_type: midType || ryukyokuType || 'kyushu',
+    };
+    await executeCommit(record);
   };
 
   // ダブロンの和了者トグル処理
@@ -282,6 +301,7 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
           <RyukyokuStep
             players={players}
             tenpai={tenpai}
+            riichiDeclared={riichiDeclared}
             submitting={submitting}
             ruleConfig={ruleConfig}
             allowMidRyukyoku={allowMidRyukyoku}
@@ -293,14 +313,8 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
                 : [...tenpai, p];
               updateDraft({ tenpai: next });
             }}
-            onCommitNormal={() => {
-              updateDraft({ winType: 'ryukyoku' });
-              handleFinalCommit();
-            }}
-            onCommitMid={() => {
-              updateDraft({ winType: 'mid_ryukyoku' });
-              handleFinalCommit();
-            }}
+            onCommitNormal={handleCommitNormalRyukyoku}
+            onCommitMid={handleCommitMidRyukyoku}
           />
         )}
 

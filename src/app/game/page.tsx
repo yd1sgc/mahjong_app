@@ -277,6 +277,7 @@ function GameContent() {
         updateDraft={updateDraft}
         onCommit={handleCommitRoundWithToast}
         initialWinType={modalWinType}
+        riichiDeclared={gameState?.riichiDeclared ?? []}
       />
 
       {/* トースト通知 */}
