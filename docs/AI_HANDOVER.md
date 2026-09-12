@@ -52,7 +52,7 @@
 - **本番環境URL:** `https://mahjong-app.yd1sgc.workers.dev`
 - **DB / BaaS:** Supabase（PostgreSQL, RLS, Realtime, RPCトランザクション配備済み）
 - **CI/CD:** GitHub Actions（スリープ防止cron、自動デプロイ連携済み）
-- **品質基準:** Vitest 全47件 PASS（結果のみ入力テスト含む）、TypeScript型エラー 0件、`next build` 全ルート正常出力確認済み
+- **品質基準:** Vitest 全49件 PASS（結果のみ入力テスト・ダブロン・上家取り・途中流局テスト含む）、TypeScript型エラー 0件、`next build` 全ルート正常出力確認済み
 
 ---
 

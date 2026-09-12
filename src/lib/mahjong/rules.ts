@@ -36,6 +36,25 @@ export function getRoundName(roundIdx: number): string {
 }
 
 /**
+ * 放銃者から見てツモ巡が最も近い和了者（上家取り）を取得する純粋関数
+ * @param players 座順プレイヤー配列（東・南・西・北）
+ * @param loser 放銃者名
+ * @param winners 和了者名配列
+ */
+export function getClosestWinner(players: string[], loser: string, winners: string[]): string {
+  if (!loser || winners.length === 0) return winners[0] || '';
+  const loserIdx = players.indexOf(loser);
+  if (loserIdx === -1) return winners[0] || '';
+
+  const distance = (p: string) => {
+    const idx = players.indexOf(p);
+    return (idx - loserIdx + players.length) % players.length;
+  };
+
+  return [...winners].sort((a, b) => distance(a) - distance(b))[0];
+}
+
+/**
  * 局履歴から現在の対局状態（スコア、本場、供託、局数）を完全に再計算する純粋関数
  *
  * @param players プレイヤー配列（東・南・西・北）
@@ -196,18 +215,8 @@ export function recalculateState(
 
       case 'multi_ron': {
         const winsData = r.multi_wins || [];
-        const loserIdx = players.indexOf(loser);
-
-        // 放銃者から見てツモ巡が最も近い和了者（上家取り）
-        const distance = (p: string) => {
-          const idx = players.indexOf(p);
-          return (idx - loserIdx + players.length) % players.length;
-        };
-
-        const closestWinner =
-          winsData.length > 0
-            ? [...winsData].sort((a, b) => distance(a.winner) - distance(b.winner))[0].winner
-            : '';
+        const winNames = winsData.map((w) => w.winner);
+        const closestWinner = getClosestWinner(players, loser, winNames);
 
         let isDealerWon = false;
 

@@ -8,6 +8,7 @@ import { useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   calculateGameSettlement,
+  getClosestWinner,
   recalculateState,
 } from '@/lib/mahjong/rules';
 import {
@@ -165,12 +166,22 @@ export function useGameActions({
         const honbaPt = ruleConfig.detail?.honba_pt ?? 300;
         const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
 
+        const multiWins = newRound.multi_wins || [];
+        const winNames = multiWins.map((w) => w.winner);
+        const closestWinner =
+          newRound.win_type === 'multi_ron'
+            ? getClosestWinner(players, newRound.loser || '', winNames)
+            : '';
+
         const seatPayloads: RoundSeatInsert[] = players.map((p, idx) => {
           const seat = idx + 1;
           const part = participants.find((pt) => pt.seat === seat);
           const memberId = part?.member_id || p;
 
-          const isWinner = newRound.winner === p ? 1 : 0;
+          const isWinner =
+            newRound.win_type === 'multi_ron'
+              ? multiWins.some((w) => w.winner === p) ? 1 : 0
+              : newRound.winner === p ? 1 : 0;
           const isLoser = newRound.loser === p ? 1 : 0;
           const isRiichi = newRound.riichi.includes(p) ? 1 : 0;
           const isTenpai = (newRound.tenpai || []).includes(p) ? 1 : 0;
@@ -203,7 +214,24 @@ export function useGameActions({
               honbaPoint = honbaEach;
               basePoint = payTotal - honbaEach;
             }
-          } else if (newRound.win_type === 'chombo' || newRound.win_type === 'ryukyoku') {
+          } else if (newRound.win_type === 'multi_ron') {
+            if (isWinner) {
+              const myWin = multiWins.find((w) => w.winner === p);
+              basePoint = myWin?.points_data?.total ?? 0;
+              honbaPoint = gameState.honba * honbaPt;
+              if (p === closestWinner) {
+                kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+              }
+            } else if (isLoser) {
+              const totalBase = multiWins.reduce((sum, w) => sum + (w.points_data?.total ?? 0), 0);
+              basePoint = -totalBase;
+              honbaPoint = -multiWins.length * (gameState.honba * honbaPt);
+            }
+          } else if (
+            newRound.win_type === 'chombo' ||
+            newRound.win_type === 'ryukyoku' ||
+            newRound.win_type === 'mid_ryukyoku'
+          ) {
             basePoint = scoreDelta;
           }
 
@@ -217,8 +245,16 @@ export function useGameActions({
             penalty_point: 0,
             score_delta: scoreDelta,
             chip_delta: 0,
-            han: isWinner ? han ?? null : null,
-            fu: isWinner ? fu ?? null : null,
+            han: isWinner
+              ? (newRound.win_type === 'multi_ron'
+                  ? multiWins.find((w) => w.winner === p)?.points_data?.han ?? null
+                  : han ?? null)
+              : null,
+            fu: isWinner
+              ? (newRound.win_type === 'multi_ron'
+                  ? multiWins.find((w) => w.winner === p)?.points_data?.fu ?? null
+                  : fu ?? null)
+              : null,
             is_winner: isWinner,
             is_loser: isLoser,
             is_riichi: isRiichi,

@@ -3,6 +3,7 @@ import {
   checkGameEnd,
   recalculateState,
   calculateGameSettlement,
+  getClosestWinner,
 } from '../src/lib/mahjong/rules';
 import { RoundRecord, RuleConfig } from '../src/types/mahjong';
 
@@ -134,6 +135,64 @@ describe('rules: recalculateState (局進行・スコア再計算)', () => {
     expect(state.scores['P2']).toBe(25000 + 3900 + 300);
     // 親P1が和了したので連荘（東1局2本場）
     expect(state.roundIdx).toBe(0);
+    expect(state.honba).toBe(2);
+  });
+
+  it('上家取り判定: getClosestWinnerがツモ巡最寄りの和了者を正しく特定すること', () => {
+    // players: ['P1', 'P2', 'P3', 'P4'] (東, 南, 西, 北)
+    // 放銃者: P2 (南家)
+    // 和了者: P1 (東家: 距離3), P3 (西家: 距離1), P4 (北家: 距離2)
+    expect(getClosestWinner(players, 'P2', ['P1', 'P3'])).toBe('P3');
+    expect(getClosestWinner(players, 'P2', ['P1', 'P4'])).toBe('P4');
+    expect(getClosestWinner(players, 'P2', ['P1', 'P3', 'P4'])).toBe('P3');
+
+    // 放銃者: P4 (北家)
+    // 和了者: P1 (東家: 距離1), P2 (南家: 距離2) -> P1が最寄り
+    expect(getClosestWinner(players, 'P4', ['P2', 'P1'])).toBe('P1');
+  });
+
+  it('トリプルロン時の各打点・本場・供託上家取りの整合性', () => {
+    const roundHistory: RoundRecord[] = [
+      {
+        kyoku_name: '東2局',
+        winner: 'P1', // 上家取り
+        loser: 'P4', // 北家放銃
+        win_type: 'multi_ron',
+        score: 0,
+        riichi: [],
+        multi_wins: [
+          { winner: 'P1', points_data: { total: 2000 } }, // 東家（距離1）
+          { winner: 'P2', points_data: { total: 3900 } }, // 南家（距離2）
+          { winner: 'P3', points_data: { total: 8000 } }, // 西家（距離3）
+        ],
+      },
+    ];
+    // 供託1本（1000点）持ち越し状態とするために前局リーチ流局を入れる
+    const historyWithRiichi: RoundRecord[] = [
+      {
+        kyoku_name: '東1局',
+        winner: null,
+        loser: null,
+        win_type: 'ryukyoku',
+        score: 0,
+        riichi: ['P4'],
+        tenpai: [],
+      },
+      ...roundHistory,
+    ];
+
+    const state = recalculateState(players, 25000, defaultRule, historyWithRiichi);
+
+    // 放銃者P4: 25000 - 1000(前局リーチ) - (2000+300) - (3900+300) - (8000+300) = 9200
+    expect(state.scores['P4']).toBe(25000 - 1000 - (2000 + 300) - (3900 + 300) - (8000 + 300));
+    // P1 (上家取り): 25000 + 2000 + 300 + 1000(供託回収) = 28300
+    expect(state.scores['P1']).toBe(25000 + 2000 + 300 + 1000);
+    // P2 (東2局の親): 25000 + 3900 + 300 = 29200
+    expect(state.scores['P2']).toBe(25000 + 3900 + 300);
+    // P3: 25000 + 8000 + 300 = 33300
+    expect(state.scores['P3']).toBe(25000 + 8000 + 300);
+    // 東2局の親P2が和了したため連荘（東2局2本場）
+    expect(state.roundIdx).toBe(1);
     expect(state.honba).toBe(2);
   });
 

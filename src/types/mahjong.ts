@@ -41,7 +41,19 @@ export interface DetailRuleConfig {
   tenpai_yame?: boolean;
   /** 途中流局時の連荘設定 ('renchan' | 'ryukyoku') */
   kyushu?: 'renchan' | 'ryukyoku';
+  /** ダブロン・トリプルロンの可否 (true: あり, false: なし/頭ハネ) デフォルト: true */
+  allow_multi_ron?: boolean;
+  /** 途中流局（九種九牌、四風連打等）の可否 (true: あり, false: なし/荒廃流局まで続行) デフォルト: true */
+  allow_mid_ryukyoku?: boolean;
   [key: string]: unknown;
+}
+
+/** ダブロン入力用の和了者情報下書き */
+export interface MultiWinnerDraft {
+  winner: string;
+  han: number;
+  fu: number;
+  score: number;
 }
 
 /** ルール設定全体 */
@@ -81,6 +93,8 @@ export interface MultiWinDetail {
   winner: string;
   points_data: {
     total: number;
+    han?: number;
+    fu?: number;
   };
 }
 

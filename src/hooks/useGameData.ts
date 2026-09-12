@@ -116,7 +116,8 @@ export function useGameData(
       // RoundRecord 形式へマッピング
       const history: RoundRecord[] = typedRounds.map((r) => {
         const seats = r.round_seats || [];
-        const winnerSeat = seats.find((s) => s.is_winner === 1);
+        const winnerSeats = seats.filter((s) => s.is_winner === 1);
+        const winnerSeat = winnerSeats[0] || null;
         const loserSeat = seats.find((s) => s.is_loser === 1);
         const riichiList = seats
           .filter((s) => s.is_riichi === 1)
@@ -124,6 +125,18 @@ export function useGameData(
         const tenpaiList = seats
           .filter((s) => s.is_tenpai === 1)
           .map((s) => playerList[s.seat - 1]);
+
+        const multiWins =
+          r.result_type === 'multi_ron' || winnerSeats.length > 1
+            ? winnerSeats.map((ws) => ({
+                winner: playerList[ws.seat - 1],
+                points_data: {
+                  total: Math.abs(ws.base_point || 0),
+                  han: ws.han ?? undefined,
+                  fu: ws.fu ?? undefined,
+                },
+              }))
+            : undefined;
 
         return {
           kyoku_name: r.kyoku_name,
@@ -133,6 +146,7 @@ export function useGameData(
           score: Math.abs(winnerSeat?.base_point || 0),
           riichi: riichiList,
           tenpai: tenpaiList,
+          multi_wins: multiWins,
         };
       });
 

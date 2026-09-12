@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { WinType } from '@/types/mahjong';
+import { MultiWinnerDraft, WinType } from '@/types/mahjong';
 
 export interface RoundInputDraft {
   winType: WinType;
@@ -14,6 +14,8 @@ export interface RoundInputDraft {
   fu: number;
   tenpai: string[];
   chomboPlayer: string | null;
+  multiWinners?: MultiWinnerDraft[];
+  ryukyokuType?: string;
 }
 
 export const DEFAULT_DRAFT: RoundInputDraft = {
@@ -24,6 +26,8 @@ export const DEFAULT_DRAFT: RoundInputDraft = {
   fu: 30,
   tenpai: [],
   chomboPlayer: null,
+  multiWinners: [],
+  ryukyokuType: 'kyushu',
 };
 
 export function useGameDraft(gameId: string) {

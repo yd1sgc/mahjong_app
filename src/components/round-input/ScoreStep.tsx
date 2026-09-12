@@ -1,16 +1,19 @@
 /**
- * 点数選択ステップ (Step 2: プリセットグリッド ＋ 翻符手動計算)
+ * 点数選択ステップ (Step 2: 3x4完全スクロールレスグリッド ＋ 倍満〜/その他ポップアップ)
+ * 単一和了およびダブロン（複数和了者）の双方に対応
  */
 
 'use client';
 
 import React, { useState } from 'react';
-import { WinType } from '@/types/mahjong';
+import { WinType, MultiWinnerDraft } from '@/types/mahjong';
 import {
-  KO_RON_PRESETS,
-  OYA_RON_PRESETS,
-  KO_TSUMO_PRESETS,
-  OYA_TSUMO_PRESETS,
+  KO_RON_PRESETS_3X4,
+  OYA_RON_PRESETS_3X4,
+  KO_TSUMO_PRESETS_3X4,
+  OYA_TSUMO_PRESETS_3X4,
+  HIGH_SCORE_PRESETS,
+  ScorePresetItem,
   HAN_OPTIONS,
   FU_OPTIONS,
 } from '@/lib/mahjong/presets';
@@ -18,127 +21,299 @@ import {
 interface ScoreStepProps {
   winner: string | null;
   winType: WinType;
-  isDealerWinner: boolean;
-  initialHan: number;
-  initialFu: number;
-  onSelectPreset: (p: { pts: number; han: number; fu: number }) => void;
-  onApplyCustomCalc: (han: number, fu: number) => void;
+  currentDealer: string;
+  multiWinners: MultiWinnerDraft[];
+  onSelectSingleScore: (p: { pts: number; han: number; fu: number }) => void;
+  onUpdateMultiWinnerScore: (winner: string, pts: number, han: number, fu: number) => void;
   onBack: () => void;
+  onNext: () => void;
 }
 
 export const ScoreStep: React.FC<ScoreStepProps> = ({
   winner,
   winType,
-  isDealerWinner,
-  initialHan,
-  initialFu,
-  onSelectPreset,
-  onApplyCustomCalc,
+  currentDealer,
+  multiWinners,
+  onSelectSingleScore,
+  onUpdateMultiWinnerScore,
   onBack,
+  onNext,
 }) => {
-  const [showCustomCalc, setShowCustomCalc] = useState(false);
-  const [customHan, setCustomHan] = useState(initialHan || 1);
-  const [customFu, setCustomFu] = useState(initialFu || 30);
+  // ダブロン時のアクティブ和了者インデックス
+  const [activeMultiIdx, setActiveMultiIdx] = useState(0);
+  // 「倍満〜 / その他」展開モーダル
+  const [showHighOrCustomModal, setShowHighOrCustomModal] = useState(false);
+  const [customHan, setCustomHan] = useState(1);
+  const [customFu, setCustomFu] = useState(30);
 
-  const presets =
-    winType === 'ron'
-      ? isDealerWinner
-        ? OYA_RON_PRESETS
-        : KO_RON_PRESETS
-      : isDealerWinner
-      ? OYA_TSUMO_PRESETS
-      : KO_TSUMO_PRESETS;
+  const isMulti = winType === 'multi_ron';
+  const currentTargetWinner = isMulti
+    ? multiWinners[activeMultiIdx]?.winner || ''
+    : winner || '';
+
+  const isTargetDealer = currentTargetWinner === currentDealer;
+
+  // 3x4プリセットの取得 (11件)
+  const presets3x4: ScorePresetItem[] = (() => {
+    if (winType === 'tsumo') {
+      return isTargetDealer ? OYA_TSUMO_PRESETS_3X4 : KO_TSUMO_PRESETS_3X4;
+    }
+    return isTargetDealer ? OYA_RON_PRESETS_3X4 : KO_RON_PRESETS_3X4;
+  })();
+
+  // 高打点（倍満〜）プリセットの取得
+  const highPresets = (() => {
+    if (winType === 'tsumo') {
+      return isTargetDealer ? HIGH_SCORE_PRESETS.oya_tsumo : HIGH_SCORE_PRESETS.ko_tsumo;
+    }
+    return isTargetDealer ? HIGH_SCORE_PRESETS.oya_ron : HIGH_SCORE_PRESETS.ko_ron;
+  })();
+
+  // プリセット選択時のハンドラ
+  const handleSelectPreset = (p: ScorePresetItem) => {
+    if (isMulti) {
+      onUpdateMultiWinnerScore(currentTargetWinner, p.pts, p.han, p.fu);
+      // 次の和了者が未設定なら自動的に次の和了者タブへ
+      if (activeMultiIdx < multiWinners.length - 1) {
+        setActiveMultiIdx((prev) => prev + 1);
+      }
+    } else {
+      onSelectSingleScore(p);
+      onNext();
+    }
+  };
+
+  // 高打点・手動計算適用ハンドラ
+  const handleApplyCustom = (pts: number, han: number, fu: number) => {
+    if (isMulti) {
+      onUpdateMultiWinnerScore(currentTargetWinner, pts, han, fu);
+      setShowHighOrCustomModal(false);
+      if (activeMultiIdx < multiWinners.length - 1) {
+        setActiveMultiIdx((prev) => prev + 1);
+      }
+    } else {
+      onSelectSingleScore({ pts, han, fu });
+      setShowHighOrCustomModal(false);
+      onNext();
+    }
+  };
+
+  // ダブロン時に全員の点数が設定済みか確認
+  const allMultiReady =
+    isMulti &&
+    multiWinners.length >= 2 &&
+    multiWinners.every((w) => w.score > 0);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-black text-neutral-200">
-          Step 3/3: 点数を選択 ({winner} / {winType === 'ron' ? 'ロン' : 'ツモ'})
-        </p>
+      {/* ─── ヘッダー ─── */}
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+        <div>
+          <span className="text-xs font-black text-neutral-200">
+            Step 2/3: 点数を選択
+          </span>
+          <span className="text-xs text-neutral-400 ml-1.5 font-bold">
+            ({currentTargetWinner} {isTargetDealer ? '親' : '子'})
+          </span>
+        </div>
         <button
           type="button"
           onClick={onBack}
           className="text-xs text-neutral-400 hover:text-white underline font-bold"
         >
-          方式を変更
+          関係者を変更
         </button>
       </div>
 
-      {/* プリセットボタン一覧 */}
-      <div className="grid grid-cols-3 gap-1.5 max-h-[48dvh] overflow-y-auto p-1 bg-neutral-950 rounded-xl border border-neutral-800">
-        {presets.map((preset) => (
+      {/* ─── ダブロン時の和了者切替タブ ─── */}
+      {isMulti && (
+        <div className="flex flex-col gap-1">
+          <div className="grid grid-cols-2 gap-1.5">
+            {multiWinners.map((mw, idx) => {
+              const isSelected = idx === activeMultiIdx;
+              const isOya = mw.winner === currentDealer;
+              return (
+                <button
+                  key={mw.winner}
+                  type="button"
+                  onClick={() => setActiveMultiIdx(idx)}
+                  className={`h-11 rounded-xl font-black text-xs px-2.5 flex items-center justify-between border transition-all ${
+                    isSelected
+                      ? 'bg-amber-600/30 border-amber-400 text-amber-300 shadow-sm'
+                      : 'bg-neutral-850 border-neutral-750 text-neutral-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>{mw.winner}</span>
+                    {isOya && <span className="text-[10px] text-amber-400 font-bold">(親)</span>}
+                  </div>
+                  <span className="font-mono text-xs">
+                    {mw.score > 0 ? `${mw.score.toLocaleString()}点` : '未選択'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 3x4 グリッド (11枠 + その他1枠 = 計12枠) ─── */}
+      <div className="grid grid-cols-3 gap-2">
+        {presets3x4.map((preset) => (
           <button
             key={preset.label}
             type="button"
-            onClick={() => onSelectPreset(preset)}
-            className="min-h-[46px] p-1.5 rounded-lg bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation"
+            onClick={() => handleSelectPreset(preset)}
+            className="h-14 rounded-xl bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs"
           >
-            <span className="leading-tight">{preset.label.split(' ')[0]}</span>
-            <span className="text-[10px] font-normal text-neutral-400 mt-0.5">
+            <span className="text-sm font-black font-mono">
+              {preset.label.split(' ')[0]}
+            </span>
+            <span className="text-[10px] font-medium text-neutral-400 mt-0.5">
               {preset.label.split(' ')[1] || ''}
             </span>
           </button>
         ))}
-      </div>
 
-      {/* 翻・符 手動計算アコーディオン */}
-      <div className="border border-neutral-800 rounded-xl overflow-hidden bg-neutral-950/60">
+        {/* 12番目の枠: 倍満〜 / その他 */}
         <button
           type="button"
-          onClick={() => setShowCustomCalc((prev) => !prev)}
-          className="w-full px-3 py-2 text-xs font-bold text-neutral-400 hover:text-white flex items-center justify-between"
+          onClick={() => setShowHighOrCustomModal(true)}
+          className="h-14 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:bg-neutral-700 border border-neutral-600 text-amber-300 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs"
         >
-          <span>翻・符から手動計算する</span>
-          <span>{showCustomCalc ? '▲ 閉じる' : '▼ 開く'}</span>
+          <span className="text-xs font-black">倍満〜 / その他</span>
+          <span className="text-[10px] font-normal text-neutral-400 mt-0.5">
+            翻・符手動計算
+          </span>
         </button>
+      </div>
 
-        {showCustomCalc && (
-          <div className="p-3 border-t border-neutral-800 flex flex-col gap-2.5">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-bold text-neutral-400 block mb-1">
-                  翻 (Han)
-                </label>
-                <select
-                  value={customHan}
-                  onChange={(e) => setCustomHan(Number(e.target.value))}
-                  className="w-full h-10 bg-neutral-900 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
-                >
-                  {HAN_OPTIONS.map((h) => (
-                    <option key={h} value={h}>
-                      {h >= 13 ? '13翻 (役満)' : `${h}翻`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-neutral-400 block mb-1">
-                  符 (Fu)
-                </label>
-                <select
-                  value={customFu}
-                  onChange={(e) => setCustomFu(Number(e.target.value))}
-                  className="w-full h-10 bg-neutral-900 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
-                >
-                  {FU_OPTIONS.map((f) => (
-                    <option key={f} value={f}>
-                      {f}符
-                    </option>
-                  ))}
-                </select>
+      {/* ─── ダブロン時: 全員選択完了後の次へボタン ─── */}
+      {isMulti && (
+        <div className="pt-2">
+          <button
+            type="button"
+            disabled={!allMultiReady}
+            onClick={onNext}
+            className={`w-full h-12 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
+              allMultiReady
+                ? 'bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black'
+                : 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-neutral-750'
+            }`}
+          >
+            確認画面へ進む &rarr;
+          </button>
+        </div>
+      )}
+
+      {/* ─── モーダル: 倍満以上 ＆ 翻・符手動計算 ─── */}
+      {showHighOrCustomModal && (
+        <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3">
+          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-750 rounded-2xl p-4 flex flex-col gap-3.5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <span className="text-sm font-black text-white">
+                高打点・翻符手動計算 ({currentTargetWinner})
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowHighOrCustomModal(false)}
+                className="text-neutral-400 hover:text-white text-base font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 高打点クイック選択 */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-bold text-neutral-400">
+                倍満以上の役
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {highPresets.map((hp) => (
+                  <button
+                    key={hp.label}
+                    type="button"
+                    onClick={() => handleApplyCustom(hp.pts, hp.han, hp.fu)}
+                    className="h-13 rounded-xl bg-neutral-850 hover:bg-amber-600 hover:text-white border border-neutral-700 text-neutral-200 font-black text-xs flex flex-col items-center justify-center transition-all"
+                  >
+                    <span className="text-xs font-bold">{hp.label.split(' ')[1] || hp.label}</span>
+                    <span className="text-[10px] font-mono opacity-80">{hp.pts.toLocaleString()}点</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onApplyCustomCalc(customHan, customFu)}
-              className="w-full h-10 rounded-lg bg-neutral-800 hover:bg-neutral-700 font-bold text-xs text-white border border-neutral-700 transition-colors"
-            >
-              この翻・符で決定
-            </button>
+            {/* 翻・符手動セレクタ */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
+              <span className="text-[11px] font-bold text-neutral-400">
+                翻と符を手動指定
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-neutral-500 block mb-1">
+                    翻 (Han)
+                  </label>
+                  <select
+                    value={customHan}
+                    onChange={(e) => setCustomHan(Number(e.target.value))}
+                    className="w-full h-10 bg-neutral-950 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                  >
+                    {HAN_OPTIONS.map((h) => (
+                      <option key={h} value={h}>
+                        {h >= 13 ? '13翻 (役満)' : `${h}翻`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-neutral-500 block mb-1">
+                    符 (Fu)
+                  </label>
+                  <select
+                    value={customFu}
+                    onChange={(e) => setCustomFu(Number(e.target.value))}
+                    className="w-full h-10 bg-neutral-950 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                  >
+                    {FU_OPTIONS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}符
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  // 手動計算点数を概算（簡易計算または純粋計算）
+                  // 満貫以上の判定
+                  let pts = 0;
+                  if (customHan >= 13) pts = isTargetDealer ? 48000 : 32000;
+                  else if (customHan >= 11) pts = isTargetDealer ? 36000 : 24000;
+                  else if (customHan >= 8) pts = isTargetDealer ? 24000 : 16000;
+                  else if (customHan >= 6) pts = isTargetDealer ? 18000 : 12000;
+                  else if (customHan >= 5 || (customHan === 4 && customFu >= 40) || (customHan === 3 && customFu >= 70)) {
+                    pts = isTargetDealer ? 12000 : 8000;
+                  } else {
+                    const basic = customFu * Math.pow(2, 2 + customHan);
+                    if (basic >= 2000) {
+                      pts = isTargetDealer ? 12000 : 8000;
+                    } else {
+                      const total = basic * (isTargetDealer ? 6 : 4);
+                      pts = Math.ceil(total / 100) * 100;
+                    }
+                  }
+                  handleApplyCustom(pts, customHan, customFu);
+                }}
+                className="w-full h-10 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition-colors mt-1"
+              >
+                計算して適用
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
