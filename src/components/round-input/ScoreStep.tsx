@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { WinType, MultiWinnerDraft } from '@/types/mahjong';
+import { calculateScore } from '@/lib/mahjong/calc';
 import {
   KO_RON_PRESETS_3X4,
   OYA_RON_PRESETS_3X4,
@@ -244,7 +245,7 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
             </div>
 
             {/* 翻・符手動セレクタ */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
+            <div className="flex flex-col gap-2.5 pt-2 border-t border-neutral-800">
               <span className="text-[11px] font-bold text-neutral-400">
                 翻と符を手動指定
               </span>
@@ -283,33 +284,76 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  // 手動計算点数を概算（簡易計算または純粋計算）
-                  // 満貫以上の判定
-                  let pts = 0;
-                  if (customHan >= 13) pts = isTargetDealer ? 48000 : 32000;
-                  else if (customHan >= 11) pts = isTargetDealer ? 36000 : 24000;
-                  else if (customHan >= 8) pts = isTargetDealer ? 24000 : 16000;
-                  else if (customHan >= 6) pts = isTargetDealer ? 18000 : 12000;
-                  else if (customHan >= 5 || (customHan === 4 && customFu >= 40) || (customHan === 3 && customFu >= 70)) {
-                    pts = isTargetDealer ? 12000 : 8000;
-                  } else {
-                    const basic = customFu * Math.pow(2, 2 + customHan);
-                    if (basic >= 2000) {
-                      pts = isTargetDealer ? 12000 : 8000;
-                    } else {
-                      const total = basic * (isTargetDealer ? 6 : 4);
-                      pts = Math.ceil(total / 100) * 100;
-                    }
+              {/* リアルタイム点数プレビュー表示 */}
+              {(() => {
+                const isTsumo = winType === 'tsumo';
+                const customScore = calculateScore(customHan, customFu, isTargetDealer, isTsumo);
+                const customRankLabel = (() => {
+                  if (customHan >= 13) return '役満';
+                  if (customHan >= 11) return '三倍満';
+                  if (customHan >= 8) return '倍満';
+                  if (customHan >= 6) return '跳満';
+                  if (
+                    customHan >= 5 ||
+                    (customHan === 4 && customFu >= 40) ||
+                    (customHan === 3 && customFu >= 70) ||
+                    customFu * Math.pow(2, 2 + customHan) >= 2000
+                  ) {
+                    return '満貫';
                   }
-                  handleApplyCustom(pts, customHan, customFu);
-                }}
-                className="w-full h-10 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition-colors mt-1"
-              >
-                計算して適用
-              </button>
+                  return null;
+                })();
+
+                const buttonLabel = isTsumo
+                  ? isTargetDealer
+                    ? `${customScore.total.toLocaleString()}点 (${customScore.nonDealerPay.toLocaleString()}オール) を適用`
+                    : `${customScore.total.toLocaleString()}点 (${customScore.nonDealerPay.toLocaleString()}/${customScore.dealerPay.toLocaleString()}) を適用`
+                  : `${customScore.total.toLocaleString()}点 を適用`;
+
+                return (
+                  <>
+                    <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex flex-col gap-1 shadow-inner">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-neutral-400">
+                        <span>
+                          計算結果 ({isTargetDealer ? '親' : '子'}・{isTsumo ? 'ツモ' : 'ロン'}
+                          {customRankLabel ? ` / ${customRankLabel}` : ''})
+                        </span>
+                        <span className="text-neutral-500 font-mono">
+                          {customHan}翻 {customFu}符
+                        </span>
+                      </div>
+
+                      {isTsumo ? (
+                        <div className="flex items-baseline justify-between mt-0.5">
+                          <span className="text-base font-black text-amber-300 font-mono">
+                            {isTargetDealer
+                              ? `${customScore.nonDealerPay.toLocaleString()} オール`
+                              : `${customScore.nonDealerPay.toLocaleString()} / ${customScore.dealerPay.toLocaleString()}`}
+                          </span>
+                          <span className="text-xs font-bold text-neutral-300">
+                            合計 <span className="font-mono text-white text-sm font-black">{customScore.total.toLocaleString()}</span> 点
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-baseline justify-between mt-0.5">
+                          <span className="text-2xl font-black text-amber-300 font-mono tracking-tight">
+                            {customScore.total.toLocaleString()}
+                            <span className="text-xs font-bold text-neutral-300 ml-1">点</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleApplyCustom(customScore.total, customHan, customFu)}
+                      className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-300 text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-1 mt-0.5"
+                    >
+                      {buttonLabel}
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
