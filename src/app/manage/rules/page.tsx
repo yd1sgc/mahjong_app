@@ -427,17 +427,17 @@ export default function RulesManagePage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-black text-white">
-                        {r.name}
-                      </span>
                       <span
-                        className={`text-[10px] font-black px-2 py-0.5 rounded border ${
+                        className={`text-[10px] font-black px-2 py-0.5 rounded border shrink-0 ${
                           r.kind === 'official'
                             ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
                             : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
                         }`}
                       >
                         {r.kind === 'official' ? '公式ルール' : 'カスタム'}
+                      </span>
+                      <span className="text-base font-black text-white">
+                        {r.name}
                       </span>
                     </div>
 
@@ -456,15 +456,6 @@ export default function RulesManagePage() {
                       >
                         複製
                       </button>
-                      {r.kind === 'custom' && (
-                        <button
-                          type="button"
-                          onClick={() => handleArchiveRule(r)}
-                          className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-rose-950/40 text-[11px] font-bold text-neutral-400 hover:text-rose-400 transition-colors"
-                        >
-                          非表示
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -1140,24 +1131,43 @@ export default function RulesManagePage() {
               </div>
 
               {/* フッターアクションボタン */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setEditingRuleId(null);
-                  }}
-                  className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !ruleName.trim()}
-                  className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black text-xs transition-all shadow-xs"
-                >
-                  {submitting ? '保存中...' : 'ルールを保存'}
-                </button>
+              <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setEditingRuleId(null);
+                    }}
+                    className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !ruleName.trim()}
+                    className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black text-xs transition-all shadow-xs"
+                  >
+                    {submitting ? '保存中...' : 'ルールを保存'}
+                  </button>
+                </div>
+
+                {editingRuleId && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const target = rules.find((r) => r.rule_id === editingRuleId);
+                      if (target) {
+                        setShowCreateModal(false);
+                        setEditingRuleId(null);
+                        await handleArchiveRule(target);
+                      }
+                    }}
+                    className="w-full py-2 rounded-lg bg-neutral-950 hover:bg-rose-950/40 border border-neutral-800 hover:border-rose-800/60 text-neutral-500 hover:text-rose-400 text-xs font-bold transition-all text-center"
+                  >
+                    このルールを非表示（アーカイブ）にする
+                  </button>
+                )}
               </div>
             </form>
           </div>
