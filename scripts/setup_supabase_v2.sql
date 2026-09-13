@@ -158,21 +158,31 @@ CREATE INDEX IF NOT EXISTS idx_round_seats_member ON public.round_seats(member_i
 INSERT INTO public.rule_templates (rule_id, name, kind, version, config_json, is_archived)
 VALUES 
 (
-    'preset_m_league', 'Mリーグルール', 'official', 1,
-    '{"basic": {"init_score": 25000, "return_score": 30000, "uma": [30, 10, -10, -30], "rounding_type": "四捨五入"}, "detail": {"tobi_end": "none", "agari_yame": "none", "honba_pt": 300, "riichi_pt": 1000, "game_length": "hanchan"}}'::jsonb,
+    'preset_m_league', 'Mリーグ', 'official', 1,
+    '{"basic": {"init_score": 25000, "return_score": 30000, "uma": [50, 10, -10, -30], "game_length": "hanchan", "rounding_type": "五捨六入", "rate_note": "オカ20,000点 / 順位ウマ10-30相当"}, "detail": {"kuitan": true, "atozuke": true, "aka_dora": "3枚", "kuikae": "prohibited", "kiriage_mangan": true, "ippatsu_dora": true, "pao": true, "yakuman_multiple": true, "kokushi_ankan_win": false, "furiten_tsumo": true, "tsumoban_none_riichi": true, "wareme": false, "nagashi_mangan": false, "honba_pt": 300, "riichi_pt": 1000, "noten_bappu_pt": 3000, "chombo_rule": "pt_penalty", "chombo_pt": 20, "renchan_rule": "tenpai", "tobi_end": "none", "sudden_death": "none", "west_extension": "none", "agari_yame": true, "tenpai_yame": true, "dubron": "atama_hane", "allow_multi_ron": false, "kyushu": "none", "allow_mid_ryukyoku": false, "house_notes": "Mリーグ公式規則準拠"}}'::jsonb,
     0
 ),
 (
-    'preset_standard', '一般アリアリ（ゴットー）', 'official', 1,
-    '{"basic": {"init_score": 25000, "return_score": 30000, "uma": [10, 5, -5, -10], "rounding_type": "五捨六入"}, "detail": {"tobi_end": "under_zero", "agari_yame": "top_only", "honba_pt": 300, "riichi_pt": 1000, "game_length": "hanchan"}}'::jsonb,
+    'preset_saikouike', '最高位戦', 'official', 1,
+    '{"basic": {"init_score": 30000, "return_score": 30000, "uma": [30, 10, -10, -30], "game_length": "hanchan", "rounding_type": "四捨五入", "rate_note": "オカなし"}, "detail": {"kuitan": true, "atozuke": true, "aka_dora": "なし", "kuikae": "prohibited", "kiriage_mangan": false, "ippatsu_dora": true, "pao": true, "yakuman_multiple": true, "kokushi_ankan_win": false, "furiten_tsumo": true, "tsumoban_none_riichi": false, "wareme": false, "nagashi_mangan": false, "honba_pt": 300, "riichi_pt": 1000, "noten_bappu_pt": 3000, "chombo_rule": "pt_penalty", "chombo_pt": 20, "renchan_rule": "tenpai", "tobi_end": "none", "sudden_death": "none", "west_extension": "none", "agari_yame": false, "tenpai_yame": false, "dubron": "atama_hane", "allow_multi_ron": false, "kyushu": "none", "allow_mid_ryukyoku": false, "house_notes": "最高位戦日本プロ麻雀協会公式規則準拠"}}'::jsonb,
     0
 ),
 (
-    'preset_saikouisen', '最高位戦日本プロ麻雀協会', 'official', 1,
-    '{"basic": {"init_score": 30000, "return_score": 30000, "uma": [30, 10, -10, -30], "rounding_type": "四捨五入"}, "detail": {"tobi_end": "none", "agari_yame": "none", "honba_pt": 300, "riichi_pt": 1000, "game_length": "hanchan"}}'::jsonb,
+    'preset_jpml', '連盟公式', 'official', 1,
+    '{"basic": {"init_score": 30000, "return_score": 30000, "uma": [8, 4, -4, -8], "game_length": "hanchan", "rounding_type": "四捨五入", "rate_note": "オカなし・浮き沈みウマ"}, "detail": {"kuitan": true, "atozuke": true, "aka_dora": "なし", "kuikae": "prohibited", "kiriage_mangan": false, "ippatsu_dora": false, "pao": true, "yakuman_multiple": false, "kokushi_ankan_win": false, "furiten_tsumo": true, "tsumoban_none_riichi": false, "wareme": false, "nagashi_mangan": false, "honba_pt": 300, "riichi_pt": 1000, "noten_bappu_pt": 3000, "chombo_rule": "pt_penalty", "chombo_pt": 20, "renchan_rule": "agari", "tobi_end": "none", "sudden_death": "none", "west_extension": "none", "agari_yame": false, "tenpai_yame": false, "dubron": "atama_hane", "allow_multi_ron": false, "kyushu": "none", "allow_mid_ryukyoku": false, "house_notes": "日本プロ麻雀連盟公式Aルール準拠（一発・裏ドラなし、和了連荘）"}}'::jsonb,
+    0
+),
+(
+    'preset_standard_ari', '一般アリアリ', 'official', 1,
+    '{"basic": {"init_score": 25000, "return_score": 30000, "uma": [50, 10, -10, -30], "game_length": "hanchan", "rounding_type": "五捨六入", "rate_note": "標準ワンツー (1000点＝1.0pt)"}, "detail": {"kuitan": true, "atozuke": true, "aka_dora": "3枚", "kuikae": "prohibited", "kiriage_mangan": false, "ippatsu_dora": true, "pao": true, "yakuman_multiple": true, "kokushi_ankan_win": true, "furiten_tsumo": true, "tsumoban_none_riichi": false, "wareme": false, "nagashi_mangan": false, "honba_pt": 300, "riichi_pt": 1000, "noten_bappu_pt": 3000, "chombo_rule": "mangan_pay", "chombo_pt": 20, "renchan_rule": "tenpai", "tobi_end": "under_zero", "sudden_death": "west", "west_extension": "under_30000", "agari_yame": true, "tenpai_yame": true, "dubron": "atama_hane_kyotaku", "allow_multi_ron": true, "kyushu": "renchan", "allow_mid_ryukyoku": true, "house_notes": "一般的なセット麻雀ルール（トビあり、西入あり、ダブロンあり）"}}'::jsonb,
     0
 )
-ON CONFLICT (rule_id) DO NOTHING;
+ON CONFLICT (rule_id) DO UPDATE SET
+    name = EXCLUDED.name,
+    kind = EXCLUDED.kind,
+    version = EXCLUDED.version,
+    config_json = EXCLUDED.config_json,
+    is_archived = EXCLUDED.is_archived;
 
 -- 7. 4桁PINによる記録係交代ストアドプロシージャ (RPC)
 CREATE OR REPLACE FUNCTION public.transfer_recorder(p_game_id TEXT, p_pin TEXT)
