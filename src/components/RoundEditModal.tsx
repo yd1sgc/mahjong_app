@@ -55,22 +55,6 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
   }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // popstate 連動（スマホ戻る操作でのモーダル安全クローズ）
-  useEffect(() => {
-    if (!isOpen) return;
-
-    window.history.pushState({ modal: 'round_edit' }, '');
-
-    const handlePopState = () => {
-      onClose();
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [isOpen, onClose]);
-
   // モーダルオープン時または局選択変更時の初期値ロード
   useEffect(() => {
     if (!isOpen || roundHistory.length === 0) return;
@@ -103,12 +87,18 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
   }, [isOpen, selectedIdx, roundHistory]);
 
   const handleClose = () => {
-    if (typeof window !== 'undefined' && window.history.state?.modal === 'round_edit') {
-      window.history.back();
-    } else {
-      onClose();
-    }
+    onClose();
   };
+
+  // 修正前の最新持ち点（モーダル表示中に不変・1回のみ計算）
+  const originalLastScores = useMemo(() => {
+    if (!isOpen || roundHistory.length === 0) return {};
+    const initScore = ruleConfig.basic?.init_score ?? 25000;
+    const details = computeAllRoundsDetails(players, initScore, ruleConfig, roundHistory);
+    return details.length > 0
+      ? details[details.length - 1].scoresAfter
+      : Object.fromEntries(players.map((p) => [p, initScore]));
+  }, [isOpen, players, ruleConfig, roundHistory]);
 
   // 編集中の入力データから仮の RoundRecord を構築
   const currentEditingRound: RoundRecord = useMemo(() => {
@@ -153,20 +143,8 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
 
   // 純粋ドメイン層による再計算プレビュー（最新局終了時の持ち点差分）
   const preview = useMemo(() => {
-    if (roundHistory.length === 0) return null;
+    if (!isOpen || roundHistory.length === 0) return null;
     const initScore = ruleConfig.basic?.init_score ?? 25000;
-
-    // 修正前の全局計算結果
-    const originalDetails = computeAllRoundsDetails(
-      players,
-      initScore,
-      ruleConfig,
-      roundHistory
-    );
-    const originalLastScores =
-      originalDetails.length > 0
-        ? originalDetails[originalDetails.length - 1].scoresAfter
-        : Object.fromEntries(players.map((p) => [p, initScore]));
 
     // 修正反映後の仮履歴
     const tempHistory = [...roundHistory];
@@ -190,7 +168,7 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
       newLastScores,
       targetDetail,
     };
-  }, [players, ruleConfig, roundHistory, selectedIdx, currentEditingRound]);
+  }, [isOpen, players, ruleConfig, roundHistory, selectedIdx, currentEditingRound, originalLastScores]);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -252,11 +230,20 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
       <div className="bg-neutral-900 border border-neutral-700 w-full max-w-lg rounded-2xl p-4 shadow-2xl flex flex-col gap-4 text-white max-h-[95vh] overflow-y-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-          <div>
-            <h2 className="text-base font-black text-white">局履歴の修正</h2>
-            <p className="text-[11px] text-neutral-400">
-              修正内容に応じて以後の本場・供託・持ち点が連鎖再計算されます
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-bold py-1 px-2 rounded-lg bg-neutral-800 hover:bg-neutral-750 transition-colors"
+            >
+              &larr; 戻る
+            </button>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-white">局履歴の修正</h2>
+              <p className="text-[10px] sm:text-[11px] text-neutral-400">
+                修正内容に応じて本場・供託・持ち点が連鎖再計算されます
+              </p>
+            </div>
           </div>
           <button
             type="button"

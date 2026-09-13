@@ -33,7 +33,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   canUndo,
   hasIntraRoundAction = false,
 }) => {
-  const [showOtherOps, setShowOtherOps] = useState(false);
+  const [showOtherModal, setShowOtherModal] = useState(false);
 
   return (
     <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-3 shadow-md">
@@ -87,56 +87,30 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             </button>
           </div>
 
-          {/* 1手戻す / 前局を取り消す */}
-          <button
-            type="button"
-            disabled={!canUndo}
-            onClick={onUndoClick}
-            className={`w-full h-10 rounded-lg font-semibold text-xs transition-colors border touch-manipulation flex items-center justify-center ${
-              canUndo
-                ? hasIntraRoundAction
-                  ? 'bg-neutral-800/80 hover:bg-neutral-700 text-amber-300 hover:text-amber-200 border-amber-500/30'
-                  : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border-neutral-700/50'
-                : 'bg-neutral-900 text-neutral-600 border-neutral-800 cursor-not-allowed'
-            }`}
-          >
-            {hasIntraRoundAction ? '1手戻す' : '前局を取り消す'}
-          </button>
-
-          {/* その他（開閉アコーディオン） */}
-          <div className="pt-1 border-t border-neutral-800/60 flex flex-col gap-2">
+          {/* サブアクション: 左が「その他」、右が「1手戻す / 前局を取り消す」 */}
+          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-800/60">
             <button
               type="button"
-              onClick={() => setShowOtherOps((prev) => !prev)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-950/60 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 text-xs font-bold transition-colors border border-neutral-800"
+              onClick={() => setShowOtherModal(true)}
+              className="h-11 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white font-semibold text-xs transition-colors border border-neutral-700/50 touch-manipulation flex items-center justify-center"
             >
-              <span>その他の操作</span>
-              {showOtherOps ? (
-                <ChevronUp className="w-3.5 h-3.5 text-neutral-400" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
-              )}
+              その他
             </button>
 
-            {showOtherOps && (
-              <div className="grid grid-cols-2 gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={onOpenRoundEditModal}
-                  className="h-10 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 font-semibold text-xs transition-colors border border-neutral-700/60 touch-manipulation flex items-center justify-center"
-                >
-                  局を修正
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onOpenChomboModal}
-                  className="h-10 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 font-semibold text-xs transition-colors border border-neutral-700/50 touch-manipulation flex items-center justify-center"
-                >
-                  チョンボ入力
-                </button>
-              </div>
-            )}
+            <button
+              type="button"
+              disabled={!canUndo}
+              onClick={onUndoClick}
+              className={`h-11 rounded-lg font-semibold text-xs transition-colors border touch-manipulation flex items-center justify-center ${
+                canUndo
+                  ? hasIntraRoundAction
+                    ? 'bg-neutral-800/80 hover:bg-neutral-700 text-amber-300 hover:text-amber-200 border-amber-500/30'
+                    : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border-neutral-700/50'
+                  : 'bg-neutral-900 text-neutral-600 border-neutral-800 cursor-not-allowed'
+              }`}
+            >
+              {hasIntraRoundAction ? '1手戻す' : '前局を取り消す'}
+            </button>
           </div>
         </div>
       ) : (
@@ -147,6 +121,62 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           <p className="text-xs text-neutral-500">
             点数はリアルタイムで自動同期されます（リロード不要）
           </p>
+        </div>
+      )}
+
+      {/* 「その他」操作選択モーダル */}
+      {showOtherModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowOtherModal(false)}
+        >
+          <div
+            className="bg-neutral-900 border border-neutral-700 w-full max-w-xs rounded-2xl p-4 shadow-2xl flex flex-col gap-3 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <span className="text-sm font-bold text-neutral-200">その他の操作</span>
+              <button
+                type="button"
+                onClick={() => setShowOtherModal(false)}
+                className="text-neutral-400 hover:text-white text-lg font-bold p-1 leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOtherModal(false);
+                  onOpenRoundEditModal();
+                }}
+                className="w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs border border-neutral-700 transition-colors flex items-center justify-center"
+              >
+                局を修正
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOtherModal(false);
+                  onOpenChomboModal();
+                }}
+                className="w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-rose-400 hover:text-rose-300 font-bold text-xs border border-neutral-700 transition-colors flex items-center justify-center"
+              >
+                チョンボ入力
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowOtherModal(false)}
+                className="w-full py-2 text-center text-xs text-neutral-400 hover:text-white font-semibold transition-colors mt-1"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
