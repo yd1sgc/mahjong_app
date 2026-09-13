@@ -183,3 +183,37 @@ describe('calcOkaNashiPoint (オカなし設定でのポイント計算)', () =>
     expect(Math.abs(total)).toBeLessThan(1e-6);
   });
 });
+
+describe('Score Presets (点数プリセット定義の整合性)', () => {
+  it('子ツモ・親ツモ・ロンの全プリセットで pointsLabel と hanFuLabel が欠損なく定義されている', async () => {
+    const presets = await import('../src/lib/mahjong/presets');
+    const allPresets = [
+      ...presets.KO_RON_PRESETS_3X4,
+      ...presets.OYA_RON_PRESETS_3X4,
+      ...presets.KO_TSUMO_PRESETS_3X4,
+      ...presets.OYA_TSUMO_PRESETS_3X4,
+      ...presets.HIGH_SCORE_PRESETS.ko_ron,
+      ...presets.HIGH_SCORE_PRESETS.oya_ron,
+      ...presets.HIGH_SCORE_PRESETS.ko_tsumo,
+      ...presets.HIGH_SCORE_PRESETS.oya_tsumo,
+    ];
+
+    for (const item of allPresets) {
+      expect(item.pointsLabel).toBeTruthy();
+      expect(item.hanFuLabel).toBeTruthy();
+      // 単なるスラッシュや記号のみになっていないことを検証
+      expect(item.pointsLabel.trim()).not.toBe('/');
+      expect(item.hanFuLabel.trim()).not.toBe('/');
+    }
+
+    // 子ツモの代表値が期待通り分割されていることの検証
+    const koTsumo1 = presets.KO_TSUMO_PRESETS_3X4[0];
+    expect(koTsumo1.pointsLabel).toBe('300 / 500');
+    expect(koTsumo1.hanFuLabel).toBe('1翻30符');
+
+    // 親ツモの代表値が期待通り分割されていることの検証
+    const oyaTsumo1 = presets.OYA_TSUMO_PRESETS_3X4[0];
+    expect(oyaTsumo1.pointsLabel).toBe('500オール');
+    expect(oyaTsumo1.hanFuLabel).toBe('1翻30符');
+  });
+});

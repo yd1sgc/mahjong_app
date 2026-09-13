@@ -165,13 +165,13 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
             key={preset.label}
             type="button"
             onClick={() => handleSelectPreset(preset)}
-            className="h-14 rounded-xl bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs"
+            className="h-14 rounded-xl bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs px-1"
           >
-            <span className="text-sm font-black font-mono">
-              {preset.label.split(' ')[0]}
+            <span className="text-xs sm:text-sm font-black font-mono leading-tight whitespace-nowrap">
+              {preset.pointsLabel}
             </span>
-            <span className="text-[10px] font-medium text-neutral-400 mt-0.5">
-              {preset.label.split(' ')[1] || ''}
+            <span className="text-[10px] font-medium text-neutral-400 mt-0.5 whitespace-nowrap">
+              {preset.hanFuLabel}
             </span>
           </button>
         ))}
@@ -235,10 +235,10 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
                     key={hp.label}
                     type="button"
                     onClick={() => handleApplyCustom(hp.pts, hp.han, hp.fu)}
-                    className="h-13 rounded-xl bg-neutral-850 hover:bg-amber-600 hover:text-white border border-neutral-700 text-neutral-200 font-black text-xs flex flex-col items-center justify-center transition-all"
+                    className="h-13 rounded-xl bg-neutral-850 hover:bg-amber-600 hover:text-white border border-neutral-700 text-neutral-200 font-black text-xs flex flex-col items-center justify-center transition-all px-1"
                   >
-                    <span className="text-xs font-bold">{hp.label.split(' ')[1] || hp.label}</span>
-                    <span className="text-[10px] font-mono opacity-80">{hp.pts.toLocaleString()}点</span>
+                    <span className="text-xs font-bold">{hp.hanFuLabel}</span>
+                    <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">{hp.pointsLabel}</span>
                   </button>
                 ))}
               </div>
