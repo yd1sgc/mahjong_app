@@ -307,9 +307,9 @@ export default function StatsPage() {
     return rawRoundStats.filter((s) => !guestNames.has(s.name));
   }, [rawRoundStats, includeGuests, guestNames]);
 
-  // 全プレイヤー名リスト（セレクト・グラフ用: ゲスト設定連動）
+  // 全プレイヤー名リスト（試合数降順: セレクト・グラフ・マトリクス初期選択用）
   const allPlayerNames = useMemo(() => {
-    return gameStats.map((s) => s.name);
+    return [...gameStats].sort((a, b) => b.games - a.games).map((s) => s.name);
   }, [gameStats]);
 
   // グラフ・マトリクス対象プレイヤーの自動同期
