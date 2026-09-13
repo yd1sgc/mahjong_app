@@ -427,12 +427,16 @@ export default function HomePage() {
                 }`}
               >
                 <option value="">グループを選択してください</option>
-                {groups.map((g) => (
-                  <option key={g.group_id} value={g.group_id}>
-                    {g.group_name}
-                  </option>
-                ))}
-                <option value="free">グループ外対局（フリー対局）</option>
+                {groups
+                  .filter(
+                    (g) => g.display_id !== 'free' && g.group_name !== 'フリー対局'
+                  )
+                  .map((g) => (
+                    <option key={g.group_id} value={g.group_id}>
+                      {g.group_name}
+                    </option>
+                  ))}
+                <option value="free">フリー対局</option>
               </select>
             </div>
 
