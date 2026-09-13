@@ -142,6 +142,7 @@ export function useGameData(
             : undefined;
 
         return {
+          round_id: r.round_id,
           round_index: r.round_index,
           kyoku_name: r.kyoku_name,
           honba: r.honba,

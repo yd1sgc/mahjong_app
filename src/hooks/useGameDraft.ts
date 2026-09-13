@@ -3,7 +3,7 @@
  * LocalStorage との同期およびクラッシュ復元を担当
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MultiWinnerDraft, RoundAction, WinType } from '@/types/mahjong';
 
 export interface RoundInputDraft {
@@ -36,6 +36,8 @@ export function useGameDraft(gameId: string) {
   const [furoDeclared, setFuroDeclared] = useState<string[]>([]);
   const [riichiDeclared, setRiichiDeclared] = useState<string[]>([]);
   const [actionHistory, setActionHistory] = useState<RoundAction[]>([]);
+  const actionHistoryRef = useRef<RoundAction[]>([]);
+  actionHistoryRef.current = actionHistory;
 
   const draftKey = `mahjong_draft_${gameId}`;
   const furoKey = `mahjong_furo_${gameId}`;
@@ -92,6 +94,7 @@ export function useGameDraft(gameId: string) {
         const parsedActions = JSON.parse(savedActions) as RoundAction[];
         if (Array.isArray(parsedActions)) {
           setActionHistory(parsedActions);
+          actionHistoryRef.current = parsedActions;
         }
       } catch {
         // パース失敗時は無視
@@ -163,13 +166,13 @@ export function useGameDraft(gameId: string) {
   // 操作履歴の追加（LocalStorage即時同期）
   const pushAction = useCallback(
     (action: RoundAction) => {
-      setActionHistory((prev) => {
-        const next = [...prev, { ...action, timestamp: Date.now() }];
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(actionHistoryKey, JSON.stringify(next));
-        }
-        return next;
-      });
+      const item = { ...action, timestamp: Date.now() };
+      const next = [...actionHistoryRef.current, item];
+      actionHistoryRef.current = next;
+      setActionHistory(next);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+      }
     },
     [actionHistoryKey]
   );
@@ -177,31 +180,30 @@ export function useGameDraft(gameId: string) {
   // 操作履歴からの特定操作除去（スコアボード直接タップ解除用）
   const removeAction = useCallback(
     (type: RoundAction['type'], player: string) => {
-      setActionHistory((prev) => {
-        const idx = prev.map((a) => `${a.type}:${a.player}`).lastIndexOf(`${type}:${player}`);
-        if (idx === -1) return prev;
-        const next = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(actionHistoryKey, JSON.stringify(next));
-        }
-        return next;
-      });
+      const prev = actionHistoryRef.current;
+      const idx = prev.map((a: RoundAction) => `${a.type}:${a.player}`).lastIndexOf(`${type}:${player}`);
+      if (idx === -1) return;
+      const next = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      actionHistoryRef.current = next;
+      setActionHistory(next);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+      }
     },
     [actionHistoryKey]
   );
 
-  // 直前操作のポップ取り出し
+  // 直前操作のポップ取り出し（同期的・確実に直前操作を返却）
   const popAction = useCallback((): RoundAction | null => {
-    let popped: RoundAction | null = null;
-    setActionHistory((prev) => {
-      if (prev.length === 0) return prev;
-      popped = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(actionHistoryKey, JSON.stringify(next));
-      }
-      return next;
-    });
+    const prev = actionHistoryRef.current;
+    if (prev.length === 0) return null;
+    const popped = prev[prev.length - 1];
+    const next = prev.slice(0, -1);
+    actionHistoryRef.current = next;
+    setActionHistory(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+    }
     return popped;
   }, [actionHistoryKey]);
 
@@ -209,6 +211,7 @@ export function useGameDraft(gameId: string) {
   const clearRoundDeclarations = useCallback(() => {
     setFuroDeclared([]);
     setRiichiDeclared([]);
+    actionHistoryRef.current = [];
     setActionHistory([]);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(furoKey);

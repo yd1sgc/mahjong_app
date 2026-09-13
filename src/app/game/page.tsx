@@ -102,6 +102,8 @@ function GameContent() {
     } else if (result.type === 'cancelled') {
       // ユーザーによる確認ダイアログのキャンセル
       return;
+    } else if (result.type === 'error') {
+      setToast({ type: 'error', message: result.message || '取り消しに失敗しました' });
     }
   };
 

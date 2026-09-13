@@ -29,6 +29,7 @@ export type UndoResult =
   | { type: 'riichi'; player: string }
   | { type: 'round'; kyokuName: string }
   | { type: 'cancelled' }
+  | { type: 'error'; message: string }
   | null;
 
 interface UseGameActionsProps {
@@ -410,11 +411,12 @@ export function useGameActions({
         setLoading(true);
         const lastIndex = gameState.roundHistory.length - 1;
 
-        const { error: delErr } = await supabase
-          .from('rounds')
-          .delete()
-          .eq('game_id', gameId)
-          .eq('round_index', lastIndex);
+        // round_id（主キー）があれば完全一致削除、なければ round_index で削除
+        const deleteQuery = lastRound.round_id
+          ? supabase.from('rounds').delete().eq('round_id', lastRound.round_id)
+          : supabase.from('rounds').delete().eq('game_id', gameId).eq('round_index', lastIndex);
+
+        const { error: delErr } = await deleteQuery;
 
         if (delErr) throw new Error(delErr.message);
 
@@ -427,7 +429,7 @@ export function useGameActions({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '巻き戻し処理に失敗しました';
       setError(msg);
-      return null;
+      return { type: 'error', message: msg };
     } finally {
       isUndoingRef.current = false;
       setLoading(false);

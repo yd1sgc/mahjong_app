@@ -137,6 +137,7 @@ export interface MultiWinDetail {
 
 /** 局の結果レコード */
 export interface RoundRecord {
+  round_id?: string;
   kyoku_name: string;
   winner: string | null;
   loser: string | null;
