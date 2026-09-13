@@ -33,12 +33,11 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
     return Math.max(max, 1.0);
   }, [matrixMembers, matrixData]);
 
-  // pt差に応じたスタイル計算（個人アプリ coolwarm_r 準拠: 青=得意, 赤=苦手）
-  // 不透明なRGB補間によりダークテーマでも黒潰れせず文字コントラストを完全確保
+  // pt差に応じたスタイル計算（個人アプリ Streamlit coolwarm_r 準拠・白背景パステル調）
   const getCellStyle = (diff: number) => {
     if (diff === 0) {
       return {
-        className: 'text-neutral-500 font-mono font-bold',
+        className: 'text-neutral-400 font-mono font-bold bg-white',
         style: undefined,
       };
     }
@@ -46,21 +45,21 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
     const factor = Math.min(1, Math.abs(diff) / maxAbsDiff);
 
     if (diff > 0) {
-      // 得意（青系）: 濃紺 [20, 35, 75] 〜 鮮やかなブルー [29, 78, 216]
-      const r = Math.round(20 + factor * (29 - 20));
-      const g = Math.round(35 + factor * (78 - 35));
-      const b = Math.round(75 + factor * (216 - 75));
+      // 得意（青系）: ごく淡い水色 [235, 245, 255] 〜 明るいスカイブルー [147, 197, 253]
+      const r = Math.round(235 - factor * (235 - 147));
+      const g = Math.round(245 - factor * (245 - 197));
+      const b = Math.round(255 - factor * (255 - 253));
       return {
-        className: 'text-white font-black font-mono shadow-xs',
+        className: 'text-blue-950 font-black font-mono',
         style: { backgroundColor: `rgb(${r}, ${g}, ${b})` },
       };
     } else {
-      // 苦手（赤系）: 暗赤 [70, 15, 25] 〜 鮮烈なローズ [225, 29, 72]
-      const r = Math.round(70 + factor * (225 - 70));
-      const g = Math.round(15 + factor * (29 - 15));
-      const b = Math.round(25 + factor * (72 - 25));
+      // 苦手（赤系）: ごく淡いピンク [255, 241, 242] 〜 明るいライトローズ [254, 205, 211]
+      const r = Math.round(255 - factor * (255 - 254));
+      const g = Math.round(241 - factor * (241 - 205));
+      const b = Math.round(242 - factor * (242 - 211));
       return {
-        className: 'text-white font-black font-mono shadow-xs',
+        className: 'text-rose-950 font-black font-mono',
         style: { backgroundColor: `rgb(${r}, ${g}, ${b})` },
       };
     }
@@ -108,30 +107,30 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
           分析対象メンバーを選択してください。
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-950">
+        <div className="overflow-x-auto rounded-xl border border-neutral-300 bg-white shadow-sm">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-neutral-800 text-[11px] font-black text-neutral-400 bg-neutral-900">
-                <th className="py-2.5 px-3 whitespace-nowrap sticky left-0 z-20 bg-neutral-900 border-r border-neutral-800 shadow-[1px_0_0_0_rgba(38,38,38,1)]">
+              <tr className="border-b border-neutral-300 text-[11px] font-black text-neutral-600 bg-neutral-100">
+                <th className="py-2.5 px-3 whitespace-nowrap sticky left-0 z-20 bg-neutral-100 border-r border-neutral-300 shadow-[1px_0_0_0_rgba(209,213,219,1)]">
                   自分 \ 相手
                 </th>
                 {matrixMembers.map((m) => (
-                  <th key={m} className="py-2.5 px-3 text-center whitespace-nowrap min-w-[4.5rem]">
+                  <th key={m} className="py-2.5 px-3 text-center whitespace-nowrap min-w-[4.5rem] border-r border-neutral-200/80 last:border-r-0">
                     {m}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/60">
+            <tbody className="divide-y divide-neutral-200">
               {matrixMembers.map((m1) => (
-                <tr key={m1} className="hover:bg-neutral-800/20 transition-colors">
-                  <td className="py-2 px-3 font-black text-white whitespace-nowrap sticky left-0 z-10 bg-neutral-900 border-r border-neutral-800 shadow-[1px_0_0_0_rgba(38,38,38,1)]">
+                <tr key={m1} className="hover:brightness-95 transition-all">
+                  <td className="py-2 px-3 font-black text-neutral-900 whitespace-nowrap sticky left-0 z-10 bg-neutral-100 border-r border-neutral-300 shadow-[1px_0_0_0_rgba(209,213,219,1)]">
                     {m1}
                   </td>
                   {matrixMembers.map((m2) => {
                     if (m1 === m2) {
                       return (
-                        <td key={m2} className="py-2 px-2.5 text-center text-neutral-600 font-mono whitespace-nowrap min-w-[4.5rem] bg-neutral-950/60">
+                        <td key={m2} className="py-2 px-2.5 text-center text-neutral-300 font-mono whitespace-nowrap min-w-[4.5rem] bg-neutral-50 border-r border-neutral-200/80 last:border-r-0">
                           -
                         </td>
                       );
@@ -141,7 +140,7 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
                     return (
                       <td
                         key={m2}
-                        className={`py-2 px-2.5 text-center whitespace-nowrap min-w-[4.5rem] transition-colors ${cell.className}`}
+                        className={`py-2 px-2.5 text-center whitespace-nowrap min-w-[4.5rem] border-r border-neutral-200/80 last:border-r-0 transition-colors ${cell.className}`}
                         style={cell.style}
                       >
                         {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)}
