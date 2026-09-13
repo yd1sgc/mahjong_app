@@ -5,6 +5,7 @@ import {
   calculateGameSettlement,
   getClosestWinner,
 } from '../src/lib/mahjong/rules';
+import { generateRuleDescription } from '../src/lib/mahjong/ruleDescription';
 import { RoundRecord, RuleConfig } from '../src/types/mahjong';
 
 describe('rules: recalculateState (局進行・スコア再計算)', () => {
@@ -515,5 +516,46 @@ describe('rules: calculateGameSettlement (終局時精算・順位・ウマオ�
 
     const sumPt = results.reduce((acc, r) => acc + r.point, 0);
     expect(Math.round(sumPt * 10) / 10).toBe(0.0);
+  });
+});
+
+describe('rules: generateRuleDescription (詳細ルール説明マップ生成)', () => {
+  it('デフォルト/空設定から体系的なカテゴリ別説明が生成されること', () => {
+    const desc = generateRuleDescription({});
+    expect(desc['精算']).toBeDefined();
+    expect(desc['基本・アリアリルール']).toBeDefined();
+    expect(desc['試合の進行']).toBeDefined();
+    expect(desc['特殊ルール・チョンボ']).toBeDefined();
+
+    expect(desc['精算'].some((s) => s.includes('25,000点持ち / 30,000点返し'))).toBe(true);
+    expect(desc['基本・アリアリルール'].some((s) => s.includes('喰いタン：あり'))).toBe(true);
+    expect(desc['試合の進行'].some((s) => s.includes('親連荘条件：聴牌連荘'))).toBe(true);
+    expect(desc['特殊ルール・チョンボ'].some((s) => s.includes('チョンボ扱い：満貫払い'))).toBe(true);
+  });
+
+  it('カスタム設定（トビなし、和了連荘、ハウスメモ）が正しく反映されること', () => {
+    const customConfig: RuleConfig = {
+      basic: {
+        init_score: 30000,
+        return_score: 30000,
+        uma: [30, 10, -10, -30],
+        rate_note: '1000点＝50円',
+      },
+      detail: {
+        tobi_end: 'none',
+        renchan_rule: 'agari',
+        kuitan: false,
+        house_notes: '役満祝儀あり\n鳴き麻雀禁止',
+      },
+    };
+
+    const desc = generateRuleDescription(customConfig);
+    expect(desc['精算'].some((s) => s.includes('30,000点持ち / 30,000点返し / トビなし'))).toBe(true);
+    expect(desc['精算'].some((s) => s.includes('レート・換算メモ：1000点＝50円'))).toBe(true);
+    expect(desc['基本・アリアリルール'].some((s) => s.includes('喰いタン：なし'))).toBe(true);
+    expect(desc['試合の進行'].some((s) => s.includes('親連荘条件：和了連荘'))).toBe(true);
+    expect(desc['ハウスルール補足メモ']).toBeDefined();
+    expect(desc['ハウスルール補足メモ']).toContain('役満祝儀あり');
+    expect(desc['ハウスルール補足メモ']).toContain('鳴き麻雀禁止');
   });
 });

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { GameRow, MemberRow, RuleTemplateRow } from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
+import { RuleDetailModal } from '@/components/RuleDetailModal';
 
 interface GroupMembership {
   group_id: string;
@@ -35,6 +36,7 @@ export default function HomePage() {
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
+  const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -448,6 +450,18 @@ export default function HomePage() {
                   </option>
                 ))}
               </select>
+              {selectedRuleId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = rules.find((item) => item.rule_id === selectedRuleId);
+                    if (r) setDetailModalRule(r);
+                  }}
+                  className="mt-1.5 text-[11px] font-bold text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
+                >
+                  ルール詳細を確認 &rarr;
+                </button>
+              )}
             </div>
 
             {/* 4桁PIN入力 */}
@@ -473,16 +487,6 @@ export default function HomePage() {
                 <label className="text-xs font-black text-neutral-300">
                   対局者 (東・南・西・北の座順)
                 </label>
-                {selectedGroupId && selectedGroupId !== 'free' && (
-                  <span className="text-[10px] text-amber-400 font-bold">
-                    ※グループ所属者のみ表示中
-                  </span>
-                )}
-                {selectedGroupId === 'free' && (
-                  <span className="text-[10px] text-cyan-400 font-bold">
-                    ※全メンバー表示中 (フリー対局)
-                  </span>
-                )}
               </div>
 
               {!selectedGroupId ? (
@@ -585,6 +589,16 @@ export default function HomePage() {
           };
         })}
       />
+
+      {/* 詳細ルール確認モーダル */}
+      {detailModalRule && (
+        <RuleDetailModal
+          ruleName={detailModalRule.name}
+          config={detailModalRule.config_json as any}
+          isOfficial={detailModalRule.kind === 'official'}
+          onClose={() => setDetailModalRule(null)}
+        />
+      )}
     </main>
   );
 }

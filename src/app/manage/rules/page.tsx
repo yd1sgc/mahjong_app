@@ -9,14 +9,30 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
+import { RuleDetailModal } from '@/components/RuleDetailModal';
+
+/** ルール名の次期バージョン名生成 (例: "親族ルール" -> "親族ルール (v2)", "親族ルール (v2)" -> "親族ルール (v3)") */
+function getNextVersionName(currentName: string): string {
+  const match = currentName.match(/^(.*?)\s*\(v(\d+)\)$/);
+  if (match) {
+    const base = match[1];
+    const nextVer = parseInt(match[2], 10) + 1;
+    return `${base} (v${nextVer})`;
+  }
+  return `${currentName} (v2)`;
+}
 
 export default function RulesManagePage() {
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
 
-  // ルール作成モーダル状態
+  // 詳細確認モーダル状態
+  const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
+
+  // ルール作成・編集モーダル状態
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState('');
   const [initScore, setInitScore] = useState(25000);
   const [returnScore, setReturnScore] = useState(30000);
@@ -51,12 +67,13 @@ export default function RulesManagePage() {
   const activeRules = rules.filter((r) => r.is_archived === 0);
   const archivedRules = rules.filter((r) => r.is_archived === 1);
 
-  // 公式ルールから初期値をコピーしてモーダルを開く
+  // 公式ルールから初期値をコピーして新規作成モーダルを開く
   const handleOpenDuplicate = (sourceRule: RuleTemplateRow) => {
     const cfg = (sourceRule.config_json || {}) as any;
     const basic = cfg.basic || {};
     const detail = cfg.detail || {};
 
+    setEditingRuleId(null);
     setRuleName(`${sourceRule.name} (カスタム)`);
     setInitScore(basic.init_score ?? 25000);
     setReturnScore(basic.return_score ?? 30000);
@@ -75,8 +92,33 @@ export default function RulesManagePage() {
     setShowCreateModal(true);
   };
 
-  // ルール新規保存
-  const handleCreateRule = async (e: React.FormEvent) => {
+  // 既存カスタムルールの編集モーダルを開く (バージョンv~ 自動付与)
+  const handleOpenEdit = (targetRule: RuleTemplateRow) => {
+    const cfg = (targetRule.config_json || {}) as any;
+    const basic = cfg.basic || cfg || {};
+    const detail = cfg.detail || {};
+
+    setEditingRuleId(targetRule.rule_id);
+    setRuleName(getNextVersionName(targetRule.name));
+    setInitScore(basic.init_score ?? 25000);
+    setReturnScore(basic.return_score ?? 30000);
+
+    const uma = Array.isArray(basic.uma) ? basic.uma : [50, 10, -10, -30];
+    setUma1(uma[0] ?? 50);
+    setUma2(uma[1] ?? 10);
+    setUma3(uma[2] ?? -10);
+    setUma4(uma[3] ?? -30);
+
+    setRenchanRule(detail.renchan_rule === 'agari' ? 'agari' : 'tenpai');
+    setTobiEnd(detail.tobi_end === 'none' ? 'none' : 'under_zero');
+    setSuddenDeath(detail.sudden_death === 'none' ? 'none' : 'west');
+
+    setFormError(null);
+    setShowCreateModal(true);
+  };
+
+  // ルール保存（新規作成または方式B版管理更新）
+  const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = ruleName.trim();
     if (!trimmed) {
@@ -93,39 +135,83 @@ export default function RulesManagePage() {
       setSubmitting(true);
       setFormError(null);
 
+      // 編集対象の既存設定があれば詳細プロパティを温存
+      let existingConfig: any = {};
+      if (editingRuleId) {
+        const target = rules.find((r) => r.rule_id === editingRuleId);
+        if (target?.config_json) {
+          existingConfig = target.config_json;
+        }
+      }
+
       const configJson = {
+        ...existingConfig,
         basic: {
+          ...(existingConfig.basic || {}),
           init_score: initScore,
           return_score: returnScore,
           uma: [uma1, uma2, uma3, uma4],
           uma_type: 'custom',
         },
         detail: {
+          ...(existingConfig.detail || {}),
           renchan_rule: renchanRule,
           tobi_end: tobiEnd,
           sudden_death: suddenDeath,
           agari_yame: 'top_end',
-          honba_pt: 300,
-          riichi_pt: 1000,
-          chombo_pt: 20000,
+          honba_pt: existingConfig.detail?.honba_pt ?? 300,
+          riichi_pt: existingConfig.detail?.riichi_pt ?? 1000,
+          chombo_pt: existingConfig.detail?.chombo_pt ?? 20,
         },
       };
 
-      const { error } = await supabase.from('rule_templates').insert({
-        rule_id: crypto.randomUUID(),
-        name: trimmed,
-        kind: 'custom',
-        version: 1,
-        config_json: configJson,
-        is_archived: 0,
-      });
+      if (editingRuleId) {
+        // ── 方式B（版管理方式） ──
+        // 1. 新しいルールIDで新バージョンを作成 (is_archived = 0)
+        const newRuleId = crypto.randomUUID();
+        const { error: insertError } = await supabase.from('rule_templates').insert({
+          rule_id: newRuleId,
+          name: trimmed,
+          kind: 'custom',
+          version: 1,
+          config_json: configJson,
+          is_archived: 0,
+        });
 
-      if (error) throw new Error(error.message);
+        if (insertError) throw new Error(insertError.message);
+
+        // 2. 編集元の旧ルールをアーカイブ (is_archived = 1)
+        const { error: archiveError } = await supabase
+          .from('rule_templates')
+          .update({ is_archived: 1 })
+          .eq('rule_id', editingRuleId);
+
+        if (archiveError) throw new Error(archiveError.message);
+
+        // 3. 旧ルールを既定にしていたグループがあれば、新ルールへ自動引き継ぎ
+        await supabase
+          .from('groups')
+          .update({ default_rule_id: newRuleId })
+          .eq('default_rule_id', editingRuleId);
+      } else {
+        // 通常の新規作成 (INSERT)
+        const { error } = await supabase.from('rule_templates').insert({
+          rule_id: crypto.randomUUID(),
+          name: trimmed,
+          kind: 'custom',
+          version: 1,
+          config_json: configJson,
+          is_archived: 0,
+        });
+
+        if (error) throw new Error(error.message);
+      }
 
       setShowCreateModal(false);
+      setEditingRuleId(null);
       await loadRules();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'ルール作成に失敗しました';
+      const msg = err instanceof Error ? err.message : 'ルールの保存に失敗しました';
       setFormError(msg);
     } finally {
       setSubmitting(false);
@@ -246,6 +332,13 @@ export default function RulesManagePage() {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
+                        onClick={() => setDetailModalRule(r)}
+                        className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-bold text-amber-300 border border-amber-500/30 transition-colors"
+                      >
+                        詳細確認
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleOpenDuplicate(r)}
                         className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-bold text-neutral-300 transition-colors"
                       >
@@ -332,12 +425,12 @@ export default function RulesManagePage() {
         </div>
       )}
 
-      {/* ─── モーダル: ルール新規作成（複製） ─── */}
+      {/* ─── モーダル: ルール新規作成・編集 ─── */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl my-8">
             <h3 className="text-base font-black text-white">
-              カスタムルールの作成
+              {editingRuleId ? 'カスタムルールの編集' : 'カスタムルールの作成'}
             </h3>
 
             {formError && (
@@ -346,7 +439,7 @@ export default function RulesManagePage() {
               </div>
             )}
 
-            <form onSubmit={handleCreateRule} className="flex flex-col gap-3.5">
+            <form onSubmit={handleSaveRule} className="flex flex-col gap-3.5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-neutral-400">
                   ルール名
@@ -470,7 +563,10 @@ export default function RulesManagePage() {
               <div className="grid grid-cols-2 gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingRuleId(null);
+                  }}
                   className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition-colors"
                 >
                   キャンセル
@@ -486,6 +582,17 @@ export default function RulesManagePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ─── 詳細確認モーダル ─── */}
+      {detailModalRule && (
+        <RuleDetailModal
+          ruleName={detailModalRule.name}
+          config={detailModalRule.config_json as any}
+          isOfficial={detailModalRule.kind === 'official'}
+          onClose={() => setDetailModalRule(null)}
+          onEdit={() => handleOpenEdit(detailModalRule)}
+        />
       )}
     </main>
   );

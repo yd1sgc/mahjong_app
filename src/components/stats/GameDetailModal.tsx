@@ -5,8 +5,9 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { GameData, RoundData } from '@/lib/mahjong/statsCalc';
+import { RuleDetailModal } from '@/components/RuleDetailModal';
 
 interface GameDetailModalProps {
   game: GameData | null;
@@ -19,6 +20,8 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
   rounds,
   onClose,
 }) => {
+  const [showRuleDetail, setShowRuleDetail] = useState(false);
+
   if (!game) return null;
 
   return (
@@ -27,9 +30,18 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
         <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
           <div>
             <h3 className="text-base font-black text-white">対局詳細</h3>
-            <p className="text-xs text-neutral-400 font-bold mt-0.5">
-              {game.played_at.slice(0, 16).replace('T', ' ')} / {game.rule_name}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-neutral-400 font-bold">
+                {game.played_at.slice(0, 16).replace('T', ' ')} / {game.rule_name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowRuleDetail(true)}
+                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 underline"
+              >
+                ルール詳細
+              </button>
+            </div>
           </div>
           <button
             type="button"
@@ -95,6 +107,14 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
         >
           閉じる
         </button>
+
+        {showRuleDetail && (
+          <RuleDetailModal
+            ruleName={game.rule_name}
+            config={game.rule_config}
+            onClose={() => setShowRuleDetail(false)}
+          />
+        )}
       </div>
     </div>
   );

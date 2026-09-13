@@ -13,6 +13,11 @@ export interface BasicRuleConfig {
   uma?: number[];
   /** 試合長 ('hanchan' | 'tonpu') */
   game_length?: 'hanchan' | 'tonpu';
+  /** レート・換算メモ */
+  rate_note?: string;
+  /** 端数処理 */
+  rounding_type?: string;
+  [key: string]: unknown;
 }
 
 /** 対局の詳細ルール設定 */

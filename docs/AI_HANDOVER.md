@@ -52,13 +52,13 @@
 - **本番環境URL:** `https://mahjong-app.yd1sgc.workers.dev`
 - **DB / BaaS:** Supabase（PostgreSQL, RLS, Realtime, RPCトランザクション配備済み）
 - **CI/CD:** GitHub Actions（スリープ防止cron、自動デプロイ連携済み）
-- **品質基準:** Vitest 全51件 PASS（結果のみ入力テスト・ダブロン・上家取り・途中流局・四人リーチテスト含む）、TypeScript型エラー 0件、`next build` 全ルート正常出力確認済み
+- **品質基準:** Vitest 全53件 PASS（結果のみ入力テスト・ダブロン・上家取り・途中流局・四人リーチ・詳細ルール確認テスト含む）、TypeScript型エラー 0件、`next build` 全ルート正常出力確認済み
 
 ---
 
 ## 4. TODO (Next Actions)
 
 - [ ] **本番デプロイ確認**
-  - [ ] Gitコミット & プッシュにより Cloudflare本番環境へ最新コードを反映
+  - [x] Gitコミット & プッシュにより Cloudflare本番環境へ最新コードを反映
 - [ ] **実戦対局テスト**
   - [ ] 端末（スマホ等）による実際の対局記録・精算・成績閲覧の通し確認

@@ -14,6 +14,7 @@ import { ActionPanel } from '@/components/ActionPanel';
 import { RoundInputModal } from '@/components/RoundInputModal';
 import { PinTransferModal } from '@/components/PinTransferModal';
 import { Toast } from '@/components/Toast';
+import { RuleDetailModal } from '@/components/RuleDetailModal';
 import { WinType } from '@/types/mahjong';
 
 function GameContent() {
@@ -46,6 +47,7 @@ function GameContent() {
   const [modalWinType, setModalWinType] = useState<WinType>('ron');
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [ruleDetailOpen, setRuleDetailOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{
     type: 'success' | 'error' | 'info';
@@ -177,10 +179,19 @@ function GameContent() {
           &larr; 中断
         </Link>
         <div className="text-center">
-          <h1 className="text-sm font-black text-neutral-100">
-            {game?.rule_name_snapshot || '対局'}
-          </h1>
-          <span className="text-[10px] text-neutral-500 font-semibold">
+          <button
+            type="button"
+            onClick={() => setRuleDetailOpen(true)}
+            className="flex items-center gap-1 mx-auto hover:opacity-80 transition-opacity"
+          >
+            <h1 className="text-sm font-black text-neutral-100">
+              {game?.rule_name_snapshot || '対局'}
+            </h1>
+            <span className="text-[10px] text-amber-400 font-bold underline">
+              詳細
+            </span>
+          </button>
+          <span className="text-[10px] text-neutral-500 font-semibold block">
             {game?.played_at?.slice(0, 16) || ''}
           </span>
         </div>
@@ -401,6 +412,15 @@ function GameContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 詳細ルール確認モーダル */}
+      {ruleDetailOpen && (
+        <RuleDetailModal
+          ruleName={game?.rule_name_snapshot || '対局ルール'}
+          config={ruleConfig}
+          onClose={() => setRuleDetailOpen(false)}
+        />
       )}
     </main>
   );
