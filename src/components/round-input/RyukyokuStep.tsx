@@ -106,21 +106,21 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
                   type="button"
                   disabled={isRiichi}
                   onClick={() => !isRiichi && onToggleTenpai(p)}
-                  className={`h-14 rounded-xl font-black text-sm flex items-center justify-center transition-all border touch-manipulation ${
+                  className={`h-14 rounded-xl text-sm flex items-center justify-center transition-all touch-manipulation ${
                     isRiichi
-                      ? 'bg-cyan-900/40 border-cyan-400/80 text-cyan-200 cursor-default shadow-xs'
+                      ? 'bg-neutral-900 border border-neutral-700 text-neutral-300 cursor-default opacity-80'
                       : isTenpai
-                      ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200 shadow-xs'
-                      : 'bg-neutral-850 border-neutral-700/80 text-neutral-300'
+                      ? 'bg-neutral-800 border-2 border-white text-white font-black shadow-xs'
+                      : 'bg-neutral-900 border border-neutral-800 text-neutral-400 font-bold hover:border-neutral-700'
                   }`}
                 >
                   <span>{p}</span>
                   {isRiichi ? (
-                    <span className="text-xs ml-1.5 text-amber-300 font-bold">
+                    <span className="text-xs ml-1.5 text-neutral-300 font-bold">
                       (立直・聴牌)
                     </span>
                   ) : (
-                    <span className="text-xs ml-1.5 opacity-80">
+                    <span className={`text-xs ml-1.5 font-black ${isTenpai ? 'text-white' : 'text-neutral-500'}`}>
                       ({isTenpai ? '聴牌' : '不聴'})
                     </span>
                   )}
@@ -129,20 +129,22 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
             })}
           </div>
 
-          <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold text-neutral-400 flex items-center justify-between">
-            <span>ノーテン罰符精算</span>
-            <span className="text-neutral-200 font-mono font-bold">
+          {/* ノーテン罰符精算（押せない情報表示：四角枠を排して区切り線のみ） */}
+          <div className="pt-2 pb-1 border-t border-neutral-800 flex items-center justify-between text-xs">
+            <span className="font-bold text-neutral-400">ノーテン罰符</span>
+            <span className="text-white font-mono font-black">
               {bappuSummaryText}
             </span>
           </div>
 
+          {/* 確定ボタン（白背景・黒太字・全幅の最優先アクション） */}
           <button
             type="button"
             disabled={submitting}
             onClick={onCommitNormal}
-            className="w-full h-12 rounded-xl bg-neutral-750 hover:bg-neutral-700 active:bg-neutral-600 disabled:opacity-50 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
+            className="w-full h-13 rounded-xl bg-white hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-40 text-black font-black text-sm shadow-md transition-all flex items-center justify-center"
           >
-            {submitting ? '記録中...' : '流局を確定して次局へ'}
+            {submitting ? '記録中...' : '流局を確定して次局へ →'}
           </button>
         </div>
       )}
@@ -162,10 +164,10 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
                   key={t.id}
                   type="button"
                   onClick={() => onSelectMidType(t.id)}
-                  className={`h-13 rounded-xl font-black text-sm flex items-center justify-center border transition-all touch-manipulation ${
+                  className={`h-13 rounded-xl text-sm flex items-center justify-center transition-all touch-manipulation ${
                     isSelected
-                      ? 'bg-amber-600/30 border-amber-400 text-amber-300 shadow-xs'
-                      : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-700/80 text-neutral-300'
+                      ? 'bg-neutral-800 border-2 border-white text-white font-black shadow-xs'
+                      : 'bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-400 font-bold'
                   }`}
                 >
                   {t.label}
@@ -174,10 +176,11 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
             })}
           </div>
 
-          <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold text-neutral-400 flex flex-col gap-1">
-            <div className="flex items-center justify-between text-neutral-300 font-bold">
-              <span>罰符受渡</span>
-              <span>なし (0点移動)</span>
+          {/* 途中流局情報（四角枠を排して区切り線のみ） */}
+          <div className="pt-2 pb-1 border-t border-neutral-800 flex flex-col gap-1 text-xs">
+            <div className="flex items-center justify-between font-bold">
+              <span className="text-neutral-400">罰符受渡</span>
+              <span className="text-white font-mono font-black">なし (0点移動)</span>
             </div>
             <div className="text-[11px] text-neutral-500">
               ※本場は+1されます。連荘または輪荘はルール設定に従って自動判定されます。
@@ -188,9 +191,9 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
             type="button"
             disabled={submitting}
             onClick={() => onCommitMid(selectedMidType)}
-            className="w-full h-12 rounded-xl bg-amber-600 hover:bg-amber-500 active:bg-amber-400 disabled:opacity-50 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
+            className="w-full h-13 rounded-xl bg-white hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-40 text-black font-black text-sm shadow-md transition-all flex items-center justify-center"
           >
-            {submitting ? '記録中...' : '途中流局を確定して次局へ'}
+            {submitting ? '記録中...' : '途中流局を確定して次局へ →'}
           </button>
         </div>
       )}
@@ -226,10 +229,10 @@ export const ChomboStep: React.FC<ChomboStepProps> = ({
               key={p}
               type="button"
               onClick={() => onSelectChomboPlayer(p)}
-              className={`h-14 rounded-xl font-black text-base flex items-center justify-center transition-all border ${
+              className={`h-14 rounded-xl text-base flex items-center justify-center transition-all ${
                 isSelected
-                  ? 'bg-rose-600/30 border-rose-500 text-rose-300 shadow-sm'
-                  : 'bg-neutral-850 border-neutral-700/80 text-neutral-300'
+                  ? 'bg-neutral-800 border-2 border-white text-white font-black shadow-xs'
+                  : 'bg-neutral-900 border border-neutral-800 text-neutral-400 font-bold'
               }`}
             >
               {p}
@@ -238,9 +241,9 @@ export const ChomboStep: React.FC<ChomboStepProps> = ({
         })}
       </div>
 
-      <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold text-neutral-400 flex items-center justify-between">
-        <span>チョンボ精算</span>
-        <span className="text-neutral-200">
+      <div className="pt-2 pb-1 border-t border-neutral-800 flex items-center justify-between text-xs">
+        <span className="font-bold text-neutral-400">チョンボ精算</span>
+        <span className="text-neutral-200 font-bold">
           満貫払い（親: 子各4000点 / 子: 親4000点・子各2000点）
         </span>
       </div>
@@ -249,13 +252,13 @@ export const ChomboStep: React.FC<ChomboStepProps> = ({
         type="button"
         disabled={!chomboPlayer || submitting}
         onClick={onCommit}
-        className={`w-full h-12 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
+        className={`w-full h-13 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
           chomboPlayer
-            ? 'bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white'
-            : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
+            ? 'bg-white hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-40 text-black'
+            : 'bg-neutral-850 text-neutral-600 border border-neutral-800 cursor-not-allowed'
         }`}
       >
-        {submitting ? '記録中...' : 'チョンボを確定（同局やり直し）'}
+        {submitting ? '記録中...' : 'チョンボを確定（同局やり直し） →'}
       </button>
     </div>
   );

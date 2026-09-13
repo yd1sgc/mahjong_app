@@ -135,21 +135,21 @@ export const ConfirmStep: React.FC<ConfirmStepProps> = ({
       )}
 
       {/* ─── 操作ボタン ─── */}
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex-1 h-12 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold text-xs transition-colors"
-        >
-          やり直す
-        </button>
+      <div className="flex flex-col gap-2 pt-1">
         <button
           type="button"
           disabled={submitting}
           onClick={onCommit}
-          className="flex-2 h-12 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] disabled:opacity-50 text-white font-black text-sm shadow-md transition-all flex items-center justify-center"
+          className="w-full h-13 rounded-xl bg-white hover:bg-neutral-200 active:scale-[0.99] disabled:opacity-40 text-black font-black text-sm shadow-md transition-all flex items-center justify-center"
         >
-          {submitting ? '記録中...' : '和了を確定して次局へ'}
+          {submitting ? '記録中...' : '和了を確定して次局へ →'}
+        </button>
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full py-1.5 text-center text-xs font-bold text-neutral-400 hover:text-white transition-colors"
+        >
+          ← 点数選択に戻る
         </button>
       </div>
     </div>

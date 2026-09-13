@@ -120,9 +120,9 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
         <button
           type="button"
           onClick={onBack}
-          className="text-xs text-neutral-400 hover:text-white underline font-bold"
+          className="text-xs px-2.5 py-1 rounded-lg bg-neutral-850 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-750 font-bold flex items-center gap-1 transition-colors"
         >
-          関係者を変更
+          ← 戻る
         </button>
       </div>
 
@@ -196,13 +196,13 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
             type="button"
             disabled={!allMultiReady}
             onClick={onNext}
-            className={`w-full h-12 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
+            className={`w-full h-13 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
               allMultiReady
-                ? 'bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black'
-                : 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-neutral-750'
+                ? 'bg-white hover:bg-neutral-200 active:scale-[0.99] text-black'
+                : 'bg-neutral-850 text-neutral-600 cursor-not-allowed border border-neutral-800'
             }`}
           >
-            確認画面へ進む &rarr;
+            確認画面へ進む →
           </button>
         </div>
       )}

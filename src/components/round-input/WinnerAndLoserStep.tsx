@@ -209,13 +209,13 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
           type="button"
           disabled={!canProceed}
           onClick={onNext}
-          className={`w-full h-12 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
+          className={`w-full h-13 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
             canProceed
-              ? 'bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black'
-              : 'bg-neutral-800 text-neutral-600 cursor-not-allowed border border-neutral-750'
+              ? 'bg-white hover:bg-neutral-200 active:scale-[0.99] text-black'
+              : 'bg-neutral-850 text-neutral-600 cursor-not-allowed border border-neutral-800'
           }`}
         >
-          点数選択へ進む &rarr;
+          点数選択へ進む →
         </button>
       </div>
     </div>
