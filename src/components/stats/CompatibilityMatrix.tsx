@@ -20,7 +20,7 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
   setMatrixMembers,
   matrixData,
 }) => {
-  // 表示中メンバー間の最大絶対値差分（グラデーション濃淡スケール用）
+  // 表示中メンバー間の最大絶対値差分（グラデーション濃淡スケール用: coolwarm_r仕様）
   const maxAbsDiff = React.useMemo(() => {
     let max = 0;
     for (const m1 of matrixMembers) {
@@ -30,30 +30,38 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
         if (diff > max) max = diff;
       }
     }
-    return max;
+    return Math.max(max, 1.0);
   }, [matrixMembers, matrixData]);
 
-  // pt差に応じたスタイル計算（青・赤の濃淡グラデーション）
+  // pt差に応じたスタイル計算（個人アプリ coolwarm_r 準拠: 青=得意, 赤=苦手）
+  // 不透明なRGB補間によりダークテーマでも黒潰れせず文字コントラストを完全確保
   const getCellStyle = (diff: number) => {
-    if (diff === 0 || maxAbsDiff === 0) {
+    if (diff === 0) {
       return {
-        className: 'text-neutral-500 font-mono',
+        className: 'text-neutral-500 font-mono font-bold',
         style: undefined,
       };
     }
-    // 0.12 〜 0.65 の範囲で背景濃淡を動的に付与
-    const ratio = Math.min(1, Math.abs(diff) / maxAbsDiff);
-    const alpha = (0.12 + ratio * 0.53).toFixed(2);
+
+    const factor = Math.min(1, Math.abs(diff) / maxAbsDiff);
 
     if (diff > 0) {
+      // 得意（青系）: 濃紺 [20, 35, 75] 〜 鮮やかなブルー [29, 78, 216]
+      const r = Math.round(20 + factor * (29 - 20));
+      const g = Math.round(35 + factor * (78 - 35));
+      const b = Math.round(75 + factor * (216 - 75));
       return {
-        className: 'text-cyan-300 font-black font-mono',
-        style: { backgroundColor: `rgba(6, 182, 212, ${alpha})` },
+        className: 'text-white font-black font-mono shadow-xs',
+        style: { backgroundColor: `rgb(${r}, ${g}, ${b})` },
       };
     } else {
+      // 苦手（赤系）: 暗赤 [70, 15, 25] 〜 鮮烈なローズ [225, 29, 72]
+      const r = Math.round(70 + factor * (225 - 70));
+      const g = Math.round(15 + factor * (29 - 15));
+      const b = Math.round(25 + factor * (72 - 25));
       return {
-        className: 'text-rose-300 font-black font-mono',
-        style: { backgroundColor: `rgba(244, 63, 94, ${alpha})` },
+        className: 'text-white font-black font-mono shadow-xs',
+        style: { backgroundColor: `rgb(${r}, ${g}, ${b})` },
       };
     }
   };
