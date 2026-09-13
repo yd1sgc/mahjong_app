@@ -11,7 +11,15 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { GameRow, MemberRow, RuleTemplateRow } from '@/types/database';
+import {
+  GameInsert,
+  GameParticipantInsert,
+  GameRow,
+  GroupInsert,
+  GroupRow,
+  MemberRow,
+  RuleTemplateRow,
+} from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
 
@@ -24,7 +32,7 @@ export default function HomePage() {
   const router = useRouter();
   const [games, setGames] = useState<GameRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<GroupRow[]>([]);
   const [groupMemberships, setGroupMemberships] = useState<GroupMembership[]>([]);
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +90,7 @@ export default function HomePage() {
           .eq('is_archived', 0);
 
         if (rData && rData.length > 0) {
-          setRules(rData as any);
+          setRules(rData);
         }
       } finally {
         setLoading(false);
@@ -99,53 +107,50 @@ export default function HomePage() {
   const handleGroupChange = (newGroupId: string) => {
     setSelectedGroupId(newGroupId);
 
-    if (newGroupId === 'free') {
-      // フリー対局の場合: 先頭の公式ルールを選択
-      if (rules.length > 0) {
+    // グループ未選択（'' または 'free'）の場合はリセット・全メンバー解放
+    if (!newGroupId || newGroupId === 'free') {
+      if (rules.length > 0 && !selectedRuleId) {
         setSelectedRuleId(rules[0].rule_id);
       }
-    } else if (newGroupId) {
-      // 特定グループの場合: そのグループの default_rule_id を自動セット
-      const grp = groups.find((g) => g.group_id === newGroupId);
-      if (grp?.default_rule_id && rules.some((r) => r.rule_id === grp.default_rule_id)) {
-        setSelectedRuleId(grp.default_rule_id);
-      } else if (rules.length > 0) {
-        setSelectedRuleId(rules[0].rule_id);
-      }
-
-      // 選択中メンバーの所属チェック: 新グループに所属していない人はクリア
-      const validMemberIds = groupMemberships
-        .filter((gm) => gm.group_id === newGroupId)
-        .map((gm) => gm.member_id);
-
-      setSelectedMembers((prev) =>
-        prev.map((mId) => (mId && validMemberIds.includes(mId) ? mId : ''))
-      );
-    } else {
-      // 未選択に戻した場合
-      setSelectedRuleId('');
-      setSelectedMembers(['', '', '', '']);
+      return;
     }
+
+    // 1. グループの既定ルールを反映
+    const targetGroup = groups.find((g) => g.group_id === newGroupId);
+    if (targetGroup?.default_rule_id) {
+      setSelectedRuleId(targetGroup.default_rule_id);
+    }
+
+    // 2. 現在選択済みのメンバーが、変更先グループに所属しているか検証
+    // 所属していない（外部・別グループの）メンバーは選択解除
+    const groupMemberIds = groupMemberships
+      .filter((gm) => gm.group_id === newGroupId)
+      .map((gm) => gm.member_id);
+
+    setSelectedMembers((prev) =>
+      prev.map((mId) => {
+        if (!mId) return '';
+        return groupMemberIds.includes(mId) ? mId : '';
+      })
+    );
   };
 
-  // 各座席（Seat 1..4）ごとのドロップダウン選択肢生成 (グループ絞り込み ＋ 重複除外)
-  const getAvailableMembersForSeat = (seatIdx: number) => {
-    if (!selectedGroupId) return [];
+  // 座席ごとの選択可能メンバー候補を取得
+  const getAvailableMembersForSeat = (seatIdx: number): MemberRow[] => {
+    // 他の座席で既に選択されているメンバーID一覧
+    const chosenInOtherSeats = selectedMembers.filter((_, idx) => idx !== seatIdx && Boolean(_));
 
-    let pool = members;
-
-    // 1. グループ絞り込み (フリー対局以外)
-    if (selectedGroupId !== 'free') {
-      const validMemberIds = groupMemberships
+    let pool: MemberRow[] = [];
+    if (!selectedGroupId || selectedGroupId === 'free') {
+      // グループ未選択またはフリー対局: 全メンバー
+      pool = members;
+    } else {
+      // 特定グループ選択時: そのグループの所属メンバーのみ
+      const allowedMemberIds = groupMemberships
         .filter((gm) => gm.group_id === selectedGroupId)
         .map((gm) => gm.member_id);
-      pool = pool.filter((m) => validMemberIds.includes(m.member_id));
+      pool = members.filter((m) => allowedMemberIds.includes(m.member_id));
     }
-
-    // 2. 他の席で選ばれている人を除外 (現在の seatIdx で選択中の人は選択肢に残す)
-    const chosenInOtherSeats = selectedMembers.filter(
-      (mId, idx) => idx !== seatIdx && mId !== ''
-    );
 
     return pool.filter((m) => !chosenInOtherSeats.includes(m.member_id));
   };
@@ -166,14 +171,16 @@ export default function HomePage() {
       const newId = crypto.randomUUID();
       const defaultRuleId = rules[0]?.rule_id || '';
       try {
-        const { data, error } = await (supabase.from('groups') as any)
-          .insert({
-            group_id: newId,
-            display_id: 'free',
-            group_name: 'フリー対局',
-            default_rule_id: defaultRuleId,
-            is_archived: 0,
-          })
+        const groupPayload: GroupInsert = {
+          group_id: newId,
+          display_id: 'free',
+          group_name: 'フリー対局',
+          default_rule_id: defaultRuleId,
+          is_archived: 0,
+        };
+        const { data, error } = await supabase
+          .from('groups')
+          .insert(groupPayload)
           .select()
           .single();
 
@@ -234,7 +241,7 @@ export default function HomePage() {
       const effectiveGroupId = await getEffectiveGroupId();
 
       // 1. games レコード作成
-      const { error: gErr } = await (supabase.from('games') as any).insert({
+      const gamePayload: GameInsert = {
         game_id: gameId,
         group_id: effectiveGroupId,
         passcode: pin,
@@ -243,7 +250,8 @@ export default function HomePage() {
         status: 'in_progress',
         sync_target: 1,
         is_synced: 1,
-      });
+      };
+      const { error: gErr } = await supabase.from('games').insert(gamePayload);
 
       if (gErr) {
         console.error('games insert error:', gErr);
@@ -251,7 +259,7 @@ export default function HomePage() {
       }
 
       // 2. game_participants 作成
-      const participants = selectedMembers.map((mId, idx) => {
+      const participants: GameParticipantInsert[] = selectedMembers.map((mId, idx) => {
         const mem = members.find((m) => m.member_id === mId);
         return {
           game_id: gameId,
@@ -264,8 +272,8 @@ export default function HomePage() {
         };
       });
 
-      const { error: pErr } = await (supabase
-        .from('game_participants') as any)
+      const { error: pErr } = await supabase
+        .from('game_participants')
         .insert(participants);
 
       if (pErr) {

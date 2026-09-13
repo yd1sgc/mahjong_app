@@ -122,7 +122,7 @@ export interface Database {
           group_id: string; // UUID
           recorder_id: string | null; // auth.users.id
           passcode: string; // 4桁PIN
-          status: 'in_progress' | 'finished' | string;
+          status: 'in_progress' | 'finished' | 'completed' | string;
           rule_name_snapshot: string;
           rule_config_snapshot: Json;
           game_mode: 'detail' | 'simple' | string;
@@ -136,7 +136,7 @@ export interface Database {
           group_id: string;
           recorder_id?: string | null;
           passcode: string;
-          status?: 'in_progress' | 'finished' | string;
+          status?: 'in_progress' | 'finished' | 'completed' | string;
           rule_name_snapshot: string;
           rule_config_snapshot: Json;
           game_mode?: 'detail' | 'simple' | string;
@@ -353,7 +353,10 @@ export type MemberRow = Database['public']['Tables']['members']['Row'];
 export type GroupRow = Database['public']['Tables']['groups']['Row'];
 export type RuleTemplateRow = Database['public']['Tables']['rule_templates']['Row'];
 export type GameRow = Database['public']['Tables']['games']['Row'];
+export type GameInsert = Database['public']['Tables']['games']['Insert'];
 export type GameParticipantRow = Database['public']['Tables']['game_participants']['Row'];
+export type GameParticipantInsert = Database['public']['Tables']['game_participants']['Insert'];
+export type GroupInsert = Database['public']['Tables']['groups']['Insert'];
 export type RoundRow = Database['public']['Tables']['rounds']['Row'];
 export type RoundSeatRow = Database['public']['Tables']['round_seats']['Row'];
 export type RoundSeatInsert = Database['public']['Tables']['round_seats']['Insert'];

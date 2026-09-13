@@ -3,7 +3,7 @@
  * Supabase通信および画面復帰（visibilitychange）時の自動再同期を担当
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   checkGameEnd,
@@ -59,11 +59,18 @@ export function useGameData(
   const [isRecorder, setIsRecorder] = useState(false);
   const [gameEndReason, setGameEndReason] = useState<string | null>(null);
 
+  // 二重フェッチ・並行実行防止用 ref
+  const isFetchingRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastFetchTimeRef = useRef<number>(0);
+
   // 1. 対局データの読み込み
   const fetchGameData = useCallback(async () => {
     if (!gameId) return;
+    if (isFetchingRef.current) return;
 
     try {
+      isFetchingRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -119,42 +126,58 @@ export function useGameData(
         const winnerSeats = seats.filter((s) => s.is_winner === 1);
         const winnerSeat = winnerSeats[0] || null;
         const loserSeat = seats.find((s) => s.is_loser === 1);
-        const riichiList = seats
-          .filter((s) => s.is_riichi === 1)
-          .map((s) => playerList[s.seat - 1]);
-        const tenpaiList = seats
-          .filter((s) => s.is_tenpai === 1)
-          .map((s) => playerList[s.seat - 1]);
+        const riichiSeats = seats.filter((s) => s.is_riichi === 1);
+        const tenpaiSeats = seats.filter((s) => s.is_tenpai === 1);
+
+        const winnerPart = winnerSeat
+          ? partList.find((p) => p.member_id === winnerSeat.member_id)
+          : null;
+        const loserPart = loserSeat
+          ? partList.find((p) => p.member_id === loserSeat.member_id)
+          : null;
 
         const multiWins =
-          r.result_type === 'multi_ron' || winnerSeats.length > 1
-            ? winnerSeats.map((ws) => ({
-                winner: playerList[ws.seat - 1],
-                points_data: {
-                  total: Math.abs(ws.base_point || 0),
-                  han: ws.han ?? undefined,
-                  fu: ws.fu ?? undefined,
-                },
-              }))
+          r.result_type === 'multi_ron'
+            ? winnerSeats.map((ws) => {
+                const p = partList.find((pt) => pt.member_id === ws.member_id);
+                return {
+                  winner: p?.player_name_snapshot || '',
+                  points_data: {
+                    total: ws.base_point,
+                    han: ws.han || 1,
+                    fu: ws.fu || 30,
+                  },
+                };
+              })
             : undefined;
 
         return {
+          round_index: r.round_index,
           kyoku_name: r.kyoku_name,
-          winner: winnerSeat ? playerList[winnerSeat.seat - 1] : null,
-          loser: loserSeat ? playerList[loserSeat.seat - 1] : null,
+          honba: r.honba,
           win_type: r.result_type as WinType,
-          score: Math.abs(winnerSeat?.base_point || 0),
-          riichi: riichiList,
-          tenpai: tenpaiList,
+          winner: winnerPart?.player_name_snapshot || null,
+          loser: loserPart?.player_name_snapshot || null,
+          score: winnerSeat?.base_point || 0,
+          riichi: riichiSeats
+            .map((s) => partList.find((p) => p.member_id === s.member_id)?.player_name_snapshot)
+            .filter((name): name is string => Boolean(name)),
+          tenpai: tenpaiSeats
+            .map((s) => partList.find((p) => p.member_id === s.member_id)?.player_name_snapshot)
+            .filter((name): name is string => Boolean(name)),
           multi_wins: multiWins,
         };
       });
 
-      // 純粋ドメイン関数で状態を完全再計算
-      const initScore = parsedRule.basic?.init_score ?? 25000;
-      const computed = recalculateState(playerList, initScore, parsedRule, history);
+      // ドメイン層による現在状態の再計算
+      const computed = recalculateState(
+        playerList,
+        parsedRule.basic?.init_score ?? 25000,
+        parsedRule,
+        history
+      );
 
-      // 終局判定
+      // 対局終了判定
       const endReason = checkGameEnd(
         computed.scores,
         computed.roundIdx,
@@ -164,7 +187,7 @@ export function useGameData(
       );
       setGameEndReason(endReason);
 
-      // 精算プレビュー計算（供託加算・ウマオカ・0.0ptゼロ和）
+      // 終了時の精算計算
       const currentSettlement = calculateGameSettlement(
         playerList,
         computed.scores,
@@ -195,6 +218,8 @@ export function useGameData(
       const msg = e instanceof Error ? e.message : 'データ読み込みに失敗しました';
       setError(msg);
     } finally {
+      isFetchingRef.current = false;
+      lastFetchTimeRef.current = Date.now();
       setLoading(false);
     }
   }, [gameId, recorderTokenKey, furoDeclared]);
@@ -204,9 +229,23 @@ export function useGameData(
     fetchGameData();
   }, [fetchGameData]);
 
-  // 2. Supabase Realtime 購読（他端末での確定を即時受信）
+  // 2. Supabase Realtime 購読（他端末での確定を即時受信、重複フェッチ抑制）
   useEffect(() => {
     if (!gameId) return;
+
+    const debouncedFetch = () => {
+      const now = Date.now();
+      // 直近 400ms 以内にローカル側でフェッチ完了している場合は二重取得を防止
+      if (now - lastFetchTimeRef.current < 400) {
+        return;
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        fetchGameData();
+      }, 250);
+    };
 
     const channel = supabase
       .channel(`game:${gameId}`)
@@ -219,7 +258,7 @@ export function useGameData(
           filter: `game_id=eq.${gameId}`,
         },
         () => {
-          fetchGameData();
+          debouncedFetch();
         }
       )
       .on(
@@ -240,11 +279,15 @@ export function useGameData(
           if (localToken && localToken === updatedGame.passcode) {
             setIsRecorder(true);
           }
+          debouncedFetch();
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
   }, [gameId, fetchGameData, recorderTokenKey]);

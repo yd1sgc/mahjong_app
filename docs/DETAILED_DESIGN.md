@@ -143,6 +143,99 @@ BEGIN
     RETURN TRUE;
 END;
 $$;
+
+-- 局確定アトミックトランザクション
+CREATE OR REPLACE FUNCTION public.commit_round_transaction(
+    p_game_id TEXT,
+    p_round_index INTEGER,
+    p_kyoku_name TEXT,
+    p_honba INTEGER,
+    p_riichi_sticks INTEGER,
+    p_result_type TEXT,
+    p_seats JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_round_id TEXT;
+    v_seat JSONB;
+BEGIN
+    v_round_id := gen_random_uuid()::TEXT;
+
+    INSERT INTO public.rounds (
+        round_id, game_id, round_index, kyoku_name, honba, riichi_sticks, result_type
+    ) VALUES (
+        v_round_id, p_game_id, p_round_index, p_kyoku_name, p_honba, p_riichi_sticks, p_result_type
+    );
+
+    FOR v_seat IN SELECT * FROM jsonb_array_elements(p_seats)
+    LOOP
+        INSERT INTO public.round_seats (
+            round_id, seat, member_id, base_point, honba_point, kyotaku_point,
+            penalty_point, score_delta, chip_delta, han, fu,
+            is_winner, is_loser, is_riichi, is_furo, is_tenpai
+        ) VALUES (
+            v_round_id,
+            (v_seat->>'seat')::INTEGER,
+            v_seat->>'member_id',
+            COALESCE((v_seat->>'base_point')::INTEGER, 0),
+            COALESCE((v_seat->>'honba_point')::INTEGER, 0),
+            COALESCE((v_seat->>'kyotaku_point')::INTEGER, 0),
+            COALESCE((v_seat->>'penalty_point')::INTEGER, 0),
+            COALESCE((v_seat->>'score_delta')::INTEGER, 0),
+            COALESCE((v_seat->>'chip_delta')::INTEGER, 0),
+            (v_seat->>'han')::INTEGER,
+            (v_seat->>'fu')::INTEGER,
+            COALESCE((v_seat->>'is_winner')::INTEGER, 0),
+            COALESCE((v_seat->>'is_loser')::INTEGER, 0),
+            COALESCE((v_seat->>'is_riichi')::INTEGER, 0),
+            COALESCE((v_seat->>'is_furo')::INTEGER, 0),
+            COALESCE((v_seat->>'is_tenpai')::INTEGER, 0)
+        );
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'round_id', v_round_id);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'commit_round_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- 対局精算アトミックトランザクション
+CREATE OR REPLACE FUNCTION public.settle_game_transaction(
+    p_game_id TEXT,
+    p_settlements JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_st JSONB;
+BEGIN
+    UPDATE public.games
+    SET status = 'completed'
+    WHERE game_id = p_game_id;
+
+    FOR v_st IN SELECT * FROM jsonb_array_elements(p_settlements)
+    LOOP
+        UPDATE public.game_participants
+        SET
+            final_score = (v_st->>'final_score')::INTEGER,
+            rank = (v_st->>'rank')::INTEGER,
+            point = (v_st->>'point')::NUMERIC(6,1)
+        WHERE game_id = p_game_id
+          AND seat = (v_st->>'seat')::INTEGER;
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'settle_game_transaction failed: %', SQLERRM;
+END;
+$$;
 ```
 
 ---
@@ -155,9 +248,13 @@ $$;
 | レイヤー | 保存場所 | 保存タイミング | 保存内容 | 公開範囲 |
 | :--- | :--- | :--- | :--- | :--- |
 | **第1段階（下書き）** | 端末の `LocalStorage` | 入力モーダルで翻・符・和了者・放銃者を選択する**1タップごと** | 未確定の入力フォーム状態 | 本人端末のみ（非公開） |
-| **第2段階（確定保存）** | Supabase (PostgreSQL) | 記録係が「局結果を確定」ボタンを押した**瞬間のみ** | 計算済みスコア、局詳細、対局ヘッダ | 全端末へRealtime通知 |
+| **第2段階（確定保存）** | Supabase (PostgreSQL) | 記録係が「局結果を確定」ボタンを押した**瞬間のみ** | 計算済みスコア、局詳細、対局ヘッダ（RPCによりアトミック一括確定） | 全端末へRealtime通知 |
 
-### 5.2 障害・中断からの復元フロー
+### 5.2 障害・中断からの復元・整合性保護フロー
+- **ブラウザ誤閉じ・電話着信・他アプリ切り替え時:**
+  1タップごとに `LocalStorage` へ即時保存しているため、画面復帰時や再アクセス時に直前の入力状態が100%復元される。また、画面復帰（`visibilitychange`）時にDBから最新の対局状態を自動再フェッチする。
+- **通信切断・確定失敗時の整合性保護（ロールバック保護）:**
+  RPC実行エラーや通信断により個別フォールバックが発生した場合でも、`rounds` 登録後に `round_seats` の保存が失敗した際は即座に挿入済み `rounds` を削除（ロールバック）し、孤立レコードや不完全な局データがDBに残るのを完全に防止する。
 - **ブラウザ誤閉じ・電話着信・クラッシュ時:**
   再アクセス時、対局画面初期化処理が `LocalStorage` を走査。未確定の入力状態が存在すれば「入力中の局データがあります。復元しますか？」とダイアログを表示し、1タップで選択状態を100%復元。
 - **通信切断時（電波圏外・雀荘地下）:**

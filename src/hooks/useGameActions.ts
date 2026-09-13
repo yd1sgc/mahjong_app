@@ -297,7 +297,11 @@ export function useGameActions({
           if (rErr) throw new Error(rErr.message);
 
           const { error: sErr } = await supabase.from('round_seats').insert(seatPayloads);
-          if (sErr) throw new Error(sErr.message);
+          if (sErr) {
+            // ロールバック: round_seats 登録失敗時に rounds レコードを削除して孤立・不整合を防ぐ
+            await supabase.from('rounds').delete().eq('round_id', roundId);
+            throw new Error(`座席データの保存に失敗したためロールバックしました: ${sErr.message}`);
+          }
         }
 
         clearDraft();

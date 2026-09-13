@@ -196,6 +196,142 @@ BEGIN
 END;
 $$;
 
+-- 7.2 局確定アトミックトランザクション (RPC)
+CREATE OR REPLACE FUNCTION public.commit_round_transaction(
+    p_game_id TEXT,
+    p_round_index INTEGER,
+    p_kyoku_name TEXT,
+    p_honba INTEGER,
+    p_riichi_sticks INTEGER,
+    p_result_type TEXT,
+    p_seats JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_round_id TEXT;
+    v_seat JSONB;
+BEGIN
+    v_round_id := gen_random_uuid()::TEXT;
+
+    INSERT INTO public.rounds (
+        round_id,
+        game_id,
+        round_index,
+        kyoku_name,
+        honba,
+        riichi_sticks,
+        result_type
+    ) VALUES (
+        v_round_id,
+        p_game_id,
+        p_round_index,
+        p_kyoku_name,
+        p_honba,
+        p_riichi_sticks,
+        p_result_type
+    );
+
+    FOR v_seat IN SELECT * FROM jsonb_array_elements(p_seats)
+    LOOP
+        INSERT INTO public.round_seats (
+            round_id,
+            seat,
+            member_id,
+            base_point,
+            honba_point,
+            kyotaku_point,
+            penalty_point,
+            score_delta,
+            chip_delta,
+            han,
+            fu,
+            is_winner,
+            is_loser,
+            is_riichi,
+            is_furo,
+            is_tenpai
+        ) VALUES (
+            v_round_id,
+            (v_seat->>'seat')::INTEGER,
+            v_seat->>'member_id',
+            COALESCE((v_seat->>'base_point')::INTEGER, 0),
+            COALESCE((v_seat->>'honba_point')::INTEGER, 0),
+            COALESCE((v_seat->>'kyotaku_point')::INTEGER, 0),
+            COALESCE((v_seat->>'penalty_point')::INTEGER, 0),
+            COALESCE((v_seat->>'score_delta')::INTEGER, 0),
+            COALESCE((v_seat->>'chip_delta')::INTEGER, 0),
+            (v_seat->>'han')::INTEGER,
+            (v_seat->>'fu')::INTEGER,
+            COALESCE((v_seat->>'is_winner')::INTEGER, 0),
+            COALESCE((v_seat->>'is_loser')::INTEGER, 0),
+            COALESCE((v_seat->>'is_riichi')::INTEGER, 0),
+            COALESCE((v_seat->>'is_furo')::INTEGER, 0),
+            COALESCE((v_seat->>'is_tenpai')::INTEGER, 0)
+        );
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'round_id', v_round_id);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'commit_round_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- 7.3 対局精算アトミックトランザクション (RPC)
+CREATE OR REPLACE FUNCTION public.settle_game_transaction(
+    p_game_id TEXT,
+    p_settlements JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_st JSONB;
+BEGIN
+    UPDATE public.games
+    SET status = 'completed'
+    WHERE game_id = p_game_id;
+
+    FOR v_st IN SELECT * FROM jsonb_array_elements(p_settlements)
+    LOOP
+        UPDATE public.game_participants
+        SET
+            final_score = (v_st->>'final_score')::INTEGER,
+            rank = (v_st->>'rank')::INTEGER,
+            point = (v_st->>'point')::NUMERIC(6,1)
+        WHERE game_id = p_game_id
+          AND seat = (v_st->>'seat')::INTEGER;
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'settle_game_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- 7.4 対局破棄アトミックトランザクション (RPC)
+CREATE OR REPLACE FUNCTION public.abort_game_transaction(
+    p_game_id TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    DELETE FROM public.games WHERE game_id = p_game_id;
+    RETURN jsonb_build_object('success', true);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'abort_game_transaction failed: %', SQLERRM;
+END;
+$$;
+
+
 -- 8. ロール権限の付与（anon / authenticated がアクセス可能にする）
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
