@@ -138,11 +138,14 @@ export interface MultiWinDetail {
 /** 局の結果レコード */
 export interface RoundRecord {
   round_id?: string;
+  round_index?: number;
   kyoku_name: string;
   winner: string | null;
   loser: string | null;
   win_type: WinType;
   score: number;
+  han?: number | null;
+  fu?: number | null;
   riichi: string[];
   furo?: string[];
   tenpai?: string[];

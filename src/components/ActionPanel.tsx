@@ -5,7 +5,8 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ActionPanelProps {
   isRecorder: boolean;
@@ -13,6 +14,7 @@ interface ActionPanelProps {
   onOpenWinModal: (type: 'ron' | 'tsumo') => void;
   onOpenRyukyokuModal: () => void;
   onOpenChomboModal: () => void;
+  onOpenRoundEditModal: () => void;
   onUndoClick: () => void;
   onOpenTransferModal: () => void;
   canUndo: boolean;
@@ -25,11 +27,14 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   onOpenWinModal,
   onOpenRyukyokuModal,
   onOpenChomboModal,
+  onOpenRoundEditModal,
   onUndoClick,
   onOpenTransferModal,
   canUndo,
   hasIntraRoundAction = false,
 }) => {
+  const [showOtherOps, setShowOtherOps] = useState(false);
+
   return (
     <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3.5 flex flex-col gap-3 shadow-md">
       {/* 権限状態インジケータ */}
@@ -82,30 +87,56 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             </button>
           </div>
 
-          {/* サブアクション (チョンボ / 1局巻き戻し) */}
-          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-800/60">
+          {/* 1手戻す / 前局を取り消す */}
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={onUndoClick}
+            className={`w-full h-10 rounded-lg font-semibold text-xs transition-colors border touch-manipulation flex items-center justify-center ${
+              canUndo
+                ? hasIntraRoundAction
+                  ? 'bg-neutral-800/80 hover:bg-neutral-700 text-amber-300 hover:text-amber-200 border-amber-500/30'
+                  : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border-neutral-700/50'
+                : 'bg-neutral-900 text-neutral-600 border-neutral-800 cursor-not-allowed'
+            }`}
+          >
+            {hasIntraRoundAction ? '1手戻す' : '前局を取り消す'}
+          </button>
+
+          {/* その他（開閉アコーディオン） */}
+          <div className="pt-1 border-t border-neutral-800/60 flex flex-col gap-2">
             <button
               type="button"
-              onClick={onOpenChomboModal}
-              className="h-11 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 font-semibold text-xs transition-colors border border-neutral-700/50 touch-manipulation flex items-center justify-center"
+              onClick={() => setShowOtherOps((prev) => !prev)}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-950/60 hover:bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 text-xs font-bold transition-colors border border-neutral-800"
             >
-              チョンボ入力
+              <span>その他の操作</span>
+              {showOtherOps ? (
+                <ChevronUp className="w-3.5 h-3.5 text-neutral-400" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-neutral-400" />
+              )}
             </button>
 
-            <button
-              type="button"
-              disabled={!canUndo}
-              onClick={onUndoClick}
-              className={`h-11 rounded-lg font-semibold text-xs transition-colors border touch-manipulation flex items-center justify-center ${
-                canUndo
-                  ? hasIntraRoundAction
-                    ? 'bg-neutral-800/80 hover:bg-neutral-700 text-amber-300 hover:text-amber-200 border-amber-500/30'
-                    : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white border-neutral-700/50'
-                  : 'bg-neutral-900 text-neutral-600 border-neutral-800 cursor-not-allowed'
-              }`}
-            >
-              {hasIntraRoundAction ? '1手戻す' : '前局を取り消す'}
-            </button>
+            {showOtherOps && (
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={onOpenRoundEditModal}
+                  className="h-10 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-200 font-semibold text-xs transition-colors border border-neutral-700/60 touch-manipulation flex items-center justify-center"
+                >
+                  局を修正
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onOpenChomboModal}
+                  className="h-10 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 font-semibold text-xs transition-colors border border-neutral-700/50 touch-manipulation flex items-center justify-center"
+                >
+                  チョンボ入力
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (

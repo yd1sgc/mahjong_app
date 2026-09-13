@@ -12,6 +12,7 @@ import { useGame } from '@/hooks/useGame';
 import { ScoreBoard } from '@/components/ScoreBoard';
 import { ActionPanel } from '@/components/ActionPanel';
 import { RoundInputModal } from '@/components/RoundInputModal';
+import { RoundEditModal } from '@/components/RoundEditModal';
 import { PinTransferModal } from '@/components/PinTransferModal';
 import { Toast } from '@/components/Toast';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
@@ -40,6 +41,7 @@ function GameContent() {
     commitRound,
     undoRound,
     undoLastAction,
+    updateRoundAndRecalculate,
     canUndo,
     hasIntraRoundAction,
     finishGame,
@@ -48,6 +50,7 @@ function GameContent() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalWinType, setModalWinType] = useState<WinType>('ron');
+  const [roundEditModalOpen, setRoundEditModalOpen] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [ruleDetailOpen, setRuleDetailOpen] = useState(false);
@@ -105,6 +108,20 @@ function GameContent() {
     } else if (result.type === 'error') {
       setToast({ type: 'error', message: result.message || '取り消しに失敗しました' });
     }
+  };
+
+  const handleUpdateRoundWithToast = async (...args: Parameters<typeof updateRoundAndRecalculate>) => {
+    const ok = await updateRoundAndRecalculate(...args);
+    if (ok) {
+      setToast({ type: 'success', message: '局データを修正し、全体を再計算しました' });
+    } else {
+      setToast({
+        type: 'error',
+        message: '局データの修正に失敗しました',
+        onRetry: () => handleUpdateRoundWithToast(...args),
+      });
+    }
+    return ok;
   };
 
   const handleConfirmFinish = async () => {
@@ -283,6 +300,7 @@ function GameContent() {
             onOpenWinModal={handleOpenWinModal}
             onOpenRyukyokuModal={handleOpenRyukyokuModal}
             onOpenChomboModal={handleOpenChomboModal}
+            onOpenRoundEditModal={() => setRoundEditModalOpen(true)}
             onUndoClick={handleUndoWithToast}
             onOpenTransferModal={() => setPinModalOpen(true)}
             canUndo={canUndo}
@@ -305,6 +323,16 @@ function GameContent() {
         onCommit={handleCommitRoundWithToast}
         initialWinType={modalWinType}
         riichiDeclared={gameState?.riichiDeclared ?? []}
+      />
+
+      {/* 局修正モーダル */}
+      <RoundEditModal
+        isOpen={roundEditModalOpen}
+        onClose={() => setRoundEditModalOpen(false)}
+        players={players}
+        ruleConfig={ruleConfig}
+        roundHistory={gameState?.roundHistory ?? []}
+        onSave={handleUpdateRoundWithToast}
       />
 
       {/* トースト通知 */}

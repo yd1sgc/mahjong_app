@@ -8,6 +8,7 @@ import { useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   calculateGameSettlement,
+  computeAllRoundsDetails,
   getClosestWinner,
   recalculateState,
 } from '@/lib/mahjong/rules';
@@ -55,6 +56,7 @@ interface UseGameActionsProps {
   popAction: () => RoundAction | null;
   clearRoundDeclarations: () => void;
   clearDraft: () => void;
+  resetAllRoundData: () => void;
   saveRecorderToken: (pin: string) => void;
   fetchGameData: () => Promise<void>;
   draftKey: string;
@@ -87,6 +89,7 @@ export function useGameActions({
   popAction,
   clearRoundDeclarations,
   clearDraft,
+  resetAllRoundData,
   saveRecorderToken,
   fetchGameData,
   draftKey,
@@ -629,6 +632,116 @@ export function useGameActions({
     setError,
   ]);
 
+  // 8. 過去局の修正およびインプレース再計算・更新（DELETEゼロ、RPC依存ゼロ）
+  const updateRoundAndRecalculate = useCallback(
+    async (targetRoundIndex: number, updatedRoundData: RoundRecord): Promise<boolean> => {
+      if (!gameState || !game || !isRecorder) return false;
+      if (
+        targetRoundIndex < 0 ||
+        targetRoundIndex >= gameState.roundHistory.length
+      ) {
+        setError('修正対象の局が存在しません');
+        return false;
+      }
+
+      try {
+        setLoading(true);
+
+        // 1. 修正局を差し替えた新しい履歴配列を構築
+        const oldHistory = gameState.roundHistory;
+        const targetRoundId = oldHistory[targetRoundIndex].round_id;
+        const newHistory = [...oldHistory];
+        newHistory[targetRoundIndex] = {
+          ...updatedRoundData,
+          round_id: targetRoundId,
+          round_index: targetRoundIndex,
+        };
+
+        // 2. 純粋関数 computeAllRoundsDetails で第0局から全再計算
+        const initScore = ruleConfig.basic?.init_score ?? 25000;
+        const allDetails = computeAllRoundsDetails(
+          players,
+          initScore,
+          ruleConfig,
+          newHistory
+        );
+
+        // 3. 修正対象局 targetRoundIndex から最新局までの rounds & round_seats をインプレース UPDATE
+        // （DELETEは1行も実行しないため、通信切断時でもデータ消失リスクゼロ）
+        for (let i = targetRoundIndex; i < allDetails.length; i++) {
+          const det = allDetails[i];
+          const roundId = oldHistory[i].round_id;
+          if (!roundId) continue;
+
+          // (1) rounds テーブル更新
+          const { error: rErr } = await supabase
+            .from('rounds')
+            .update({
+              kyoku_name: det.kyokuName,
+              honba: det.honba,
+              riichi_sticks: det.riichiSticks,
+              result_type: det.resultType,
+            })
+            .eq('round_id', roundId);
+
+          if (rErr) {
+            throw new Error(`第${i + 1}局の更新に失敗しました: ${rErr.message}`);
+          }
+
+          // (2) round_seats テーブル更新（4座席それぞれ）
+          for (const s of det.seatDetails) {
+            const { error: sErr } = await supabase
+              .from('round_seats')
+              .update({
+                base_point: s.basePoint,
+                honba_point: s.honbaPoint,
+                kyotaku_point: s.kyotakuPoint,
+                penalty_point: s.penaltyPoint,
+                score_delta: s.scoreDelta,
+                is_winner: s.isWinner ? 1 : 0,
+                is_loser: s.isLoser ? 1 : 0,
+                is_riichi: s.isRiichi ? 1 : 0,
+                is_furo: s.isFuro ? 1 : 0,
+                is_tenpai: s.isTenpai ? 1 : 0,
+                han: s.han,
+                fu: s.fu,
+              })
+              .eq('round_id', roundId)
+              .eq('seat', s.seat);
+
+            if (sErr) {
+              throw new Error(`第${i + 1}局(座席${s.seat})の更新に失敗しました: ${sErr.message}`);
+            }
+          }
+        }
+
+        // 4. DB更新が完全に成功した直後にのみ、現在局の未確定ローカルデータ（下書き・副露・立直・履歴）を完全リセット
+        resetAllRoundData();
+
+        // 5. 最新の対局データをDBから再読み込みし、画面全体を同期
+        await fetchGameData();
+        return true;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : '局の修正・再計算に失敗しました';
+        setError(msg);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      gameState,
+      game,
+      isRecorder,
+      ruleConfig,
+      players,
+      resetAllRoundData,
+      fetchGameData,
+      setLoading,
+      setError,
+    ]
+  );
+
   return {
     transferRecorder,
     toggleFuro,
@@ -636,6 +749,7 @@ export function useGameActions({
     commitRound,
     undoRound,
     undoLastAction,
+    updateRoundAndRecalculate,
     finishGame,
     abortGame,
   };

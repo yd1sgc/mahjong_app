@@ -222,3 +222,20 @@
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全11ルート正常出力完了。
 
+## Phase 5-L 完了（対局中局修正機能・「その他の操作」アコーディオン・DELETEゼロ再計算）
+- **「その他の操作」開閉アコーディオン新設（`src/components/ActionPanel.tsx`）**:
+  - メイン領域（和了・流局、1手戻す/前局取消）の下に配置し、展開時に「局を修正」「チョンボ入力」を表示（誤タップ防止）。
+- **局修正モーダル新設（`src/components/RoundEditModal.tsx`）**:
+  - 過去の第1局〜最新局を選択して編集（ロン、ツモ、ダブロン、流局、チョンボ）。
+  - ダブロンの複数和了者・打点個別設定、流局テンパイ、リーチ・副露宣言者の編集に対応。
+  - リアルタイム全体再計算プレビュー（各プレイヤーの持ち点変動差分とゼロサム検算）を表示。
+  - `history.pushState` / `popstate` 連動により、スマホの戻る操作で対局画面から離脱せずモーダルのみを安全に閉じる制御を実装。
+- **DELETEゼロ・RPC排除のインプレースUPDATE方式（`src/hooks/useGameActions.ts`, `src/lib/mahjong/rules.ts`）**:
+  - 純粋関数 `computeAllRoundsDetails` を新設し、第0局から副作用ゼロで全局詳細（各席の点数差分・本場点・供託点等）を算出。
+  - 外部RPC依存を完全排除し、既存の `round_id` を主キーとして `rounds` および `round_seats` をインプレースに直接 `UPDATE`。局削除（DELETE）を1行も実行しないため、通信切断時でもデータ消失リスクを物理的にゼロに抑止。
+- **端末残存データ（LocalStorage）の安全初期化（`src/hooks/useGameDraft.ts`）**:
+  - DBへの更新が完全に成功した直後にのみ、現在局の未確定データ（下書き `draft`、副露 `furo`、立直 `riichi`、履歴 `actionHistory`）を完全初期化（`resetAllRoundData()`）。通信失敗時は下書きを維持して再試行可能。
+- `npx vitest run`: 全58件 ALL PASS（局修正連鎖再計算・ダブロン供託上家取りテスト3件追加）。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全11ルート正常出力完了。
+

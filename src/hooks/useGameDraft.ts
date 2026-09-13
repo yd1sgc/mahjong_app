@@ -220,6 +220,12 @@ export function useGameDraft(gameId: string) {
     }
   }, [furoKey, riichiKey, actionHistoryKey]);
 
+  // 局修正完了時等における現在局の全データ（下書き・副露・立直・履歴）の完全初期化
+  const resetAllRoundData = useCallback(() => {
+    clearDraft();
+    clearRoundDeclarations();
+  }, [clearDraft, clearRoundDeclarations]);
+
   // 記録係PINトークン取得
   const getRecorderToken = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
@@ -251,6 +257,7 @@ export function useGameDraft(gameId: string) {
     removeAction,
     popAction,
     clearRoundDeclarations,
+    resetAllRoundData,
     getRecorderToken,
     saveRecorderToken,
     recorderTokenKey,

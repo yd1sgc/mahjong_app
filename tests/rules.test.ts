@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkGameEnd,
+  computeAllRoundsDetails,
   recalculateState,
   calculateGameSettlement,
   getClosestWinner,
@@ -605,3 +606,161 @@ describe('rules: generateRuleDescription (詳細ルール説明マップ生成)'
     expect(desc['ハウスルール補足メモ']).toContain('鳴き麻雀禁止');
   });
 });
+
+describe('rules: computeAllRoundsDetails & 局修正連鎖再計算', () => {
+  const defaultRule: RuleConfig = {
+    basic: { init_score: 25000, return_score: 30000 },
+    detail: {
+      noten_bappu_pt: 3000,
+      mangan_base_pt: 8000,
+      chombo_rule: 'mangan_pay',
+      renchan_rule: 'tenpai',
+      honba_pt: 300,
+      riichi_pt: 1000,
+    },
+  };
+  const players = ['P1', 'P2', 'P3', 'P4'];
+
+  it('computeAllRoundsDetails: 各局の局名・本場・供託・座席差分が正確に算出されること', () => {
+    const roundHistory: RoundRecord[] = [
+      {
+        round_id: 'r1',
+        kyoku_name: '東1局',
+        win_type: 'ron',
+        winner: 'P1',
+        loser: 'P2',
+        score: 8000,
+        riichi: ['P3'],
+        tenpai: [],
+      },
+      {
+        round_id: 'r2',
+        kyoku_name: '東1局',
+        win_type: 'tsumo',
+        winner: 'P2',
+        loser: null,
+        score: 4000, // 子ツモ: 親2000, 子1000
+        riichi: [],
+        tenpai: [],
+      },
+    ];
+
+    const details = computeAllRoundsDetails(players, 25000, defaultRule, roundHistory);
+    expect(details.length).toBe(2);
+
+    // 第1局 (東1局 0本場)
+    const r1 = details[0];
+    expect(r1.kyokuName).toBe('東1局');
+    expect(r1.honba).toBe(0);
+    expect(r1.riichiSticks).toBe(0);
+    // P3がリーチ (-1000)、P2がP1へ放銃 (-8000)、P1が和了 (+8000 + 供託1000 = +9000)
+    expect(r1.scoresAfter['P1']).toBe(34000);
+    expect(r1.scoresAfter['P2']).toBe(17000);
+    expect(r1.scoresAfter['P3']).toBe(24000);
+    expect(r1.scoresAfter['P4']).toBe(25000);
+
+    // 第2局 (P1和了により親連荘: 東1局 1本場)
+    const r2 = details[1];
+    expect(r2.kyokuName).toBe('東1局');
+    expect(r2.honba).toBe(1);
+    expect(r2.riichiSticks).toBe(0);
+    // P2が子ツモ 1000/2000 + 1本場(100オール)
+    // 親P1支払い: 2100, 子P3, P4支払い: 1100, P2受取: 4300
+    expect(r2.scoresAfter['P2']).toBe(17000 + 4300);
+    expect(r2.scoresAfter['P1']).toBe(34000 - 2100);
+  });
+
+  it('局修正の連鎖再計算: 第1局を親アガリから子アガリに変更すると親番が輪荘し第2局の局名が東2局にシフトすること', () => {
+    // 修正前の履歴（第1局: P1ロン和了 → 第2局: 東1局1本場）
+    const roundHistory: RoundRecord[] = [
+      {
+        round_id: 'r1',
+        kyoku_name: '東1局',
+        win_type: 'ron',
+        winner: 'P1',
+        loser: 'P2',
+        score: 8000,
+        riichi: [],
+        tenpai: [],
+      },
+      {
+        round_id: 'r2',
+        kyoku_name: '東1局',
+        win_type: 'ryukyoku',
+        winner: null,
+        loser: null,
+        score: 0,
+        riichi: [],
+        tenpai: ['P2'],
+      },
+    ];
+
+    // 第1局を「P2のロン和了（和了者: P2, 放銃者: P1）」に修正
+    const modifiedHistory: RoundRecord[] = [
+      {
+        ...roundHistory[0],
+        winner: 'P2',
+        loser: 'P1',
+      },
+      roundHistory[1],
+    ];
+
+    const details = computeAllRoundsDetails(players, 25000, defaultRule, modifiedHistory);
+
+    // 第1局で子P2が和了したため、親番はP2へ移動（輪荘）
+    expect(details[0].kyokuName).toBe('東1局');
+    expect(details[0].honba).toBe(0);
+    expect(details[0].scoresAfter['P2']).toBe(33000);
+    expect(details[0].scoresAfter['P1']).toBe(17000);
+
+    // 第2局は東1局1本場ではなく「東2局 0本場」へ自動シフトしていること
+    expect(details[1].kyokuName).toBe('東2局');
+    expect(details[1].honba).toBe(0);
+
+    // ゼロサム検算（合計100,000点）
+    const totalScore = Object.values(details[1].scoresAfter).reduce((a, b) => a + b, 0);
+    expect(totalScore).toBe(100000);
+  });
+
+  it('ダブロン修正時の計算整合性: 放銃者から2名分の打点が引かれ上家取りで供託が渡りゼロサムが維持されること', () => {
+    // 第1局でP3がリーチ、P1がP2とP4へダブロン放銃（P2: 8000点, P4: 12000点）
+    // 座順: P1(東), P2(南), P3(西), P4(北)
+    // 放銃者P1から見て最も近い和了者はP2（上家取り）
+    const roundHistory: RoundRecord[] = [
+      {
+        round_id: 'r1',
+        kyoku_name: '東1局',
+        win_type: 'multi_ron',
+        winner: null,
+        loser: 'P1',
+        score: 0,
+        riichi: ['P3'],
+        tenpai: [],
+        multi_wins: [
+          { winner: 'P2', points_data: { total: 8000, han: 4, fu: 30 } },
+          { winner: 'P4', points_data: { total: 12000, han: 5, fu: 30 } },
+        ],
+      },
+    ];
+
+    const details = computeAllRoundsDetails(players, 25000, defaultRule, roundHistory);
+    const r1 = details[0];
+
+    // P3はリーチで -1000 (24,000点)
+    expect(r1.scoresAfter['P3']).toBe(24000);
+
+    // P1はP2へ8000 + P4へ12000支払い = -20000 (5,000点)
+    expect(r1.scoresAfter['P1']).toBe(5000);
+
+    // P2は8000点 ＋ 供託1000点（上家取り） = +9000 (34,000点)
+    expect(r1.scoresAfter['P2']).toBe(34000);
+
+    // P4は12000点 (37,000点)
+    expect(r1.scoresAfter['P4']).toBe(37000);
+
+    // ゼロサム検算
+    const totalScore = Object.values(r1.scoresAfter).reduce((a, b) => a + b, 0);
+    expect(totalScore).toBe(100000);
+  });
+});
+
