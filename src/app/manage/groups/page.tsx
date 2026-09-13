@@ -10,11 +10,18 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { MemberRow, GroupRow, RuleTemplateRow } from '@/types/database';
 
+interface GroupMembership {
+  group_id: string;
+  member_id: string;
+}
+
 export default function GroupsManagePage() {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [groups, setGroups] = useState<GroupRow[]>([]);
+  const [groupMemberships, setGroupMemberships] = useState<GroupMembership[]>([]);
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMembersList, setShowMembersList] = useState(false);
   const [showArchivedMembers, setShowArchivedMembers] = useState(false);
 
   // メンバー追加モーダル
@@ -24,9 +31,13 @@ export default function GroupsManagePage() {
   const [submittingMember, setSubmittingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
 
-  // メンバー名変更モーダル
+  // メンバー総合編集モーダル
   const [editingMember, setEditingMember] = useState<MemberRow | null>(null);
   const [editMemberName, setEditMemberName] = useState('');
+  const [editMemberIsGuest, setEditMemberIsGuest] = useState(false);
+  const [editMemberGroupIds, setEditMemberGroupIds] = useState<string[]>([]);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // グループ作成モーダル
   const [showAddGroupModal, setShowAddGroupModal] = useState(false);
@@ -55,7 +66,13 @@ export default function GroupsManagePage() {
         .eq('is_archived', 0);
       if (grpData) setGroups(grpData);
 
-      // 3. ルール取得（グループ作成用）
+      // 3. グループメンバーシップ取得
+      const { data: gmData } = await supabase
+        .from('group_memberships')
+        .select('group_id, member_id');
+      if (gmData) setGroupMemberships(gmData as GroupMembership[]);
+
+      // 4. ルール取得（グループ作成用）
       const { data: rData } = await supabase
         .from('rule_templates')
         .select('*')
@@ -118,13 +135,25 @@ export default function GroupsManagePage() {
     }
   };
 
-  // 2. メンバー名変更
-  const handleUpdateMemberName = async (e: React.FormEvent) => {
+  // 2. メンバー編集モーダルを開く
+  const openEditModal = (member: MemberRow) => {
+    setEditingMember(member);
+    setEditMemberName(member.member_name);
+    setEditMemberIsGuest(member.is_guest === 1);
+    const currentGroups = groupMemberships
+      .filter((gm) => gm.member_id === member.member_id)
+      .map((gm) => gm.group_id);
+    setEditMemberGroupIds(currentGroups);
+    setEditError(null);
+  };
+
+  // 3. メンバー編集の保存（名前・ゲスト設定・所属グループ）
+  const handleSaveMemberEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
     const trimmed = editMemberName.trim();
     if (!trimmed) {
-      alert('メンバー名を入力してください');
+      setEditError('メンバー名を入力してください');
       return;
     }
 
@@ -135,15 +164,73 @@ export default function GroupsManagePage() {
           m.member_name.toLowerCase() === trimmed.toLowerCase()
       )
     ) {
-      alert('同名のメンバーが既に登録されています');
+      setEditError('同名のメンバーが既に登録されています');
       return;
     }
 
     try {
-      setSubmittingMember(true);
+      setSubmittingEdit(true);
+      setEditError(null);
+
+      // (1) members テーブル更新 (名前、ゲストフラグ)
+      const { error: memErr } = await supabase
+        .from('members')
+        .update({
+          member_name: trimmed,
+          is_guest: editMemberIsGuest ? 1 : 0,
+        })
+        .eq('member_id', editingMember.member_id);
+
+      if (memErr) throw new Error(memErr.message);
+
+      // (2) group_memberships テーブル同期
+      // 既存の所属を削除
+      const { error: delErr } = await supabase
+        .from('group_memberships')
+        .delete()
+        .eq('member_id', editingMember.member_id);
+
+      if (delErr) throw new Error(delErr.message);
+
+      // 選択されたグループがあれば一括登録
+      if (editMemberGroupIds.length > 0) {
+        const inserts = editMemberGroupIds.map((gId) => ({
+          group_id: gId,
+          member_id: editingMember.member_id,
+        }));
+        const { error: insErr } = await supabase
+          .from('group_memberships')
+          .insert(inserts);
+
+        if (insErr) throw new Error(insErr.message);
+      }
+
+      setEditingMember(null);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '更新に失敗しました';
+      setEditError(msg);
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  // 4. 編集モーダル内からのアーカイブ（非表示化）
+  const handleArchiveFromModal = async () => {
+    if (!editingMember) return;
+    if (
+      !confirm(
+        `「${editingMember.member_name}」を非表示（アーカイブ）にしますか？\n過去の対局成績は保持されます。`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setSubmittingEdit(true);
       const { error } = await supabase
         .from('members')
-        .update({ member_name: trimmed })
+        .update({ is_archived: 1 })
         .eq('member_id', editingMember.member_id);
 
       if (error) throw new Error(error.message);
@@ -151,10 +238,10 @@ export default function GroupsManagePage() {
       setEditingMember(null);
       await loadData();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '更新に失敗しました';
+      const msg = err instanceof Error ? err.message : 'アーカイブに失敗しました';
       alert(msg);
     } finally {
-      setSubmittingMember(false);
+      setSubmittingEdit(false);
     }
   };
 
@@ -300,46 +387,95 @@ export default function GroupsManagePage() {
               </button>
             </div>
 
-            {/* 有効メンバー一覧 */}
-            <div className="flex flex-col gap-2">
-              {activeMembers.map((m) => (
-                <div
-                  key={m.member_id}
-                  className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between shadow-xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-sm font-black text-white">
-                      {m.member_name}
-                    </span>
-                    {m.is_guest === 1 && (
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700">
-                        ゲスト
-                      </span>
-                    )}
-                  </div>
+            {/* アコーディオン開閉トグルボタン */}
+            <button
+              type="button"
+              onClick={() => setShowMembersList(!showMembersList)}
+              className="w-full p-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 flex items-center justify-between transition-colors shadow-xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white">
+                  メンバー一覧 ({activeMembers.length}名)
+                </span>
+                <span className="text-[11px] font-bold text-neutral-400">
+                  {showMembersList ? '折りたたむ' : '展開して表示・編集'}
+                </span>
+              </div>
+              <span className="text-xs font-black text-amber-500">
+                {showMembersList ? '▲ 閉じる' : '▼ 表示する'}
+              </span>
+            </button>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingMember(m);
-                        setEditMemberName(m.member_name);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-bold text-neutral-300 transition-colors"
-                    >
-                      名前変更
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleArchiveMember(m)}
-                      className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-rose-950/40 text-[11px] font-bold text-neutral-400 hover:text-rose-400 transition-colors"
-                    >
-                      非表示
-                    </button>
+            {/* 有効メンバー一覧 (アコーディオン開閉) */}
+            {showMembersList && (
+              <div className="flex flex-col gap-2">
+                {activeMembers.length === 0 ? (
+                  <div className="p-6 text-center text-neutral-500 text-xs font-bold bg-neutral-950 rounded-xl border border-neutral-850">
+                    登録されているメンバーはいません。「+ メンバーを追加」から登録してください。
                   </div>
-                </div>
-              ))}
-            </div>
+                ) : (
+                  activeMembers.map((m) => {
+                    // このメンバーが所属している通常グループ一覧
+                    const memberGroupNames = groupMemberships
+                      .filter((gm) => gm.member_id === m.member_id)
+                      .map((gm) => groups.find((g) => g.group_id === gm.group_id))
+                      .filter(
+                        (g): g is GroupRow =>
+                          Boolean(g) &&
+                          g!.display_id !== 'free' &&
+                          g!.group_name !== 'フリー対局'
+                      )
+                      .map((g) => g.group_name);
+
+                    return (
+                      <div
+                        key={m.member_id}
+                        className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between shadow-xs gap-2"
+                      >
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-white truncate">
+                              {m.member_name}
+                            </span>
+                            {m.is_guest === 1 && (
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700 shrink-0">
+                                ゲスト
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 所属グループバッジ */}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {memberGroupNames.length > 0 ? (
+                              memberGroupNames.map((name) => (
+                                <span
+                                  key={name}
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                                >
+                                  {name}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] font-bold text-neutral-500">
+                                未所属
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(m)}
+                          className="shrink-0 py-1.5 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-black text-white transition-colors"
+                        >
+                          編集
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
 
             {/* アーカイブ済みメンバー（アコーディオン） */}
             {archivedMembers.length > 0 && (
@@ -494,18 +630,32 @@ export default function GroupsManagePage() {
         </div>
       )}
 
-      {/* ─── モーダル: メンバー名変更 ─── */}
+      {/* ─── モーダル: メンバー総合編集 ─── */}
       {editingMember && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-            <h3 className="text-base font-black text-white">
-              メンバー名の変更
-            </h3>
+          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <h3 className="text-base font-black text-white">メンバー編集</h3>
+              <button
+                type="button"
+                onClick={() => setEditingMember(null)}
+                className="text-neutral-400 hover:text-white text-base font-bold px-1"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleUpdateMemberName} className="flex flex-col gap-3.5">
+            {editError && (
+              <div className="p-2.5 rounded-lg bg-rose-950/50 border border-rose-800/80 text-rose-300 text-xs font-bold">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveMemberEdit} className="flex flex-col gap-4">
+              {/* メンバー名 */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-neutral-400">
-                  新しいメンバー名
+                  メンバー名（表示名）
                 </label>
                 <input
                   type="text"
@@ -516,7 +666,76 @@ export default function GroupsManagePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2">
+              {/* 外部参加者（ゲスト）設定 */}
+              <label className="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={editMemberIsGuest}
+                  onChange={(e) => setEditMemberIsGuest(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded-sm bg-neutral-900 border-neutral-700 text-amber-500 focus:ring-0"
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-black text-neutral-200">
+                    外部参加者（ゲスト・臨時メンバー）
+                  </span>
+                  <span className="text-[10px] font-bold text-neutral-500 leading-tight">
+                    ※チェックを外して所属グループを設定すると、過去にゲストとして打った試合も含めて正規メンバー成績に合算されます
+                  </span>
+                </div>
+              </label>
+
+              {/* 所属グループ選択 */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-neutral-400">
+                  所属グループの選択（複数選択可）
+                </label>
+                {groups.filter(
+                  (g) => g.display_id !== 'free' && g.group_name !== 'フリー対局'
+                ).length === 0 ? (
+                  <div className="text-xs text-neutral-500 p-3 bg-neutral-950 rounded-xl border border-neutral-850">
+                    登録されているグループはありません
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl bg-neutral-950 border border-neutral-800">
+                    {groups
+                      .filter(
+                        (g) =>
+                          g.display_id !== 'free' && g.group_name !== 'フリー対局'
+                      )
+                      .map((g) => {
+                        const isChecked = editMemberGroupIds.includes(g.group_id);
+                        return (
+                          <label
+                            key={g.group_id}
+                            className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-neutral-900 cursor-pointer text-xs font-bold text-neutral-200"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditMemberGroupIds((prev) => [
+                                    ...prev,
+                                    g.group_id,
+                                  ]);
+                                } else {
+                                  setEditMemberGroupIds((prev) =>
+                                    prev.filter((id) => id !== g.group_id)
+                                  );
+                                }
+                              }}
+                              className="w-4 h-4 rounded-sm bg-neutral-900 border-neutral-700 text-amber-500 focus:ring-0"
+                            />
+                            <span>{g.group_name}</span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              {/* ボタン群: 保存 / キャンセル */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
@@ -526,11 +745,26 @@ export default function GroupsManagePage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submittingMember || !editMemberName.trim()}
+                  disabled={submittingEdit || !editMemberName.trim()}
                   className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black text-xs transition-all shadow-xs"
                 >
-                  {submittingMember ? '更新中...' : '変更を保存'}
+                  {submittingEdit ? '保存中...' : '変更を保存'}
                 </button>
+              </div>
+
+              {/* 非表示（アーカイブ）化ボタン */}
+              <div className="pt-3 border-t border-neutral-800 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleArchiveFromModal}
+                  disabled={submittingEdit}
+                  className="w-full h-10 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-rose-900/60 hover:bg-rose-950/20 text-neutral-400 hover:text-rose-400 text-xs font-bold transition-colors"
+                >
+                  このメンバーを非表示にする
+                </button>
+                <span className="text-[10px] text-neutral-500 text-center font-bold">
+                  ※過去の対局成績は保持され、いつでも復元できます
+                </span>
               </div>
             </form>
           </div>
