@@ -239,3 +239,18 @@
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全11ルート正常出力完了。
 
+## Phase 5-M 完了（点数プリセット表示不具合修正 & ツモ/高打点表示完全化）
+- **点数プリセットデータ構造の刷新（`src/lib/mahjong/presets.ts`）**:
+  - `ScorePresetItem` に `pointsLabel`（点数表記）と `hanFuLabel`（役・翻符表記）を追加。
+  - 従来 `split(' ')` での空白分割に依存していたため、子ツモ（`300 / 500`）でスラッシュ以降が消失し `300` と `/` のみしか表示されなかった不具合を根本解決。
+  - 親ツモ（`500オール` 等）、子ツモ（`300 / 500` 等）、高打点（`倍満` 等）の全要素で点数と役・翻符を明確に分離。
+- **点数選択画面の表示修正（`src/components/round-input/ScoreStep.tsx`）**:
+  - プリセットグリッド上段に `pointsLabel`、下段に `hanFuLabel` を直接描画。
+  - 高打点モーダル内でも役名（倍満・三倍満・役満）と点数を正しく明示。
+- **整合性テスト追加（`tests/calc.test.ts`）**:
+  - 全プリセットのラベル整合性テストを新設。
+- `npx vitest run`: 全59件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全11ルート正常出力完了。
+- 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
