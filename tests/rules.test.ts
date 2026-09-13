@@ -278,7 +278,42 @@ describe('rules: recalculateState (局進行・スコア再計算)', () => {
     expect(s.scores['P4']).toBe(24000);
   });
 
-  it('連荘ルール切替（テンパイ連荘 vs アガリ連荘）', () => {
+  it('進行中の立直宣言（currentRiichiDeclared）がスコアと供託棒に正しく反映されること', () => {
+    // 局履歴なし（東1局開始時）で P1 と P3 が立直を宣言
+    const state = recalculateState(players, 25000, defaultRule, [], ['P1', 'P3']);
+    expect(state.scores['P1']).toBe(24000);
+    expect(state.scores['P2']).toBe(25000);
+    expect(state.scores['P3']).toBe(24000);
+    expect(state.scores['P4']).toBe(25000);
+    expect(state.riichiStick).toBe(2);
+    expect(state.riichiDeclared).toEqual(['P1', 'P3']);
+  });
+
+  it('進行中の局で立直宣言後、和了者が供託棒を総取りすること（二重加算なし）', () => {
+    // 東1局で P1 が立直をかけ、P2 が 1000点（子ロン）で P3 から和了
+    const roundHistory: RoundRecord[] = [
+      {
+        kyoku_name: '東1局',
+        winner: 'P2',
+        loser: 'P3',
+        win_type: 'ron',
+        score: 1000,
+        riichi: ['P1'],
+      },
+    ];
+    const state = recalculateState(players, 25000, defaultRule, roundHistory, []);
+    // P1: 立直棒-1000 = 24000
+    // P3: 放銃-1000 = 24000
+    // P2: アガリ+1000 + 供託1本(+1000) = 27000
+    // P4: 変動なし = 25000
+    expect(state.scores['P1']).toBe(24000);
+    expect(state.scores['P2']).toBe(27000);
+    expect(state.scores['P3']).toBe(24000);
+    expect(state.scores['P4']).toBe(25000);
+    expect(state.riichiStick).toBe(0); // 供託棒回収済み
+  });
+
+  it('親の連荘判定（テンパイ連荘: 親テンパイ時連荘）', () => {
     const ryukyokuHistory: RoundRecord[] = [
       {
         kyoku_name: '東1局',

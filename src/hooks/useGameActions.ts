@@ -30,7 +30,6 @@ interface UseGameActionsProps {
   participants: GameParticipantRow[];
   ruleConfig: RuleConfig;
   gameState: GameStateSnapshot | null;
-  setGameState: React.Dispatch<React.SetStateAction<GameStateSnapshot | null>>;
   isRecorder: boolean;
   setIsRecorder: React.Dispatch<React.SetStateAction<boolean>>;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -38,11 +37,16 @@ interface UseGameActionsProps {
   furoDeclared: string[];
   setFuro: (players: string[]) => void;
   clearFuro: () => void;
+  riichiDeclared: string[];
+  setRiichi: (players: string[]) => void;
+  clearRiichi: () => void;
+  clearRoundDeclarations: () => void;
   clearDraft: () => void;
   saveRecorderToken: (pin: string) => void;
   fetchGameData: () => Promise<void>;
   draftKey: string;
   furoKey: string;
+  riichiKey: string;
   recorderTokenKey: string;
 }
 
@@ -53,7 +57,6 @@ export function useGameActions({
   participants,
   ruleConfig,
   gameState,
-  setGameState,
   isRecorder,
   setIsRecorder,
   setLoading,
@@ -61,11 +64,16 @@ export function useGameActions({
   furoDeclared,
   setFuro,
   clearFuro,
+  riichiDeclared,
+  setRiichi,
+  clearRiichi,
+  clearRoundDeclarations,
   clearDraft,
   saveRecorderToken,
   fetchGameData,
   draftKey,
   furoKey,
+  riichiKey,
   recorderTokenKey,
 }: UseGameActionsProps) {
   // 1. 4桁PINによる記録係交代
@@ -103,45 +111,42 @@ export function useGameActions({
   const toggleFuro = useCallback(
     (player: string) => {
       if (!isRecorder) return;
+      // 立直済みのプレイヤーは副露不可
+      if (riichiDeclared.includes(player)) return;
+
       const isAlready = furoDeclared.includes(player);
       const next = isAlready
         ? furoDeclared.filter((p) => p !== player)
         : [...furoDeclared, player];
 
       setFuro(next);
-      if (gameState) {
-        setGameState({
-          ...gameState,
-          furoDeclared: next,
-        });
-      }
     },
-    [isRecorder, furoDeclared, setFuro, gameState, setGameState]
+    [isRecorder, riichiDeclared, furoDeclared, setFuro]
   );
 
   // 3. リーチ宣言
   const declareRiichi = useCallback(
     (player: string) => {
       if (!gameState || !isRecorder) return;
+      // 副露済みのプレイヤーは立直不可
+      if (furoDeclared.includes(player)) return;
 
-      const isAlready = gameState.riichiDeclared.includes(player);
+      const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
+      const currentScore = gameState.scores[player] ?? 0;
+      const isAlready = riichiDeclared.includes(player);
+
+      // 未立直の場合は持ち点がリーチ点以上必要
+      if (!isAlready && currentScore < riichiPt) {
+        return;
+      }
+
       const nextRiichi = isAlready
-        ? gameState.riichiDeclared.filter((p) => p !== player)
-        : [...gameState.riichiDeclared, player];
+        ? riichiDeclared.filter((p) => p !== player)
+        : [...riichiDeclared, player];
 
-      const updated = recalculateState(
-        players,
-        ruleConfig.basic?.init_score ?? 25000,
-        ruleConfig,
-        gameState.roundHistory,
-        nextRiichi
-      );
-      setGameState({
-        ...updated,
-        furoDeclared,
-      });
+      setRiichi(nextRiichi);
     },
-    [gameState, isRecorder, furoDeclared, players, ruleConfig, setGameState]
+    [gameState, isRecorder, ruleConfig, furoDeclared, riichiDeclared, setRiichi]
   );
 
   // 4. 局結果の確定（コミット）
@@ -197,7 +202,7 @@ export function useGameActions({
             if (isWinner) {
               basePoint = newRound.score;
               honbaPoint = gameState.honba * honbaPt;
-              kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+              kyotakuPoint = gameState.riichiStick * riichiPt;
             } else if (isLoser) {
               basePoint = -newRound.score;
               honbaPoint = -gameState.honba * honbaPt;
@@ -206,7 +211,7 @@ export function useGameActions({
             if (isWinner) {
               basePoint = newRound.score;
               honbaPoint = gameState.honba * honbaPt;
-              kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+              kyotakuPoint = gameState.riichiStick * riichiPt;
             } else {
               const riichiDeduct = isRiichi ? -riichiPt : 0;
               const payTotal = scoreDelta - riichiDeduct;
@@ -220,7 +225,7 @@ export function useGameActions({
               basePoint = myWin?.points_data?.total ?? 0;
               honbaPoint = gameState.honba * honbaPt;
               if (p === closestWinner) {
-                kyotakuPoint = (gameState.riichiStick + newRound.riichi.length) * riichiPt;
+                kyotakuPoint = gameState.riichiStick * riichiPt;
               }
             } else if (isLoser) {
               const totalBase = multiWins.reduce((sum, w) => sum + (w.points_data?.total ?? 0), 0);
@@ -305,7 +310,7 @@ export function useGameActions({
         }
 
         clearDraft();
-        clearFuro();
+        clearRoundDeclarations();
 
         await fetchGameData();
         return true;
@@ -327,7 +332,7 @@ export function useGameActions({
       furoDeclared,
       ruleConfig,
       clearDraft,
-      clearFuro,
+      clearRoundDeclarations,
       fetchGameData,
       setLoading,
       setError,
@@ -352,7 +357,7 @@ export function useGameActions({
 
       if (delErr) throw new Error(delErr.message);
 
-      clearFuro();
+      clearRoundDeclarations();
       await fetchGameData();
       return true;
     } catch (e: unknown) {
@@ -362,7 +367,7 @@ export function useGameActions({
     } finally {
       setLoading(false);
     }
-  }, [gameState, isRecorder, gameId, clearFuro, fetchGameData, setLoading, setError]);
+  }, [gameState, isRecorder, gameId, clearRoundDeclarations, fetchGameData, setLoading, setError]);
 
   // 6. 対局の確定・精算終了
   const finishGame = useCallback(async (): Promise<boolean> => {
@@ -425,7 +430,7 @@ export function useGameActions({
       }
 
       clearDraft();
-      clearFuro();
+      clearRoundDeclarations();
 
       await fetchGameData();
       return true;
@@ -444,7 +449,7 @@ export function useGameActions({
     ruleConfig,
     gameId,
     clearDraft,
-    clearFuro,
+    clearRoundDeclarations,
     fetchGameData,
     setLoading,
     setError,
@@ -481,10 +486,11 @@ export function useGameActions({
       }
 
       clearDraft();
-      clearFuro();
+      clearRoundDeclarations();
       if (typeof window !== 'undefined') {
         localStorage.removeItem(draftKey);
         localStorage.removeItem(furoKey);
+        localStorage.removeItem(riichiKey);
         localStorage.removeItem(recorderTokenKey);
       }
 
@@ -501,9 +507,10 @@ export function useGameActions({
     isRecorder,
     gameId,
     clearDraft,
-    clearFuro,
+    clearRoundDeclarations,
     draftKey,
     furoKey,
+    riichiKey,
     recorderTokenKey,
     setLoading,
     setError,

@@ -8,28 +8,42 @@
  * - useGameActions: 局コミット・精算・破棄・Undo等のアクション実行
  */
 
+import { useMemo } from 'react';
 import { useGameDraft, RoundInputDraft, DEFAULT_DRAFT } from './useGameDraft';
 import { useGameData } from './useGameData';
 import { useGameActions } from './useGameActions';
+import {
+  checkGameEnd,
+  recalculateState,
+  calculateGameSettlement,
+} from '@/lib/mahjong/rules';
+import { GameStateSnapshot } from '@/types/mahjong';
 
 export type { RoundInputDraft };
 export { DEFAULT_DRAFT };
 
 export function useGame(gameId: string) {
-  // 1. 下書き・副露・PIN管理サブフック
+  // 1. 下書き・副露・立直・PIN管理サブフック（単一情報源）
   const {
     draft,
     hasDraftToRestore,
     furoDeclared,
+    riichiDeclared,
     updateDraft,
     clearDraft,
     setFuro,
     clearFuro,
+    setRiichi,
+    clearRiichi,
+    clearRoundDeclarations,
     saveRecorderToken,
     recorderTokenKey,
+    riichiKey,
+    furoKey,
+    draftKey,
   } = useGameDraft(gameId);
 
-  // 2. データ取得・Realtime同期・ドメイン計算サブフック
+  // 2. データ取得・Realtime同期サブフック（局履歴に基づくBaseState管理）
   const {
     loading,
     setLoading,
@@ -39,19 +53,59 @@ export function useGame(gameId: string) {
     players,
     participants,
     ruleConfig,
-    gameState,
-    setGameState,
-    settlement,
+    baseState,
     isRecorder,
     setIsRecorder,
-    gameEndReason,
     fetchGameData,
-  } = useGameData(gameId, recorderTokenKey, furoDeclared);
+  } = useGameData(gameId, recorderTokenKey);
 
-  const draftKey = `mahjong_draft_${gameId}`;
-  const furoKey = `mahjong_furo_${gameId}`;
+  // 3. 現在の局進行状態（gameState）を BaseState と 局中宣言から純粋導出
+  const gameState = useMemo<GameStateSnapshot | null>(() => {
+    if (!baseState) return null;
+    if (riichiDeclared.length === 0 && furoDeclared.length === 0) {
+      return {
+        ...baseState,
+        riichiDeclared: [],
+        furoDeclared: [],
+      };
+    }
+    const computed = recalculateState(
+      players,
+      ruleConfig.basic?.init_score ?? 25000,
+      ruleConfig,
+      baseState.roundHistory,
+      riichiDeclared
+    );
+    return {
+      ...computed,
+      riichiDeclared,
+      furoDeclared,
+    };
+  }, [baseState, players, ruleConfig, riichiDeclared, furoDeclared]);
 
-  // 3. アクション操作（RPC・フォールバック対応）サブフック
+  // 4. 終局判定および精算計算の導出
+  const gameEndReason = useMemo(() => {
+    if (!gameState) return null;
+    return checkGameEnd(
+      gameState.scores,
+      gameState.roundIdx,
+      players,
+      ruleConfig,
+      gameState.roundHistory
+    );
+  }, [gameState, players, ruleConfig]);
+
+  const settlement = useMemo(() => {
+    if (!gameState) return null;
+    return calculateGameSettlement(
+      players,
+      gameState.scores,
+      ruleConfig,
+      gameState.riichiStick
+    );
+  }, [gameState, players, ruleConfig]);
+
+  // 5. アクション操作（RPC・フォールバック対応）サブフック
   const {
     transferRecorder,
     toggleFuro,
@@ -67,7 +121,6 @@ export function useGame(gameId: string) {
     participants,
     ruleConfig,
     gameState,
-    setGameState,
     isRecorder,
     setIsRecorder,
     setLoading,
@@ -75,11 +128,16 @@ export function useGame(gameId: string) {
     furoDeclared,
     setFuro,
     clearFuro,
+    riichiDeclared,
+    setRiichi,
+    clearRiichi,
+    clearRoundDeclarations,
     clearDraft,
     saveRecorderToken,
     fetchGameData,
     draftKey,
     furoKey,
+    riichiKey,
     recorderTokenKey,
   });
 

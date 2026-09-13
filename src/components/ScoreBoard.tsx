@@ -6,12 +6,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { GameStateSnapshot } from '@/types/mahjong';
+import { GameStateSnapshot, RuleConfig } from '@/types/mahjong';
 import { getDealer, getRoundName } from '@/lib/mahjong/rules';
 
 interface ScoreBoardProps {
   players: string[];
   gameState: GameStateSnapshot | null;
+  ruleConfig?: RuleConfig;
   onRiichiClick?: (player: string) => void;
   onFuroClick?: (player: string) => void;
   isRecorder?: boolean;
@@ -22,6 +23,7 @@ const SEAT_NAMES = ['東', '南', '西', '北'];
 export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   players,
   gameState,
+  ruleConfig,
   onRiichiClick,
   onFuroClick,
   isRecorder = false,
@@ -83,8 +85,9 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             diffValue = score - baseScore;
           }
 
-          // 副露と立直の相互排他
-          const canRiichi = isRecorder && !isRiichi && !isFuro;
+          // 副露と立直の相互排他および最低持ち点チェック
+          const riichiPt = ruleConfig?.detail?.riichi_pt ?? 1000;
+          const canRiichi = isRecorder && !isRiichi && !isFuro && score >= riichiPt;
           const canFuro = isRecorder && !isRiichi;
 
           return (

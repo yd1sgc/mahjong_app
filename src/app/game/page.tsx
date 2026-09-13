@@ -233,6 +233,7 @@ function GameContent() {
         <ScoreBoard
           players={players}
           gameState={gameState}
+          ruleConfig={ruleConfig}
           onRiichiClick={declareRiichi}
           onFuroClick={toggleFuro}
           isRecorder={isRecorder && game?.status !== 'completed'}

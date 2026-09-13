@@ -34,9 +34,11 @@ export function useGameDraft(gameId: string) {
   const [draft, setDraft] = useState<RoundInputDraft>(DEFAULT_DRAFT);
   const [hasDraftToRestore, setHasDraftToRestore] = useState(false);
   const [furoDeclared, setFuroDeclared] = useState<string[]>([]);
+  const [riichiDeclared, setRiichiDeclared] = useState<string[]>([]);
 
   const draftKey = `mahjong_draft_${gameId}`;
   const furoKey = `mahjong_furo_${gameId}`;
+  const riichiKey = `mahjong_riichi_${gameId}`;
   const recorderTokenKey = `mahjong_recorder_${gameId}`;
 
   // 初期ロード時にLocalStorageから復元
@@ -67,7 +69,20 @@ export function useGameDraft(gameId: string) {
         // パース失敗時は無視
       }
     }
-  }, [gameId, draftKey, furoKey]);
+
+    // 3. 立直復元
+    const savedRiichi = localStorage.getItem(riichiKey);
+    if (savedRiichi) {
+      try {
+        const parsedRiichi = JSON.parse(savedRiichi) as string[];
+        if (Array.isArray(parsedRiichi)) {
+          setRiichiDeclared(parsedRiichi);
+        }
+      } catch {
+        // パース失敗時は無視
+      }
+    }
+  }, [gameId, draftKey, furoKey, riichiKey]);
 
   // 下書き更新（LocalStorage即時同期）
   const updateDraft = useCallback(
@@ -111,6 +126,35 @@ export function useGameDraft(gameId: string) {
     }
   }, [furoKey]);
 
+  // 立直状態の更新（LocalStorage即時同期）
+  const setRiichi = useCallback(
+    (players: string[]) => {
+      setRiichiDeclared(players);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(riichiKey, JSON.stringify(players));
+      }
+    },
+    [riichiKey]
+  );
+
+  // 立直消去
+  const clearRiichi = useCallback(() => {
+    setRiichiDeclared([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(riichiKey);
+    }
+  }, [riichiKey]);
+
+  // 局中宣言（副露・立直）の一括消去
+  const clearRoundDeclarations = useCallback(() => {
+    setFuroDeclared([]);
+    setRiichiDeclared([]);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(furoKey);
+      localStorage.removeItem(riichiKey);
+    }
+  }, [furoKey, riichiKey]);
+
   // 記録係PINトークン取得
   const getRecorderToken = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
@@ -130,12 +174,19 @@ export function useGameDraft(gameId: string) {
     draft,
     hasDraftToRestore,
     furoDeclared,
+    riichiDeclared,
     updateDraft,
     clearDraft,
     setFuro,
     clearFuro,
+    setRiichi,
+    clearRiichi,
+    clearRoundDeclarations,
     getRecorderToken,
     saveRecorderToken,
     recorderTokenKey,
+    riichiKey,
+    furoKey,
+    draftKey,
   };
 }

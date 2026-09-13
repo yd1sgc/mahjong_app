@@ -5,12 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import {
-  checkGameEnd,
-  recalculateState,
-  calculateGameSettlement,
-  SettlementPlayerResult,
-} from '@/lib/mahjong/rules';
+import { recalculateState } from '@/lib/mahjong/rules';
 import {
   GameStateSnapshot,
   RoundRecord,
@@ -34,19 +29,16 @@ export interface UseGameDataReturn {
   players: string[];
   participants: GameParticipantRow[];
   ruleConfig: RuleConfig;
-  gameState: GameStateSnapshot | null;
-  setGameState: React.Dispatch<React.SetStateAction<GameStateSnapshot | null>>;
-  settlement: SettlementPlayerResult[] | null;
+  baseState: GameStateSnapshot | null;
+  setBaseState: React.Dispatch<React.SetStateAction<GameStateSnapshot | null>>;
   isRecorder: boolean;
   setIsRecorder: React.Dispatch<React.SetStateAction<boolean>>;
-  gameEndReason: string | null;
   fetchGameData: () => Promise<void>;
 }
 
 export function useGameData(
   gameId: string,
-  recorderTokenKey: string,
-  furoDeclared: string[]
+  recorderTokenKey: string
 ): UseGameDataReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +46,8 @@ export function useGameData(
   const [players, setPlayers] = useState<string[]>([]);
   const [participants, setParticipants] = useState<GameParticipantRow[]>([]);
   const [ruleConfig, setRuleConfig] = useState<RuleConfig>({});
-  const [gameState, setGameState] = useState<GameStateSnapshot | null>(null);
-  const [settlement, setSettlement] = useState<SettlementPlayerResult[] | null>(null);
+  const [baseState, setBaseState] = useState<GameStateSnapshot | null>(null);
   const [isRecorder, setIsRecorder] = useState(false);
-  const [gameEndReason, setGameEndReason] = useState<string | null>(null);
 
   // 二重フェッチ・並行実行防止用 ref
   const isFetchingRef = useRef(false);
@@ -177,25 +167,6 @@ export function useGameData(
         history
       );
 
-      // 対局終了判定
-      const endReason = checkGameEnd(
-        computed.scores,
-        computed.roundIdx,
-        playerList,
-        parsedRule,
-        history
-      );
-      setGameEndReason(endReason);
-
-      // 終了時の精算計算
-      const currentSettlement = calculateGameSettlement(
-        playerList,
-        computed.scores,
-        parsedRule,
-        computed.riichiStick
-      );
-      setSettlement(currentSettlement);
-
       // (4) 記録係判定
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = authData?.user?.id;
@@ -210,10 +181,7 @@ export function useGameData(
 
       setIsRecorder(Boolean(isCurrentRecorder));
 
-      setGameState({
-        ...computed,
-        furoDeclared,
-      });
+      setBaseState(computed);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'データ読み込みに失敗しました';
       setError(msg);
@@ -222,7 +190,7 @@ export function useGameData(
       lastFetchTimeRef.current = Date.now();
       setLoading(false);
     }
-  }, [gameId, recorderTokenKey, furoDeclared]);
+  }, [gameId, recorderTokenKey]);
 
   // 初回マウント時フェッチ
   useEffect(() => {
@@ -318,12 +286,10 @@ export function useGameData(
     players,
     participants,
     ruleConfig,
-    gameState,
-    setGameState,
-    settlement,
+    baseState,
+    setBaseState,
     isRecorder,
     setIsRecorder,
-    gameEndReason,
     fetchGameData,
   };
 }
