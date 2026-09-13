@@ -524,18 +524,19 @@ describe('rules: generateRuleDescription (詳細ルール説明マップ生成)'
     const desc = generateRuleDescription({});
     expect(desc['精算']).toBeDefined();
     expect(desc['基本・アリアリルール']).toBeDefined();
-    expect(desc['試合の進行']).toBeDefined();
+    expect(desc['試合の進行・点数']).toBeDefined();
     expect(desc['特殊ルール・チョンボ']).toBeDefined();
 
     expect(desc['精算'].some((s) => s.includes('25,000点持ち / 30,000点返し'))).toBe(true);
     expect(desc['基本・アリアリルール'].some((s) => s.includes('喰いタン：あり'))).toBe(true);
-    expect(desc['試合の進行'].some((s) => s.includes('親連荘条件：聴牌連荘'))).toBe(true);
+    expect(desc['試合の進行・点数'].some((s) => s.includes('親連荘条件：聴牌連荘'))).toBe(true);
     expect(desc['特殊ルール・チョンボ'].some((s) => s.includes('チョンボ扱い：満貫払い'))).toBe(true);
   });
 
-  it('カスタム設定（トビなし、和了連荘、ハウスメモ）が正しく反映されること', () => {
+  it('カスタム設定（トビなし、和了連荘、ハウスメモ、赤ドラ、本場点等）が正しく反映されること', () => {
     const customConfig: RuleConfig = {
       basic: {
+        game_length: 'tonpu',
         init_score: 30000,
         return_score: 30000,
         uma: [30, 10, -10, -30],
@@ -545,15 +546,25 @@ describe('rules: generateRuleDescription (詳細ルール説明マップ生成)'
         tobi_end: 'none',
         renchan_rule: 'agari',
         kuitan: false,
+        aka_dora: '4枚 (赤5筒2枚)',
+        kiriage_mangan: true,
+        honba_pt: 1500,
+        noten_bappu_pt: 4000,
+        wareme: true,
         house_notes: '役満祝儀あり\n鳴き麻雀禁止',
       },
     };
 
     const desc = generateRuleDescription(customConfig);
+    expect(desc['精算'].some((s) => s.includes('形式：東風戦'))).toBe(true);
     expect(desc['精算'].some((s) => s.includes('30,000点持ち / 30,000点返し / トビなし'))).toBe(true);
     expect(desc['精算'].some((s) => s.includes('レート・換算メモ：1000点＝50円'))).toBe(true);
     expect(desc['基本・アリアリルール'].some((s) => s.includes('喰いタン：なし'))).toBe(true);
-    expect(desc['試合の進行'].some((s) => s.includes('親連荘条件：和了連荘'))).toBe(true);
+    expect(desc['基本・アリアリルール'].some((s) => s.includes('赤牌：4枚 (赤5筒2枚)'))).toBe(true);
+    expect(desc['基本・アリアリルール'].some((s) => s.includes('切り上げ満貫あり'))).toBe(true);
+    expect(desc['試合の進行・点数'].some((s) => s.includes('親連荘条件：和了連荘'))).toBe(true);
+    expect(desc['試合の進行・点数'].some((s) => s.includes('本場：1,500点 / リーチ棒：1,000点 / ノーテン罰符：場4,000点'))).toBe(true);
+    expect(desc['特殊ルール・チョンボ'].some((s) => s.includes('割れ目：あり (得失点2倍)'))).toBe(true);
     expect(desc['ハウスルール補足メモ']).toBeDefined();
     expect(desc['ハウスルール補足メモ']).toContain('役満祝儀あり');
     expect(desc['ハウスルール補足メモ']).toContain('鳴き麻雀禁止');

@@ -30,8 +30,8 @@ export interface DetailRuleConfig {
   noten_bappu_pt?: number;
   /** 満貫の基本点（チョンボ支払計算用、例: 8000） */
   mangan_base_pt?: number;
-  /** チョンボ時の精算方式 ('mangan_pay': 満貫払い, 'pt_penalty': 最終ポイント減点) */
-  chombo_rule?: 'mangan_pay' | 'pt_penalty';
+  /** チョンボ時の精算方式 ('mangan_pay': 満貫払い, 'pt_penalty': 最終ポイント減点, 'agari_hoki': アガリ放棄) */
+  chombo_rule?: 'mangan_pay' | 'pt_penalty' | 'agari_hoki';
   /** チョンボ減点時のペナルティpt（例: 20） */
   chombo_pt?: number;
   /** 連荘条件 ('tenpai': テンパイ連荘, 'agari': 和了連荘, 'noten': 常に連荘) */
@@ -40,16 +40,48 @@ export interface DetailRuleConfig {
   tobi_end?: 'under_zero' | 'zero_or_less' | 'none';
   /** 西入・延長条件 ('under_30000': 30000点未満で延長, 'none' | 'fixed_nan4': 南4局で打ち切り) */
   west_extension?: 'under_30000' | 'none' | 'fixed_nan4';
+  /** サドンデス設定（互換用エイリアス） */
+  sudden_death?: 'west' | 'none';
   /** 親トップ時のアガリやめ (true / false) */
-  agari_yame?: boolean;
+  agari_yame?: boolean | string;
   /** 親トップ時のテンパイやめ (true / false) */
-  tenpai_yame?: boolean;
-  /** 途中流局時の連荘設定 ('renchan' | 'ryukyoku') */
-  kyushu?: 'renchan' | 'ryukyoku';
+  tenpai_yame?: boolean | string;
+  /** 途中流局時の連荘設定 ('renchan' | 'ryukyoku' | 'none') */
+  kyushu?: 'renchan' | 'ryukyoku' | 'none';
   /** ダブロン・トリプルロンの可否 (true: あり, false: なし/頭ハネ) デフォルト: true */
   allow_multi_ron?: boolean;
+  /** ダブロンの供託・頭ハネ方式 ('atama_hane' | 'atama_hane_kyotaku' | 'split') */
+  dubron?: 'atama_hane' | 'atama_hane_kyotaku' | 'split';
   /** 途中流局（九種九牌、四風連打等）の可否 (true: あり, false: なし/荒廃流局まで続行) デフォルト: true */
   allow_mid_ryukyoku?: boolean;
+  /** 喰いタン (true: あり, false: なし) デフォルト: true */
+  kuitan?: boolean;
+  /** 赤牌・赤ドラ ('なし' | '3枚' | '4枚 (赤5筒2枚)' | 'その他') */
+  aka_dora?: string;
+  /** 後付け (true: あり, false: なし) デフォルト: true */
+  atozuke?: boolean;
+  /** 喰い替え ('prohibited': 不可, 'allowed': 可) */
+  kuikae?: 'prohibited' | 'allowed';
+  /** 切り上げ満貫 (true: あり, false: なし) */
+  kiriage_mangan?: boolean;
+  /** 一発・裏ドラ・カンドラ (true: あり, false: なし) */
+  ippatsu_dora?: boolean;
+  /** 流し満貫 (true: あり, false: なし) */
+  nagashi_mangan?: boolean;
+  /** パオ（役満責任払い） (true: あり, false: なし) */
+  pao?: boolean;
+  /** 役満複合・数え役満 (true: あり, false: なし) */
+  yakuman_multiple?: boolean;
+  /** 国士無双暗カンアガリ (true: あり, false: なし) */
+  kokushi_ankan_win?: boolean;
+  /** フリテンリーチ・同巡見逃しツモ (true: あり, false: なし) */
+  furiten_tsumo?: boolean;
+  /** ツモ番なしリーチ (true: 可能, false: 不可) */
+  tsumoban_none_riichi?: boolean;
+  /** 割れ目 (true: 点数2倍, false: なし) */
+  wareme?: boolean;
+  /** ハウスルール補足メモ（複数行） */
+  house_notes?: string;
   [key: string]: unknown;
 }
 

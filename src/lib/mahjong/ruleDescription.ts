@@ -35,7 +35,9 @@ export function generateRuleDescription(config?: RuleConfig | null): RuleDescrip
       : 'トビなし';
 
   // 1. 精算
+  const gameLengthStr = basic.game_length === 'tonpu' ? '東風戦' : '半荘戦';
   const seisan: string[] = [
+    `形式：${gameLengthStr}`,
     `${initScore.toLocaleString()}点持ち / ${returnScore.toLocaleString()}点返し / ${tobiStr}`,
     `順位点 (ウマ)：[${umaStr}]`,
     `端数処理：${(basic as Record<string, unknown>).rounding_type || '五捨六入'}`,
@@ -50,15 +52,17 @@ export function generateRuleDescription(config?: RuleConfig | null): RuleDescrip
   const atozukeStr = detail.atozuke !== false ? 'あり' : 'なし';
   const akaStr = (detail as Record<string, unknown>).aka_dora || '3枚';
   const kuikaeStr = (detail as Record<string, unknown>).kuikae === 'allowed' ? '可' : '不可';
+  const doraStr = detail.ippatsu_dora !== false ? '一発・カンドラ・裏ドラあり' : '一発・カンドラ・裏ドラなし';
+  const kiriageStr = detail.kiriage_mangan ? '切り上げ満貫あり' : '切り上げ満貫なし';
 
   const kihon: string[] = [
     `喰いタン：${kuitanStr} / 後付け：${atozukeStr} / 赤牌：${akaStr}`,
-    `喰い替え：${kuikaeStr} / 一発・カンドラ・裏ドラあり`,
+    `喰い替え：${kuikaeStr} / ${doraStr} / ${kiriageStr}`,
     `フリテンリーチ・見逃しツモ：${(detail as Record<string, unknown>).furiten_tsumo !== false ? 'あり' : 'なし'}`,
     `ツモ番なしリーチ：${(detail as Record<string, unknown>).tsumoban_none_riichi ? '可能' : '不可'}`,
   ];
 
-  // 3. 試合の進行
+  // 3. 試合の進行・点数設定
   const renchanMap: Record<string, string> = {
     tenpai: '聴牌連荘',
     agari: '和了連荘',
@@ -73,13 +77,17 @@ export function generateRuleDescription(config?: RuleConfig | null): RuleDescrip
   };
   const westStr = westMap[detail.west_extension || 'under_30000'] || '西入あり';
 
-  const agariYameStr = detail.agari_yame !== false ? 'あり' : 'なし';
+  const agariYameStr = detail.agari_yame !== false && (detail.agari_yame as unknown) !== 'none' ? 'あり' : 'なし';
   const tenpaiYameStr = detail.tenpai_yame !== false ? 'あり' : 'なし';
 
+  const honbaVal = detail.honba_pt ?? 300;
+  const notenBappuVal = detail.noten_bappu_pt ?? 3000;
+  const riichiVal = detail.riichi_pt ?? 1000;
+
   const shinko: string[] = [
-    `親連荘条件：${renchanStr}`,
-    `西入延長：${westStr}`,
+    `親連荘条件：${renchanStr} / 西入延長：${westStr}`,
     `アガリ止め：${agariYameStr} / テンパイ止め：${tenpaiYameStr}`,
+    `本場：${honbaVal.toLocaleString()}点 / リーチ棒：${riichiVal.toLocaleString()}点 / ノーテン罰符：場${notenBappuVal.toLocaleString()}点`,
   ];
 
   const midRyuMap: Record<string, string> = {
@@ -112,11 +120,17 @@ export function generateRuleDescription(config?: RuleConfig | null): RuleDescrip
     `国士無双暗カンアガリ：${(detail as Record<string, unknown>).kokushi_ankan_win !== false ? 'あり' : 'なし'}`,
     `チョンボ扱い：${chomboStr}`,
   ];
+  if (detail.nagashi_mangan) {
+    tokushu.push('流し満貫：あり');
+  }
+  if (detail.wareme) {
+    tokushu.push('割れ目：あり (得失点2倍)');
+  }
 
   const res: RuleDescription = {
     精算: seisan,
     '基本・アリアリルール': kihon,
-    試合の進行: shinko,
+    '試合の進行・点数': shinko,
     '特殊ルール・チョンボ': tokushu,
   };
 

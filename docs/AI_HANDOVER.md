@@ -48,10 +48,10 @@
 ## 3. Current System Status
 
 - **Webフロントエンド:** Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS, Lucide React
-- **ビルド・配信:** `next.config.ts` で `output: "export"`（Cloudflare Pages/Workers Static Assets 静的SPA仕様）
+- **ビルド・配信:** `next.config.ts` で `output: "export"`。Cloudflare Workers Static Assets（`wrangler.jsonc`）仕様。本番反映は `npm run build && npx wrangler deploy` にて `./out` を配信。
 - **本番環境URL:** `https://mahjong-app.yd1sgc.workers.dev`
 - **DB / BaaS:** Supabase（PostgreSQL, Realtime, RPCアトミックトランザクション `commit_round_transaction`, `settle_game_transaction`, `abort_game_transaction` 配備）
-- **CI/CD:** GitHub Actions（スリープ防止cron、自動デプロイ連携済み）
+- **CI/CD:** GitHub Actions（スリープ防止cron `supabase_keepalive.yml` 稼働中）
 - **品質基準:** Vitest 全53件 PASS、TypeScript型エラー 0件（`as any` 一掃）、Realtime重複フェッチ抑制（デバウンス・並行制御済み）、フォールバック時自動ロールバック保証済み
 - **SQL資産:** `scripts/setup_supabase_v2.sql`, `scripts/update_transactions_rpc.sql`（RPC単体適用用）
 
@@ -61,8 +61,8 @@
 
 - [ ] **Supabase本番DBへのRPC適用**
   - [ ] `scripts/update_transactions_rpc.sql` を Supabase SQL Editor で実行（ユーザー操作）
-- [ ] **本番デプロイ反映**
-  - [ ] Gitコミット & プッシュにより Cloudflare本番環境へ最新コードを反映
+- [x] **本番デプロイ反映（Phase 5-J 完了）**
+  - [x] `npm run build && npx wrangler deploy` により Cloudflare本番環境へ最新コード（フリー対局統一、メンバー総合編集・アコーディオン）反映完了
 - [ ] **実戦対局テスト**
   - [ ] 端末（スマホ等）による実際の対局記録・精算・成績閲覧の通し確認
 
