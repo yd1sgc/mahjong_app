@@ -162,3 +162,14 @@ export interface GameStateSnapshot {
   riichiDeclared: string[];
   furoDeclared: string[];
 }
+
+/** 局内操作の種類（立直宣言・副露宣言） */
+export type RoundActionType = 'declare_riichi' | 'declare_furo';
+
+/** 局内の1手操作履歴 */
+export interface RoundAction {
+  type: RoundActionType;
+  player: string;
+  timestamp?: number;
+}
+

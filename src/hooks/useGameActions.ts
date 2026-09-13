@@ -4,7 +4,7 @@
  * Supabase RPC（アトミックトランザクション）優先実行 ＋ フォールバック対応
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   calculateGameSettlement,
@@ -13,6 +13,7 @@ import {
 } from '@/lib/mahjong/rules';
 import {
   GameStateSnapshot,
+  RoundAction,
   RoundRecord,
   RuleConfig,
 } from '@/types/mahjong';
@@ -22,6 +23,13 @@ import {
   RoundSeatInsert,
   Json,
 } from '@/types/database';
+
+export type UndoResult =
+  | { type: 'furo'; player: string }
+  | { type: 'riichi'; player: string }
+  | { type: 'round'; kyokuName: string }
+  | { type: 'cancelled' }
+  | null;
 
 interface UseGameActionsProps {
   gameId: string;
@@ -40,6 +48,10 @@ interface UseGameActionsProps {
   riichiDeclared: string[];
   setRiichi: (players: string[]) => void;
   clearRiichi: () => void;
+  actionHistory: RoundAction[];
+  pushAction: (action: RoundAction) => void;
+  removeAction: (type: RoundAction['type'], player: string) => void;
+  popAction: () => RoundAction | null;
   clearRoundDeclarations: () => void;
   clearDraft: () => void;
   saveRecorderToken: (pin: string) => void;
@@ -47,6 +59,7 @@ interface UseGameActionsProps {
   draftKey: string;
   furoKey: string;
   riichiKey: string;
+  actionHistoryKey: string;
   recorderTokenKey: string;
 }
 
@@ -67,6 +80,10 @@ export function useGameActions({
   riichiDeclared,
   setRiichi,
   clearRiichi,
+  actionHistory,
+  pushAction,
+  removeAction,
+  popAction,
   clearRoundDeclarations,
   clearDraft,
   saveRecorderToken,
@@ -74,6 +91,7 @@ export function useGameActions({
   draftKey,
   furoKey,
   riichiKey,
+  actionHistoryKey,
   recorderTokenKey,
 }: UseGameActionsProps) {
   // 1. 4桁PINによる記録係交代
@@ -120,8 +138,13 @@ export function useGameActions({
         : [...furoDeclared, player];
 
       setFuro(next);
+      if (isAlready) {
+        removeAction('declare_furo', player);
+      } else {
+        pushAction({ type: 'declare_furo', player });
+      }
     },
-    [isRecorder, riichiDeclared, furoDeclared, setFuro]
+    [isRecorder, riichiDeclared, furoDeclared, setFuro, removeAction, pushAction]
   );
 
   // 3. リーチ宣言
@@ -145,8 +168,13 @@ export function useGameActions({
         : [...riichiDeclared, player];
 
       setRiichi(nextRiichi);
+      if (isAlready) {
+        removeAction('declare_riichi', player);
+      } else {
+        pushAction({ type: 'declare_riichi', player });
+      }
     },
-    [gameState, isRecorder, ruleConfig, furoDeclared, riichiDeclared, setRiichi]
+    [gameState, isRecorder, ruleConfig, furoDeclared, riichiDeclared, setRiichi, removeAction, pushAction]
   );
 
   // 4. 局結果の確定（コミット）
@@ -339,7 +367,88 @@ export function useGameActions({
     ]
   );
 
-  // 5. 1局巻き戻し（Undo）
+  // 5. 操作単位の巻き戻し（Undo）: 局内操作スタック優先 ＋ 前局確定取消（確認ダイアログ付き）
+  const isUndoingRef = useRef(false);
+
+  const undoLastAction = useCallback(async (): Promise<UndoResult> => {
+    if (!gameState || !isRecorder) return null;
+    if (isUndoingRef.current) return null;
+
+    try {
+      isUndoingRef.current = true;
+
+      // 1. 局内操作（立直・副露）がスタックに存在する場合: 直前のアクションを解除
+      if (actionHistory.length > 0) {
+        const lastAction = popAction();
+        if (!lastAction) return null;
+
+        if (lastAction.type === 'declare_furo') {
+          const next = furoDeclared.filter((p) => p !== lastAction.player);
+          setFuro(next);
+          return { type: 'furo', player: lastAction.player };
+        } else if (lastAction.type === 'declare_riichi') {
+          const next = riichiDeclared.filter((p) => p !== lastAction.player);
+          setRiichi(next);
+          return { type: 'riichi', player: lastAction.player };
+        }
+        return null;
+      }
+
+      // 2. 局内操作がなく、確定済みの局が存在する場合: 直前の確定局を取り消し
+      if (gameState.roundHistory.length > 0) {
+        const lastRound = gameState.roundHistory[gameState.roundHistory.length - 1];
+        const confirmed = typeof window !== 'undefined'
+          ? window.confirm(
+              `直前の【${lastRound.kyoku_name} ${lastRound.honba}本場】の確定記録を取り消して前の局に戻しますか？\n（入力した局結果が削除されます）`
+            )
+          : true;
+
+        if (!confirmed) {
+          return { type: 'cancelled' };
+        }
+
+        setLoading(true);
+        const lastIndex = gameState.roundHistory.length - 1;
+
+        const { error: delErr } = await supabase
+          .from('rounds')
+          .delete()
+          .eq('game_id', gameId)
+          .eq('round_index', lastIndex);
+
+        if (delErr) throw new Error(delErr.message);
+
+        clearRoundDeclarations();
+        await fetchGameData();
+        return { type: 'round', kyokuName: lastRound.kyoku_name };
+      }
+
+      return null;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '巻き戻し処理に失敗しました';
+      setError(msg);
+      return null;
+    } finally {
+      isUndoingRef.current = false;
+      setLoading(false);
+    }
+  }, [
+    gameState,
+    isRecorder,
+    actionHistory,
+    popAction,
+    furoDeclared,
+    setFuro,
+    riichiDeclared,
+    setRiichi,
+    gameId,
+    clearRoundDeclarations,
+    fetchGameData,
+    setLoading,
+    setError,
+  ]);
+
+  // 6. 1局巻き戻し（従来互換・直接局削除）
   const undoRound = useCallback(async (): Promise<boolean> => {
     if (!gameState || !isRecorder || gameState.roundHistory.length === 0) {
       return false;
@@ -491,6 +600,7 @@ export function useGameActions({
         localStorage.removeItem(draftKey);
         localStorage.removeItem(furoKey);
         localStorage.removeItem(riichiKey);
+        localStorage.removeItem(actionHistoryKey);
         localStorage.removeItem(recorderTokenKey);
       }
 
@@ -511,6 +621,7 @@ export function useGameActions({
     draftKey,
     furoKey,
     riichiKey,
+    actionHistoryKey,
     recorderTokenKey,
     setLoading,
     setError,
@@ -522,6 +633,7 @@ export function useGameActions({
     declareRiichi,
     commitRound,
     undoRound,
+    undoLastAction,
     finishGame,
     abortGame,
   };

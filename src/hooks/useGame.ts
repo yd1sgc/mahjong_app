@@ -29,17 +29,22 @@ export function useGame(gameId: string) {
     hasDraftToRestore,
     furoDeclared,
     riichiDeclared,
+    actionHistory,
     updateDraft,
     clearDraft,
     setFuro,
     clearFuro,
     setRiichi,
     clearRiichi,
+    pushAction,
+    removeAction,
+    popAction,
     clearRoundDeclarations,
     saveRecorderToken,
     recorderTokenKey,
     riichiKey,
     furoKey,
+    actionHistoryKey,
     draftKey,
   } = useGameDraft(gameId);
 
@@ -112,6 +117,7 @@ export function useGame(gameId: string) {
     declareRiichi,
     commitRound,
     undoRound,
+    undoLastAction,
     finishGame,
     abortGame,
   } = useGameActions({
@@ -131,6 +137,10 @@ export function useGame(gameId: string) {
     riichiDeclared,
     setRiichi,
     clearRiichi,
+    actionHistory,
+    pushAction,
+    removeAction,
+    popAction,
     clearRoundDeclarations,
     clearDraft,
     saveRecorderToken,
@@ -138,8 +148,13 @@ export function useGame(gameId: string) {
     draftKey,
     furoKey,
     riichiKey,
+    actionHistoryKey,
     recorderTokenKey,
   });
+
+  const canUndo =
+    (actionHistory.length > 0) || ((gameState?.roundHistory.length ?? 0) > 0);
+  const hasIntraRoundAction = actionHistory.length > 0;
 
   return {
     loading,
@@ -156,11 +171,15 @@ export function useGame(gameId: string) {
     updateDraft,
     clearDraft,
     hasDraftToRestore,
+    actionHistory,
+    canUndo,
+    hasIntraRoundAction,
     transferRecorder,
     toggleFuro,
     declareRiichi,
     commitRound,
     undoRound,
+    undoLastAction,
     finishGame,
     abortGame,
     refetch: fetchGameData,

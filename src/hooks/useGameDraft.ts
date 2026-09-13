@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { MultiWinnerDraft, WinType } from '@/types/mahjong';
+import { MultiWinnerDraft, RoundAction, WinType } from '@/types/mahjong';
 
 export interface RoundInputDraft {
   winType: WinType;
@@ -35,10 +35,12 @@ export function useGameDraft(gameId: string) {
   const [hasDraftToRestore, setHasDraftToRestore] = useState(false);
   const [furoDeclared, setFuroDeclared] = useState<string[]>([]);
   const [riichiDeclared, setRiichiDeclared] = useState<string[]>([]);
+  const [actionHistory, setActionHistory] = useState<RoundAction[]>([]);
 
   const draftKey = `mahjong_draft_${gameId}`;
   const furoKey = `mahjong_furo_${gameId}`;
   const riichiKey = `mahjong_riichi_${gameId}`;
+  const actionHistoryKey = `mahjong_action_history_${gameId}`;
   const recorderTokenKey = `mahjong_recorder_${gameId}`;
 
   // 初期ロード時にLocalStorageから復元
@@ -82,7 +84,20 @@ export function useGameDraft(gameId: string) {
         // パース失敗時は無視
       }
     }
-  }, [gameId, draftKey, furoKey, riichiKey]);
+
+    // 4. 操作履歴復元
+    const savedActions = localStorage.getItem(actionHistoryKey);
+    if (savedActions) {
+      try {
+        const parsedActions = JSON.parse(savedActions) as RoundAction[];
+        if (Array.isArray(parsedActions)) {
+          setActionHistory(parsedActions);
+        }
+      } catch {
+        // パース失敗時は無視
+      }
+    }
+  }, [gameId, draftKey, furoKey, riichiKey, actionHistoryKey]);
 
   // 下書き更新（LocalStorage即時同期）
   const updateDraft = useCallback(
@@ -145,15 +160,62 @@ export function useGameDraft(gameId: string) {
     }
   }, [riichiKey]);
 
-  // 局中宣言（副露・立直）の一括消去
+  // 操作履歴の追加（LocalStorage即時同期）
+  const pushAction = useCallback(
+    (action: RoundAction) => {
+      setActionHistory((prev) => {
+        const next = [...prev, { ...action, timestamp: Date.now() }];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+        }
+        return next;
+      });
+    },
+    [actionHistoryKey]
+  );
+
+  // 操作履歴からの特定操作除去（スコアボード直接タップ解除用）
+  const removeAction = useCallback(
+    (type: RoundAction['type'], player: string) => {
+      setActionHistory((prev) => {
+        const idx = prev.map((a) => `${a.type}:${a.player}`).lastIndexOf(`${type}:${player}`);
+        if (idx === -1) return prev;
+        const next = [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+        }
+        return next;
+      });
+    },
+    [actionHistoryKey]
+  );
+
+  // 直前操作のポップ取り出し
+  const popAction = useCallback((): RoundAction | null => {
+    let popped: RoundAction | null = null;
+    setActionHistory((prev) => {
+      if (prev.length === 0) return prev;
+      popped = prev[prev.length - 1];
+      const next = prev.slice(0, -1);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(actionHistoryKey, JSON.stringify(next));
+      }
+      return next;
+    });
+    return popped;
+  }, [actionHistoryKey]);
+
+  // 局中宣言（副露・立直・操作履歴）の一括消去
   const clearRoundDeclarations = useCallback(() => {
     setFuroDeclared([]);
     setRiichiDeclared([]);
+    setActionHistory([]);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(furoKey);
       localStorage.removeItem(riichiKey);
+      localStorage.removeItem(actionHistoryKey);
     }
-  }, [furoKey, riichiKey]);
+  }, [furoKey, riichiKey, actionHistoryKey]);
 
   // 記録係PINトークン取得
   const getRecorderToken = useCallback((): string | null => {
@@ -175,18 +237,23 @@ export function useGameDraft(gameId: string) {
     hasDraftToRestore,
     furoDeclared,
     riichiDeclared,
+    actionHistory,
     updateDraft,
     clearDraft,
     setFuro,
     clearFuro,
     setRiichi,
     clearRiichi,
+    pushAction,
+    removeAction,
+    popAction,
     clearRoundDeclarations,
     getRecorderToken,
     saveRecorderToken,
     recorderTokenKey,
     riichiKey,
     furoKey,
+    actionHistoryKey,
     draftKey,
   };
 }

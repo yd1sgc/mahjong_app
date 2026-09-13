@@ -39,6 +39,9 @@ function GameContent() {
     declareRiichi,
     commitRound,
     undoRound,
+    undoLastAction,
+    canUndo,
+    hasIntraRoundAction,
     finishGame,
     abortGame,
   } = useGame(gameId);
@@ -85,11 +88,20 @@ function GameContent() {
   };
 
   const handleUndoWithToast = async () => {
-    const ok = await undoRound();
-    if (ok) {
-      setToast({ type: 'info', message: '直前の局を巻き戻しました' });
-    } else {
-      setToast({ type: 'error', message: 'Undoに失敗しました' });
+    const result = await undoLastAction();
+    if (!result) {
+      setToast({ type: 'error', message: '取り消しに失敗しました' });
+      return;
+    }
+    if (result.type === 'furo') {
+      setToast({ type: 'info', message: `${result.player} の副露を取り消しました` });
+    } else if (result.type === 'riichi') {
+      setToast({ type: 'info', message: `${result.player} の立直を取り消しました` });
+    } else if (result.type === 'round') {
+      setToast({ type: 'info', message: `${result.kyokuName} の記録を取り消しました` });
+    } else if (result.type === 'cancelled') {
+      // ユーザーによる確認ダイアログのキャンセル
+      return;
     }
   };
 
@@ -271,7 +283,8 @@ function GameContent() {
             onOpenChomboModal={handleOpenChomboModal}
             onUndoClick={handleUndoWithToast}
             onOpenTransferModal={() => setPinModalOpen(true)}
-            canUndo={(gameState?.roundHistory.length ?? 0) > 0}
+            canUndo={canUndo}
+            hasIntraRoundAction={hasIntraRoundAction}
           />
         )}
       </footer>
