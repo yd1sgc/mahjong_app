@@ -22,6 +22,7 @@ import {
 } from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
+import { RuleConfig } from '@/types/mahjong';
 
 interface GroupMembership {
   group_id: string;
@@ -288,9 +289,10 @@ export default function HomePage() {
 
       // 対局画面へ遷移
       router.push(`/game?id=${gameId}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert(`対局作成に失敗しました: ${e.message}`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      alert(`対局作成に失敗しました: ${errMsg}`);
     } finally {
       setCreating(false);
     }
@@ -591,7 +593,7 @@ export default function HomePage() {
         onClose={() => setShowSimpleModal(false)}
         groupId={selectedGroupId === 'free' ? groups.find(g => g.display_id === 'free')?.group_id || groups[0]?.group_id : selectedGroupId}
         ruleName={rules.find((r) => r.rule_id === selectedRuleId)?.name || '標準ルール'}
-        ruleConfig={(rules.find((r) => r.rule_id === selectedRuleId)?.config_json as any) || {}}
+        ruleConfig={((rules.find((r) => r.rule_id === selectedRuleId)?.config_json as unknown as RuleConfig) || {}) as RuleConfig}
         players={selectedMembers.map((mId, idx) => {
           const mem = members.find((m) => m.member_id === mId);
           return {
@@ -606,7 +608,7 @@ export default function HomePage() {
       {detailModalRule && (
         <RuleDetailModal
           ruleName={detailModalRule.name}
-          config={detailModalRule.config_json as any}
+          config={detailModalRule.config_json as unknown as RuleConfig}
           isOfficial={detailModalRule.kind === 'official'}
           onClose={() => setDetailModalRule(null)}
         />

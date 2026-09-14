@@ -9,7 +9,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { MemberRow, RuleTemplateRow } from '@/types/database';
+import {
+  MemberRow,
+  RuleTemplateRow,
+  GroupRow,
+  GameRow,
+  GameParticipantRow,
+  RoundRow,
+  RoundSeatRow,
+} from '@/types/database';
+import { RuleConfig } from '@/types/mahjong';
 import {
   GameData,
   RoundData,
@@ -31,7 +40,7 @@ import { GameDetailModal } from '@/components/stats/GameDetailModal';
 export default function StatsPage() {
   const [games, setGames] = useState<GameData[]>([]);
   const [rounds, setRounds] = useState<RoundData[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<GroupRow[]>([]);
   const [rules, setRules] = useState<RuleTemplateRow[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,29 +103,29 @@ export default function StatsPage() {
         const { data: memData } = await supabase.from('members').select('*').eq('is_archived', 0);
 
         if (grpData) setGroups(grpData);
-        if (ruleData) setRules(ruleData as any);
+        if (ruleData) setRules(ruleData);
         if (memData) setMembers(memData);
 
-        const gamesList = gData || [];
-        const partList = pData || [];
-        const roundsList = rData || [];
-        const seatsList = sData || [];
+        const gamesList: GameRow[] = gData || [];
+        const partList: GameParticipantRow[] = pData || [];
+        const roundsList: RoundRow[] = rData || [];
+        const seatsList: RoundSeatRow[] = sData || [];
 
         // ルールID -> ルール名の正規化マップ作成
         const ruleMap = new Map<string, string>();
         if (ruleData) {
-          ruleData.forEach((r: any) => {
+          ruleData.forEach((r) => {
             ruleMap.set(r.rule_id, r.name);
             ruleMap.set(r.name, r.name);
           });
         }
 
         // GameData へマッピング
-        const mappedGames: GameData[] = gamesList.map((g: any) => {
+        const mappedGames: GameData[] = gamesList.map((g) => {
           const parts = partList
-            .filter((p: any) => p.game_id === g.game_id)
-            .sort((a: any, b: any) => a.seat - b.seat)
-            .map((p: any) => ({
+            .filter((p) => p.game_id === g.game_id)
+            .sort((a, b) => a.seat - b.seat)
+            .map((p) => ({
               seat: p.seat,
               member_id: p.member_id,
               name: p.player_name_snapshot || '不明',
@@ -132,19 +141,18 @@ export default function StatsPage() {
             game_id: g.game_id,
             played_at: g.played_at || '',
             group_id: g.group_id,
-            rule_id: g.rule_id || '',
             rule_name: normalizedRule,
-            rule_config: g.rule_config_snapshot || {},
+            rule_config: (g.rule_config_snapshot as unknown as RuleConfig) || ({} as RuleConfig),
             participants: parts,
           };
         });
 
         // RoundData へマッピング
-        const mappedRounds: RoundData[] = roundsList.map((r: any) => {
+        const mappedRounds: RoundData[] = roundsList.map((r) => {
           const seats = seatsList
-            .filter((s: any) => s.round_id === r.round_id)
-            .sort((a: any, b: any) => a.seat - b.seat)
-            .map((s: any) => ({
+            .filter((s) => s.round_id === r.round_id)
+            .sort((a, b) => a.seat - b.seat)
+            .map((s) => ({
               seat: s.seat,
               member_id: s.member_id,
               score_delta: s.score_delta,

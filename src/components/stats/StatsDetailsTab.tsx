@@ -30,17 +30,19 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
 
       {/* 5タブセレクター */}
       <div className="grid grid-cols-5 gap-1 bg-neutral-900 p-1 rounded-xl border border-neutral-800">
-        {[
-          { id: 'basic', label: '基本' },
-          { id: 'datan', label: '打点' },
-          { id: 'syubi', label: '守備' },
-          { id: 'riichi', label: '立直' },
-          { id: 'furo', label: '副露' },
-        ].map((tab) => (
+        {(
+          [
+            { id: 'basic', label: '基本' },
+            { id: 'datan', label: '打点' },
+            { id: 'syubi', label: '守備' },
+            { id: 'riichi', label: '立直' },
+            { id: 'furo', label: '副露' },
+          ] as const
+        ).map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveDetailTab(tab.id as any)}
+            onClick={() => setActiveDetailTab(tab.id)}
             className={`py-2 rounded-lg text-xs font-black transition-all ${
               activeDetailTab === tab.id
                 ? 'bg-amber-500 text-black shadow-xs'

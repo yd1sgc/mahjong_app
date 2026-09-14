@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
 import { validateRuleInput } from '@/lib/mahjong/validation';
+import { RuleConfig } from '@/types/mahjong';
 
 /** ルール名の次期バージョン名生成 (例: "親族ルール" -> "親族ルール (v2)", "親族ルール (v2)" -> "親族ルール (v3)") */
 function getNextVersionName(currentName: string): string {
@@ -227,11 +228,11 @@ export default function RulesManagePage() {
       setFormError(null);
 
       // 編集対象の既存設定があれば詳細プロパティを温存
-      let existingConfig: any = {};
+      let existingConfig: Partial<RuleConfig> = {};
       if (editingRuleId) {
         const target = rules.find((r) => r.rule_id === editingRuleId);
         if (target?.config_json) {
-          existingConfig = target.config_json;
+          existingConfig = target.config_json as unknown as Partial<RuleConfig>;
         }
       }
 
@@ -420,7 +421,7 @@ export default function RulesManagePage() {
           {/* ルールカード一覧 */}
           <div className="flex flex-col gap-3">
             {activeRules.map((r) => {
-              const cfg = (r.config_json || {}) as any;
+              const cfg = (r.config_json || {}) as unknown as Partial<RuleConfig>;
               const basic = cfg.basic || {};
               const detail = cfg.detail || {};
 
@@ -631,7 +632,7 @@ export default function RulesManagePage() {
                       </label>
                       <select
                         value={gameLength}
-                        onChange={(e) => setGameLength(e.target.value as any)}
+                        onChange={(e) => setGameLength(e.target.value as 'hanchan' | 'tonpu')}
                         className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                       >
                         <option value="hanchan">半荘戦（東南戦）</option>
@@ -705,7 +706,7 @@ export default function RulesManagePage() {
                         </label>
                         <select
                           value={renchanRule}
-                          onChange={(e) => setRenchanRule(e.target.value as any)}
+                          onChange={(e) => setRenchanRule(e.target.value as 'tenpai' | 'agari')}
                           className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                         >
                           <option value="tenpai">テンパイ連荘</option>
@@ -719,7 +720,7 @@ export default function RulesManagePage() {
                         </label>
                         <select
                           value={tobiEnd}
-                          onChange={(e) => setTobiEnd(e.target.value as any)}
+                          onChange={(e) => setTobiEnd(e.target.value as 'under_zero' | 'zero_or_less' | 'none')}
                           className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                         >
                           <option value="under_zero">0点未満で終了</option>
@@ -735,7 +736,7 @@ export default function RulesManagePage() {
                       </label>
                       <select
                         value={suddenDeath}
-                        onChange={(e) => setSuddenDeath(e.target.value as any)}
+                        onChange={(e) => setSuddenDeath(e.target.value as 'west' | 'none')}
                         className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                       >
                         <option value="west">西入あり（トップが返し点未満時）</option>
@@ -829,7 +830,7 @@ export default function RulesManagePage() {
                         </label>
                         <select
                           value={kyushu}
-                          onChange={(e) => setKyushu(e.target.value as any)}
+                          onChange={(e) => setKyushu(e.target.value as 'renchan' | 'ryukyoku' | 'none')}
                           className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                         >
                           <option value="renchan">あり（親連荘）</option>
@@ -845,7 +846,7 @@ export default function RulesManagePage() {
                       </label>
                       <select
                         value={dubron}
-                        onChange={(e) => setDubron(e.target.value as any)}
+                        onChange={(e) => setDubron(e.target.value as 'atama_hane_kyotaku' | 'atama_hane' | 'split')}
                         className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                       >
                         <option value="atama_hane_kyotaku">あり（供託・本場は頭ハネ）</option>
@@ -861,7 +862,7 @@ export default function RulesManagePage() {
                         </label>
                         <select
                           value={chomboRule}
-                          onChange={(e) => setChomboRule(e.target.value as any)}
+                          onChange={(e) => setChomboRule(e.target.value as 'mangan_pay' | 'pt_penalty' | 'agari_hoki')}
                           className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                         >
                           <option value="mangan_pay">満貫払い（親4000/子2000等）</option>
@@ -943,7 +944,7 @@ export default function RulesManagePage() {
                         </label>
                         <select
                           value={kuikae}
-                          onChange={(e) => setKuikae(e.target.value as any)}
+                          onChange={(e) => setKuikae(e.target.value as 'prohibited' | 'allowed')}
                           className="w-full h-10 px-3 rounded-lg bg-neutral-950 border border-neutral-700 text-white font-bold text-xs"
                         >
                           <option value="prohibited">不可（禁止）</option>
@@ -1182,7 +1183,7 @@ export default function RulesManagePage() {
       {detailModalRule && (
         <RuleDetailModal
           ruleName={detailModalRule.name}
-          config={detailModalRule.config_json as any}
+          config={detailModalRule.config_json as unknown as RuleConfig}
           isOfficial={detailModalRule.kind === 'official'}
           onClose={() => setDetailModalRule(null)}
           onEdit={() => handleOpenEdit(detailModalRule)}

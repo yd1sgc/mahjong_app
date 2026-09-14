@@ -4,6 +4,8 @@
  * （ReactやDOM非依存の純粋関数群）
  */
 
+import { RuleConfig } from '@/types/mahjong';
+
 export interface GameParticipantItem {
   seat: number;
   member_id: string;
@@ -17,9 +19,9 @@ export interface GameData {
   game_id: string;
   played_at: string;
   group_id: string;
-  rule_id: string;
+  rule_id?: string;
   rule_name: string;
-  rule_config: any;
+  rule_config: RuleConfig;
   participants: GameParticipantItem[];
 }
 

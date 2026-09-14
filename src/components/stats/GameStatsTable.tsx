@@ -27,7 +27,7 @@ export const GameStatsTable: React.FC<GameStatsTableProps> = ({
           <span>並び順:</span>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as 'totalPt' | 'okaNashiPt' | 'avgRank' | 'games')}
             className="bg-neutral-900 border border-neutral-800 rounded-lg px-2 py-1 text-xs text-white font-bold"
           >
             <option value="totalPt">総合pt</option>

@@ -46,8 +46,9 @@ export const PinTransferModal: React.FC<PinTransferModalProps> = ({
       if (ok) {
         onClose();
       }
-    } catch (e: any) {
-      setErrorMessage(e.message || '引き継ぎに失敗しました');
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : '引き継ぎに失敗しました';
+      setErrorMessage(errMsg);
     } finally {
       setSubmitting(false);
     }

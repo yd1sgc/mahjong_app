@@ -1,5 +1,5 @@
 import { RuleConfig } from '@/types/mahjong';
-import { Database } from '@/types/database';
+import { Database, Json } from '@/types/database';
 import { calculateGameSettlement } from './rules';
 
 export interface SimpleGamePlayerInput {
@@ -75,7 +75,7 @@ export function buildSimpleGamePayload(input: BuildSimpleGameInput): SimpleGameP
     played_at: playedAt,
     passcode,
     rule_name_snapshot: ruleName,
-    rule_config_snapshot: ruleConfig as any,
+    rule_config_snapshot: ruleConfig as unknown as Json,
     status: 'completed',
     game_mode: 'simple',
     sync_target: 1,

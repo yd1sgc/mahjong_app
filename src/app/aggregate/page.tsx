@@ -52,8 +52,8 @@ export default function AggregatePage() {
           .from('game_participants')
           .select('*');
 
-        const gList: GameRow[] = (gData as any[]) || [];
-        const pList: GameParticipantRow[] = (pData as any[]) || [];
+        const gList: GameRow[] = gData || [];
+        const pList: GameParticipantRow[] = pData || [];
 
         const mapped: GameItem[] = gList.map((g) => {
           const parts = pList

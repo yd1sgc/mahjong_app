@@ -119,11 +119,11 @@ export function SimpleGameInputModal({
       });
 
       // 1. games レコード作成
-      const { error: gErr } = await (supabase.from('games') as any).insert(payload.game);
+      const { error: gErr } = await supabase.from('games').insert(payload.game);
       if (gErr) throw new Error(gErr.message || JSON.stringify(gErr));
 
       // 2. game_participants レコード作成
-      const { error: pErr } = await (supabase.from('game_participants') as any).insert(
+      const { error: pErr } = await supabase.from('game_participants').insert(
         payload.participants
       );
       if (pErr) throw new Error(pErr.message || JSON.stringify(pErr));
@@ -143,9 +143,10 @@ export function SimpleGameInputModal({
         gameId,
         settlements: resList,
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Simple game save error:', e);
-      alert(`保存に失敗しました: ${e.message}`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      alert(`保存に失敗しました: ${errMsg}`);
     } finally {
       setSaving(false);
     }
