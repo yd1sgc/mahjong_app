@@ -35,7 +35,7 @@
     - `src/lib/mahjong/`: 麻雀計算・純粋ドメイン層（`calc.ts`, `rules.ts`, `statsCalc.ts`, `presets.ts`）
     - `src/lib/supabase.ts`: Supabaseクライアント初期化
   - `src/types/`: TypeScript型定義（`mahjong.ts`, `database.ts`）
-- `tests/`: Vitest 自動単体テスト群（全53件）
+- `tests/`: Vitest 自動単体テスト群（全104件・カバレッジ92%超）
 - `scripts/`: 保守・運用スクリプト（`safety_hook.py` 等）
 - `docs/`: システム設計・引継・仕様書
   - `docs/AI_HANDOVER.md`: 本引継書（セッション開始時に参照）
@@ -52,7 +52,7 @@
 - **本番環境URL:** `https://mahjong-app.yd1sgc.workers.dev`
 - **DB / BaaS:** Supabase（PostgreSQL, Realtime, RPCアトミックトランザクション `commit_round_transaction`, `settle_game_transaction`, `abort_game_transaction` 配備）
 - **CI/CD:** GitHub Actions（スリープ防止cron `supabase_keepalive.yml` 稼働中）
-- **品質基準:** Vitest 全59件 PASS、TypeScript型エラー 0件（`as any` 一掃）、Realtime重複フェッチ抑制（デバウンス・並行制御済み）、フォールバック時自動ロールバック保証済み
+- **品質基準:** Vitest 全104件 PASS、ドメイン層カバレッジ 92.53%（Lines）/ 96.62%（Funcs）達成、TypeScript型エラー 0件（`as any` 一掃）、Realtime重複フェッチ抑制（デバウンス・並行制御済み）、フォールバック時自動ロールバック保証済み
 - **SQL資産:** `scripts/setup_supabase_v2.sql`, `scripts/update_transactions_rpc.sql`（RPC単体適用用）
 - **登録ルール構成（短縮名称・全6件）:**
   - 公式: Mリーグ、最高位戦、連盟公式、一般アリアリ
