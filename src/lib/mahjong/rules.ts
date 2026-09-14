@@ -184,7 +184,11 @@ export function recalculateState(
       }
 
       case 'chombo': {
-        const chomboPlayer = winner;
+        const chomboPlayer = winner || loser || '';
+        if (!chomboPlayer || !players.includes(chomboPlayer)) {
+          dealerContinues = true;
+          break;
+        }
         const chomboRule = detailCfg.chombo_rule ?? 'mangan_pay';
         if (chomboRule === 'mangan_pay') {
           const mBase = detailCfg.mangan_base_pt ?? 8000;
@@ -644,7 +648,11 @@ export function computeAllRoundsDetails(
       }
 
       case 'chombo': {
-        const chomboPlayer = winner;
+        const chomboPlayer = winner || loser || '';
+        if (!chomboPlayer || !players.includes(chomboPlayer)) {
+          dealerContinues = true;
+          break;
+        }
         const chomboRule = detailCfg.chombo_rule ?? 'mangan_pay';
         if (chomboRule === 'mangan_pay') {
           const mBase = detailCfg.mangan_base_pt ?? 8000;

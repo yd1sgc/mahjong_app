@@ -764,3 +764,208 @@ describe('rules: computeAllRoundsDetails & 局修正連鎖再計算', () => {
   });
 });
 
+describe('Layer 4: 麻雀ドメイン境界値・エッジケース網羅検証', () => {
+  const players = ['P1', 'P2', 'P3', 'P4']; // 座席: 1:東(起家), 2:南, 3:西, 4:北
+  const defaultRule: RuleConfig = {
+    basic: { init_score: 25000, return_score: 30000, game_length: 'hanchan', uma: [30, 10, -10, -30] },
+    detail: {
+      tobi_end: 'under_zero',
+      west_extension: 'under_30000',
+      agari_yame: true,
+      tenpai_yame: true,
+      riichi_pt: 1000,
+    },
+  };
+
+  describe('1. 同点タイブレーク（起家・座順優先）と供託棒加算', () => {
+    it('全員25,000点同点時: 起家から順に1位〜4位に厳格確定し、山分けされないこと', () => {
+      const scores = { P1: 25000, P2: 25000, P3: 25000, P4: 25000 };
+      const settlement = calculateGameSettlement(players, scores, defaultRule, 0);
+
+      // 順位は座順通り
+      expect(settlement[0].player).toBe('P1');
+      expect(settlement[0].rank).toBe(1);
+      expect(settlement[1].player).toBe('P2');
+      expect(settlement[1].rank).toBe(2);
+      expect(settlement[2].player).toBe('P3');
+      expect(settlement[2].rank).toBe(3);
+      expect(settlement[3].player).toBe('P4');
+      expect(settlement[3].rank).toBe(4);
+
+      // ウマ・オカが山分けされず個別に適用されること (オカ: 20pt)
+      // 1位: (25000 - 30000)/1000 + 30 + 20 = 45.0
+      // 2位: (25000 - 30000)/1000 + 10 = 5.0
+      // 3位: (25000 - 30000)/1000 - 10 = -15.0
+      // 4位: (25000 - 30000)/1000 - 30 = -35.0
+      // 合計: 45 + 5 - 15 - 35 = 0
+      expect(settlement[0].point).toBe(45);
+      expect(settlement[1].point).toBe(5);
+      expect(settlement[2].point).toBe(-15);
+      expect(settlement[3].point).toBe(-35);
+    });
+
+    it('2位・3位同点時: 座順が前のプレイヤーが2位、後ろが3位になること', () => {
+      const scores = { P1: 35000, P2: 25000, P3: 25000, P4: 15000 };
+      const settlement = calculateGameSettlement(players, scores, defaultRule, 0);
+
+      expect(settlement[0].player).toBe('P1');
+      expect(settlement[0].rank).toBe(1);
+      expect(settlement[1].player).toBe('P2');
+      expect(settlement[1].rank).toBe(2);
+      expect(settlement[2].player).toBe('P3');
+      expect(settlement[2].rank).toBe(3);
+      expect(settlement[3].player).toBe('P4');
+      expect(settlement[3].rank).toBe(4);
+    });
+
+    it('トップ同点時に供託棒が残っている場合: 起家優先で上家に供託が全額加算され単独トップとなること', () => {
+      // P1とP2が30,000点で同点トップ、供託棒が1本（1,000点）残存
+      const scores = { P1: 30000, P2: 30000, P3: 20000, P4: 20000 };
+      const settlement = calculateGameSettlement(players, scores, defaultRule, 1);
+
+      // P1に1,000点が加算され31,000点で単独1位
+      expect(settlement[0].player).toBe('P1');
+      expect(settlement[0].finalScore).toBe(31000);
+      expect(settlement[0].rank).toBe(1);
+
+      expect(settlement[1].player).toBe('P2');
+      expect(settlement[1].finalScore).toBe(30000);
+      expect(settlement[1].rank).toBe(2);
+    });
+  });
+
+  describe('2. トビ判定（0点ちょうど vs マイナス）の境界値', () => {
+    it('under_zero（0点未満）: 0点ちょうどはトビとならず続行、-100点でトビ終了すること', () => {
+      const ruleUnderZero: RuleConfig = {
+        ...defaultRule,
+        detail: { ...defaultRule.detail, tobi_end: 'under_zero' },
+      };
+
+      // 0点ちょうど: トビ終了しない（null）
+      const zeroScores = { P1: 40000, P2: 30000, P3: 30000, P4: 0 };
+      expect(checkGameEnd(zeroScores, 0, players, ruleUnderZero)).toBeNull();
+
+      // -100点: トビ終了
+      const minusScores = { P1: 40000, P2: 30000, P3: 30100, P4: -100 };
+      expect(checkGameEnd(minusScores, 0, players, ruleUnderZero)).toBe('飛び終了（P4 が0点未満）');
+    });
+
+    it('zero_or_less（0点以下）: 0点ちょうどで即座にトビ終了すること', () => {
+      const ruleZeroOrLess: RuleConfig = {
+        ...defaultRule,
+        detail: { ...defaultRule.detail, tobi_end: 'zero_or_less' },
+      };
+
+      const zeroScores = { P1: 40000, P2: 30000, P3: 30000, P4: 0 };
+      expect(checkGameEnd(zeroScores, 0, players, ruleZeroOrLess)).toBe('飛び終了（P4 が0点以下）');
+    });
+
+    it('none（トビなし）: -5000点でもトビ終了しないこと', () => {
+      const ruleNoTobi: RuleConfig = {
+        ...defaultRule,
+        detail: { ...defaultRule.detail, tobi_end: 'none' },
+      };
+
+      const minusScores = { P1: 50000, P2: 30000, P3: 25000, P4: -5000 };
+      expect(checkGameEnd(minusScores, 0, players, ruleNoTobi)).toBeNull();
+    });
+  });
+
+  describe('3. オーラスアガリ止め・テンパイ止め・サドンデス（西入）', () => {
+    it('南4局（オーラス）で親がトップで和了: アガリ止めで対局終了すること', () => {
+      // roundIdx: 7 (南4局、親は players[7 % 4] = P4)
+      const scores = { P1: 20000, P2: 20000, P3: 20000, P4: 40000 };
+      const history: RoundRecord[] = [
+        {
+          kyoku_name: '南4局',
+          winner: 'P4', // 親
+          loser: 'P1',
+          win_type: 'ron',
+          score: 3900,
+          riichi: [],
+        },
+      ];
+
+      const endReason = checkGameEnd(scores, 7, players, defaultRule, history);
+      expect(endReason).toBe('アガリやめ（親トップ）');
+    });
+
+    it('南4局で親がトップでテンパイ流局: テンパイ止めで対局終了すること', () => {
+      const scores = { P1: 20000, P2: 20000, P3: 20000, P4: 40000 };
+      const history: RoundRecord[] = [
+        {
+          kyoku_name: '南4局',
+          winner: null,
+          loser: null,
+          win_type: 'ryukyoku',
+          score: 0,
+          riichi: [],
+          tenpai: ['P4'], // 親テンパイ
+        },
+      ];
+
+      const endReason = checkGameEnd(scores, 7, players, defaultRule, history);
+      expect(endReason).toBe('テンパイやめ（親トップ）');
+    });
+
+    it('南4局終了時に全員が返り点（30,000点）未満: 西入突入（続行）すること', () => {
+      // roundIdx: 8 (西1局)、全員30,000点未満
+      const scores = { P1: 28000, P2: 26000, P3: 24000, P4: 22000 };
+      const history: RoundRecord[] = [
+        {
+          kyoku_name: '南4局',
+          winner: 'P1',
+          loser: 'P2',
+          win_type: 'ron',
+          score: 2000,
+          riichi: [],
+        },
+      ];
+
+      const endReason = checkGameEnd(scores, 8, players, defaultRule, history);
+      // 西入突入のため終了せず続行（null）
+      expect(endReason).toBeNull();
+    });
+
+    it('西入中に誰かが返り点（30,000点）に到達した局でサドンデス終了すること', () => {
+      // 西1局（親はP1）、子P2がP3から満貫8000点ロンして 33000点でトップになり終了
+      const scores = { P1: 27000, P2: 33000, P3: 20000, P4: 20000 };
+      const history: RoundRecord[] = [
+        { kyoku_name: '南4局', winner: 'P1', loser: 'P2', win_type: 'ron', score: 2000, riichi: [] },
+        { kyoku_name: '西1局', winner: 'P2', loser: 'P3', win_type: 'ron', score: 8000, riichi: [] },
+      ];
+
+      // 子のアガリで親流れし roundIdx は 9 (西2局へ進む時点)
+      const endReason = checkGameEnd(scores, 9, players, defaultRule, history);
+      expect(endReason).toBe('サドンデス終了（トップ 33,000点）');
+    });
+
+    it('西4局終了（延長上限到達）で全員30,000点未満のままの場合: 延長終了すること', () => {
+      // limitIdx = 8, limitIdx + 4 = 12 (西4局終了後のインデックス)
+      const scores = { P1: 28000, P2: 26000, P3: 24000, P4: 22000 };
+      const history: RoundRecord[] = [
+        { kyoku_name: '西4局', winner: 'P1', loser: 'P2', win_type: 'ron', score: 2000, riichi: [] },
+      ];
+
+      const endReason = checkGameEnd(scores, 12, players, defaultRule, history);
+      expect(endReason).toBe('西4局終了（延長終了）');
+    });
+
+    it('東風戦（tonpu）の場合: 東4局終了時にトップが30,000点未満なら南入すること', () => {
+      const tonpuRule: RuleConfig = {
+        basic: { init_score: 25000, return_score: 30000, game_length: 'tonpu' },
+        detail: { west_extension: 'under_30000' },
+      };
+      // roundIdx: 4 (東4局終了後 = 南1局)、全員30000点未満
+      const scores = { P1: 28000, P2: 26000, P3: 24000, P4: 22000 };
+      const history: RoundRecord[] = [
+        { kyoku_name: '東4局', winner: 'P1', loser: 'P2', win_type: 'ron', score: 2000, riichi: [] },
+      ];
+
+      const endReason = checkGameEnd(scores, 4, players, tonpuRule, history);
+      // 南入するため終了せず続行（null）
+      expect(endReason).toBeNull();
+    });
+  });
+});
+

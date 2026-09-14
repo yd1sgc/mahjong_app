@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
+import { validateRuleInput } from '@/lib/mahjong/validation';
 
 /** ルール名の次期バージョン名生成 (例: "親族ルール" -> "親族ルール (v2)", "親族ルール (v2)" -> "親族ルール (v3)") */
 function getNextVersionName(currentName: string): string {
@@ -207,16 +208,19 @@ export default function RulesManagePage() {
   // ルール保存（新規作成または方式B版管理更新）
   const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = ruleName.trim();
-    if (!trimmed) {
-      setFormError('ルール名を入力してください');
+    const validation = validateRuleInput({
+      name: ruleName,
+      initScore,
+      returnScore,
+      uma: [uma1, uma2, uma3, uma4],
+    });
+
+    if (!validation.valid) {
+      setFormError(validation.error || '入力内容を確認してください');
       return;
     }
 
-    if (initScore > returnScore) {
-      setFormError('返し点は配給原点以上である必要があります');
-      return;
-    }
+    const trimmed = ruleName.trim();
 
     try {
       setSubmitting(true);

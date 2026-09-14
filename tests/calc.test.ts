@@ -216,4 +216,61 @@ describe('Score Presets (点数プリセット定義の整合性)', () => {
     expect(oyaTsumo1.pointsLabel).toBe('500オール');
     expect(oyaTsumo1.hanFuLabel).toBe('1翻30符');
   });
+
+  describe('高翻数および特殊計算のエッジケース検証', () => {
+    it('11翻 三倍満: 子24000点 / 親36000点', () => {
+      const koRon = calculateScore(11, 30, false, false);
+      expect(koRon.total).toBe(24000);
+
+      const oyaRon = calculateScore(11, 30, true, false);
+      expect(oyaRon.total).toBe(36000);
+
+      const koTsumo = calculateScore(12, 30, false, true);
+      expect(koTsumo.total).toBe(24000);
+      expect(koTsumo.dealerPay).toBe(12000);
+      expect(koTsumo.nonDealerPay).toBe(6000);
+
+      const oyaTsumo = calculateScore(12, 30, true, true);
+      expect(oyaTsumo.total).toBe(36000);
+      expect(oyaTsumo.nonDealerPay).toBe(12000);
+    });
+
+    it('26翻以上 数え役満 / 二倍役満: 子64000点 / 親96000点', () => {
+      const koRon = calculateScore(26, 30, false, false);
+      expect(koRon.total).toBe(64000);
+
+      const oyaRon = calculateScore(26, 30, true, false);
+      expect(oyaRon.total).toBe(96000);
+
+      const koTsumo = calculateScore(26, 30, false, true);
+      expect(koTsumo.total).toBe(64000);
+      expect(koTsumo.dealerPay).toBe(32000);
+      expect(koTsumo.nonDealerPay).toBe(16000);
+
+      const oyaTsumo = calculateScore(26, 30, true, true);
+      expect(oyaTsumo.total).toBe(96000);
+      expect(oyaTsumo.nonDealerPay).toBe(32000);
+    });
+
+    it('calcPoint: pt_penalty ルール適用時、チョンボ回数に応じてポイントが正しく減点されること', () => {
+      const ruleWithPtPenalty = {
+        basic: { return_score: 30000, uma: [20, 10, -10, -20] },
+        detail: {
+          chombo_rule: 'pt_penalty',
+          chombo_pt: 20, // チョンボ1回につき -20pt
+        },
+      };
+
+      // 2位 30000点、チョンボ1回
+      // 通常pt: (30000 - 30000)/1000 + 10 = 10.0
+      // チョンボ減点: -20
+      // 最終pt: -10.0
+      const pt = calcPoint(30000, 2, ruleWithPtPenalty as any, 1);
+      expect(pt).toBe(-10);
+
+      // チョンボ2回
+      const pt2 = calcPoint(30000, 2, ruleWithPtPenalty as any, 2);
+      expect(pt2).toBe(-30);
+    });
+  });
 });

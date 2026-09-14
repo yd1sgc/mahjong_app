@@ -9,6 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { MemberRow, GroupRow, RuleTemplateRow } from '@/types/database';
+import { validateMemberInput, validateGroupInput } from '@/lib/mahjong/validation';
 
 interface GroupMembership {
   group_id: string;
@@ -99,16 +100,12 @@ export default function GroupsManagePage() {
   // 1. 新規メンバー登録
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = newMemberName.trim();
-    if (!trimmed) {
-      setMemberError('メンバー名を入力してください');
+    const validation = validateMemberInput(newMemberName, members);
+    if (!validation.valid) {
+      setMemberError(validation.error || '入力内容を確認してください');
       return;
     }
-
-    if (members.some((m) => m.member_name.toLowerCase() === trimmed.toLowerCase())) {
-      setMemberError('同名のメンバーが既に登録されています');
-      return;
-    }
+    const trimmed = validation.trimmedName;
 
     try {
       setSubmittingMember(true);
@@ -151,22 +148,12 @@ export default function GroupsManagePage() {
   const handleSaveMemberEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
-    const trimmed = editMemberName.trim();
-    if (!trimmed) {
-      setEditError('メンバー名を入力してください');
+    const validation = validateMemberInput(editMemberName, members, editingMember.member_id);
+    if (!validation.valid) {
+      setEditError(validation.error || '入力内容を確認してください');
       return;
     }
-
-    if (
-      members.some(
-        (m) =>
-          m.member_id !== editingMember.member_id &&
-          m.member_name.toLowerCase() === trimmed.toLowerCase()
-      )
-    ) {
-      setEditError('同名のメンバーが既に登録されています');
-      return;
-    }
+    const trimmed = validation.trimmedName;
 
     try {
       setSubmittingEdit(true);
@@ -284,11 +271,13 @@ export default function GroupsManagePage() {
   // 5. 新規グループ作成
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = newGroupName.trim();
-    if (!trimmed) {
-      setGroupError('グループ名を入力してください');
+    const validation = validateGroupInput(newGroupName, groups);
+    if (!validation.valid) {
+      setGroupError(validation.error || '入力内容を確認してください');
       return;
     }
+    const trimmed = validation.trimmedName;
+
     if (!selectedRuleId) {
       setGroupError('デフォルトルールを選択してください');
       return;
