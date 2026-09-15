@@ -248,9 +248,8 @@ export function useGameData(
             typeof window !== 'undefined'
               ? localStorage.getItem(recorderTokenKey)
               : null;
-          if (localToken && localToken === updatedGame.passcode) {
-            setIsRecorder(true);
-          }
+          const isNowRecorder = Boolean(localToken && localToken === updatedGame.passcode);
+          setIsRecorder(isNowRecorder);
           debouncedFetch();
         }
       )

@@ -99,7 +99,7 @@ export function useGameActions({
   actionHistoryKey,
   recorderTokenKey,
 }: UseGameActionsProps) {
-  // 1. 4桁PINによる記録係交代
+  // 1. 4桁PINによる記録係交代（単一トークン排他制御）
   const transferRecorder = useCallback(
     async (pin: string): Promise<boolean> => {
       try {
@@ -108,17 +108,22 @@ export function useGameActions({
           throw new Error('4桁PINコードが一致しません');
         }
 
-        saveRecorderToken(pin);
-        setIsRecorder(true);
+        // 引き継ぎ成功時に新しい4桁PINを自動生成（前任者の旧PINを無効化）
+        const newPin = Math.floor(1000 + Math.random() * 9000).toString();
 
-        try {
-          await supabase.rpc('transfer_recorder', {
-            p_game_id: gameId,
-            p_pin: pin,
-          });
-        } catch {
-          // RPC未配備時はローカル権限保持のみで継続
+        // DB上の対局PINを新PINへ更新
+        const { error: updateErr } = await supabase
+          .from('games')
+          .update({ passcode: newPin })
+          .eq('game_id', gameId);
+
+        if (updateErr) {
+          throw new Error(`PINの更新に失敗しました: ${updateErr.message}`);
         }
+
+        // 新端末のローカルストレージに新PINを保存し、自身を記録係に設定
+        saveRecorderToken(newPin);
+        setIsRecorder(true);
 
         return true;
       } catch (e: unknown) {
