@@ -10,6 +10,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { MemberRow, GroupRow, RuleTemplateRow } from '@/types/database';
 import { validateMemberInput, validateGroupInput } from '@/lib/mahjong/validation';
+import { AdminPinModal } from '@/components/manage/AdminPinModal';
+import { isAdminAuthenticated } from '@/lib/adminAuth';
 
 interface GroupMembership {
   group_id: string;
@@ -47,6 +49,19 @@ export default function GroupsManagePage() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [submittingGroup, setSubmittingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+
+  // 管理者PIN認証モーダル
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void | Promise<void>) | null>(null);
+
+  const executeWithAdminAuth = useCallback((action: () => void | Promise<void>) => {
+    if (isAdminAuthenticated()) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowPinModal(true);
+    }
+  }, []);
 
   // データ読込
   const loadData = useCallback(async () => {
@@ -155,51 +170,51 @@ export default function GroupsManagePage() {
     }
     const trimmed = validation.trimmedName;
 
-    try {
-      setSubmittingEdit(true);
-      setEditError(null);
+    executeWithAdminAuth(async () => {
+      try {
+        setSubmittingEdit(true);
+        setEditError(null);
 
-      // (1) members テーブル更新 (名前、ゲストフラグ)
-      const { error: memErr } = await supabase
-        .from('members')
-        .update({
-          member_name: trimmed,
-          is_guest: editMemberIsGuest ? 1 : 0,
-        })
-        .eq('member_id', editingMember.member_id);
+        // (1) members テーブル更新 (名前、ゲストフラグ)
+        const { error: memErr } = await supabase
+          .from('members')
+          .update({
+            member_name: trimmed,
+            is_guest: editMemberIsGuest ? 1 : 0,
+          })
+          .eq('member_id', editingMember.member_id);
 
-      if (memErr) throw new Error(memErr.message);
+        if (memErr) throw new Error(memErr.message);
 
-      // (2) group_memberships テーブル同期
-      // 既存の所属を削除
-      const { error: delErr } = await supabase
-        .from('group_memberships')
-        .delete()
-        .eq('member_id', editingMember.member_id);
-
-      if (delErr) throw new Error(delErr.message);
-
-      // 選択されたグループがあれば一括登録
-      if (editMemberGroupIds.length > 0) {
-        const inserts = editMemberGroupIds.map((gId) => ({
-          group_id: gId,
-          member_id: editingMember.member_id,
-        }));
-        const { error: insErr } = await supabase
+        // (2) group_memberships テーブル同期
+        const { error: delErr } = await supabase
           .from('group_memberships')
-          .insert(inserts);
+          .delete()
+          .eq('member_id', editingMember.member_id);
 
-        if (insErr) throw new Error(insErr.message);
+        if (delErr) throw new Error(delErr.message);
+
+        if (editMemberGroupIds.length > 0) {
+          const inserts = editMemberGroupIds.map((gId) => ({
+            group_id: gId,
+            member_id: editingMember.member_id,
+          }));
+          const { error: insErr } = await supabase
+            .from('group_memberships')
+            .insert(inserts);
+
+          if (insErr) throw new Error(insErr.message);
+        }
+
+        setEditingMember(null);
+        await loadData();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '更新に失敗しました';
+        setEditError(msg);
+      } finally {
+        setSubmittingEdit(false);
       }
-
-      setEditingMember(null);
-      await loadData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '更新に失敗しました';
-      setEditError(msg);
-    } finally {
-      setSubmittingEdit(false);
-    }
+    });
   };
 
   // 4. 編集モーダル内からのアーカイブ（非表示化）
@@ -213,23 +228,25 @@ export default function GroupsManagePage() {
       return;
     }
 
-    try {
-      setSubmittingEdit(true);
-      const { error } = await supabase
-        .from('members')
-        .update({ is_archived: 1 })
-        .eq('member_id', editingMember.member_id);
+    executeWithAdminAuth(async () => {
+      try {
+        setSubmittingEdit(true);
+        const { error } = await supabase
+          .from('members')
+          .update({ is_archived: 1 })
+          .eq('member_id', editingMember.member_id);
 
-      if (error) throw new Error(error.message);
+        if (error) throw new Error(error.message);
 
-      setEditingMember(null);
-      await loadData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'アーカイブに失敗しました';
-      alert(msg);
-    } finally {
-      setSubmittingEdit(false);
-    }
+        setEditingMember(null);
+        await loadData();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'アーカイブに失敗しました';
+        alert(msg);
+      } finally {
+        setSubmittingEdit(false);
+      }
+    });
   };
 
   // 3. メンバーアーカイブ（論理削除）
@@ -238,34 +255,38 @@ export default function GroupsManagePage() {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('members')
-        .update({ is_archived: 1 })
-        .eq('member_id', member.member_id);
+    executeWithAdminAuth(async () => {
+      try {
+        const { error } = await supabase
+          .from('members')
+          .update({ is_archived: 1 })
+          .eq('member_id', member.member_id);
 
-      if (error) throw new Error(error.message);
-      await loadData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'アーカイブに失敗しました';
-      alert(msg);
-    }
+        if (error) throw new Error(error.message);
+        await loadData();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'アーカイブに失敗しました';
+        alert(msg);
+      }
+    });
   };
 
   // 4. メンバー復元
   const handleRestoreMember = async (member: MemberRow) => {
-    try {
-      const { error } = await supabase
-        .from('members')
-        .update({ is_archived: 0 })
-        .eq('member_id', member.member_id);
+    executeWithAdminAuth(async () => {
+      try {
+        const { error } = await supabase
+          .from('members')
+          .update({ is_archived: 0 })
+          .eq('member_id', member.member_id);
 
-      if (error) throw new Error(error.message);
-      await loadData();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '復元に失敗しました';
-      alert(msg);
-    }
+        if (error) throw new Error(error.message);
+        await loadData();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '復元に失敗しました';
+        alert(msg);
+      }
+    });
   };
 
   // 5. 新規グループ作成
@@ -826,6 +847,22 @@ export default function GroupsManagePage() {
           </div>
         </div>
       )}
+
+      {/* 管理者PIN認証モーダル */}
+      <AdminPinModal
+        isOpen={showPinModal}
+        onClose={() => {
+          setShowPinModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={() => {
+          setShowPinModal(false);
+          if (pendingAction) {
+            pendingAction();
+            setPendingAction(null);
+          }
+        }}
+      />
     </main>
   );
 }

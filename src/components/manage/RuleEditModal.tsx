@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
 import { validateRuleInput } from '@/lib/mahjong/validation';
 import { RuleConfig } from '@/types/mahjong';
+import { AdminPinModal } from '@/components/manage/AdminPinModal';
+import { isAdminAuthenticated } from '@/lib/adminAuth';
 
 /** ルール名の次期バージョン名生成 (例: "親族ルール" -> "親族ルール (v2)", "親族ルール (v2)" -> "親族ルール (v3)") */
 function getNextVersionName(currentName: string): string {
@@ -43,6 +45,7 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'flow' | 'rules' | 'notes'>('basic');
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
 
   // タブ1: 基本設定
   const [ruleName, setRuleName] = useState('');
@@ -295,21 +298,8 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
     );
   };
 
-  // ルール保存ハンドラー
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validation = validateRuleInput({
-      name: ruleName,
-      initScore,
-      returnScore,
-      uma: [uma1, uma2, uma3, uma4],
-    });
-
-    if (!validation.valid) {
-      setFormError(validation.error || '入力内容を確認してください');
-      return;
-    }
-
+  // 実際のルール保存処理
+  const performSave = async () => {
     const trimmed = ruleName.trim();
 
     try {
@@ -416,6 +406,30 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // ルール保存ハンドラー
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validation = validateRuleInput({
+      name: ruleName,
+      initScore,
+      returnScore,
+      uma: [uma1, uma2, uma3, uma4],
+    });
+
+    if (!validation.valid) {
+      setFormError(validation.error || '入力内容を確認してください');
+      return;
+    }
+
+    // 既存ルールの更新（版上げ・アーカイブ）時は管理者PIN認証が必要
+    if (editingRuleId && !isAdminAuthenticated()) {
+      setShowPinModal(true);
+      return;
+    }
+
+    await performSave();
   };
 
   return (
@@ -988,6 +1002,16 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* 管理者PIN認証モーダル */}
+      <AdminPinModal
+        isOpen={showPinModal}
+        onClose={() => setShowPinModal(false)}
+        onSuccess={() => {
+          setShowPinModal(false);
+          performSave();
+        }}
+      />
     </div>
   );
 };

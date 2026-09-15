@@ -13,6 +13,8 @@ import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
 import { RuleEditModal } from '@/components/manage/RuleEditModal';
+import { AdminPinModal } from '@/components/manage/AdminPinModal';
+import { isAdminAuthenticated } from '@/lib/adminAuth';
 import { RuleConfig } from '@/types/mahjong';
 
 export default function RulesManagePage() {
@@ -27,6 +29,19 @@ export default function RulesManagePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalSourceRule, setModalSourceRule] = useState<RuleTemplateRow | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
+
+  // 管理者PIN認証モーダル
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void | Promise<void>) | null>(null);
+
+  const executeWithAdminAuth = useCallback((action: () => void | Promise<void>) => {
+    if (isAdminAuthenticated()) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowPinModal(true);
+    }
+  }, []);
 
   // データ読込
   const loadRules = useCallback(async () => {
@@ -65,18 +80,20 @@ export default function RulesManagePage() {
 
   // 復元
   const handleRestoreRule = async (rule: RuleTemplateRow) => {
-    try {
-      const { error } = await supabase
-        .from('rule_templates')
-        .update({ is_archived: 0 })
-        .eq('rule_id', rule.rule_id);
+    executeWithAdminAuth(async () => {
+      try {
+        const { error } = await supabase
+          .from('rule_templates')
+          .update({ is_archived: 0 })
+          .eq('rule_id', rule.rule_id);
 
-      if (error) throw new Error(error.message);
-      await loadRules();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '復元に失敗しました';
-      alert(msg);
-    }
+        if (error) throw new Error(error.message);
+        await loadRules();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '復元に失敗しました';
+        alert(msg);
+      }
+    });
   };
 
   return (
@@ -264,6 +281,22 @@ export default function RulesManagePage() {
           }}
         />
       )}
+
+      {/* 管理者PIN認証モーダル */}
+      <AdminPinModal
+        isOpen={showPinModal}
+        onClose={() => {
+          setShowPinModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={() => {
+          setShowPinModal(false);
+          if (pendingAction) {
+            pendingAction();
+            setPendingAction(null);
+          }
+        }}
+      />
     </main>
   );
 }

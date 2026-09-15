@@ -52,7 +52,7 @@
 - **本番環境URL:** `https://mahjong-app.yd1sgc.workers.dev`
 - **DB / BaaS:** Supabase（PostgreSQL, Realtime, クライアント側フォールバック＆自動ロールバック標準運用、RPC適用不要）
 - **CI/CD:** GitHub Actions（スリープ防止cron `supabase_keepalive.yml` 稼働中）
-- **品質基準:** Vitest 全104件 PASS、ドメイン層カバレッジ 92.53%（Lines）/ 96.62%（Funcs）達成、TypeScript型エラー 0件・`as any` 完全0件達成、デッドコード一掃（undoRound完全削除）、3層クリーンアーキテクチャ徹底、局修正一括UPSERT化（直列多重通信の解消・不可分更新）、簡易入力ロールバック保証済み、フォールバック時自動ロールバック保証済み
+- **品質基準:** Vitest 全110件 PASS、ドメイン層カバレッジ 92.53%（Lines）/ 96.62%（Funcs）達成、TypeScript型エラー 0件・`as any` 完全0件達成、管理PIN（3桁: 258）による既存データ変更保護済み、デッドコード一掃（undoRound完全削除）、3層クリーンアーキテクチャ徹底、局修正一括UPSERT化（直列多重通信の解消・不可分更新）、簡易入力ロールバック保証済み、フォールバック時自動ロールバック保証済み
 - **SQL資産:** `scripts/setup_supabase_v2.sql`, `scripts/update_transactions_rpc.sql`（RPC単体適用用）
 - **登録ルール構成（短縮名称・全6件）:**
   - 公式: Mリーグ、最高位戦、連盟公式、一般アリアリ
@@ -62,7 +62,7 @@
 
 ## 4. TODO (Next Actions)
 
-- [ ] **本番デプロイ反映（Phase 5-O 完了分＋モバイル最適化）**
+- [ ] **本番デプロイ反映（管理PIN保護＋モバイル最適化）**
   - [ ] `npm run build && npx wrangler deploy` による最新コードの配信反映
 - [ ] **実戦対局テスト**
   - [ ] 端末（スマホ等）による実際の対局記録・局修正・精算・成績閲覧の通し確認
