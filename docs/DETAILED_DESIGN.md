@@ -99,50 +99,37 @@ classDiagram
 * **記録係端末（1台）：** 和了・流局・リーチ・チョンボ・Undo・対局終了の入力ボタンが活性化。
 * **閲覧端末（他3人・観戦者）：** 入力ボタンを完全非活性（`disabled` または非表示）とし、スコアボード・点差・順位のみをリアルタイム表示。
 
-### 4.2 4桁PINコードによるフェイルオーバー（記録係の交代）
+### 4.2 4桁PINコードによるフェイルオーバー（記録係の交代・単一端末排他制御）
 記録係のスマートフォンがバッテリー切れ、端末故障、離席等で使えなくなった場合、その場で別の端末へ入力権限を移譲できる。
+本システムは匿名Webアプリとして稼働するため、外部認証（auth.uid）に依存せず、4桁PINを「引き継ぎ時に自動再生成されるワンタイムトークン」として運用することで、**常に1台のみが操作権限を持つ排他制御（二重操作の完全防止）**を実現している。
 
 ```mermaid
 sequenceDiagram
-    participant A as 記録係A (バッテリー低下)
-    participant B as プレイヤーB (交代希望)
-    participant S as Supabase (PostgreSQL RPC)
+    participant A as 記録係A (旧端末)
+    participant B as プレイヤーB (新端末)
+    participant S as Supabase (PostgreSQL & Realtime)
 
-    Note over A: 対局開始時に画面上に「PIN: 5824」が表示される
-    A->>B: 卓上で「PINは5824」と口頭伝達
-    B->>B: 画面の「記録係を引き継ぐ」をタップ
-    B->>S: transfer_recorder(game_id, input_pin='5824')
-    alt PIN一致
-        S-->>S: games.recorder_id を B の auth.uid() に更新
-        S-->>B: 引き継ぎ成功 (入力ボタンが活性化)
-        S-->>A: 権限喪失 (閲覧専用に切り替わる)
+    Note over A: 対局画面上に「PIN: 1234」が表示されている
+    A->>B: 卓上で「PINは1234」と口頭伝達
+    B->>B: 画面の「記録係を引き継ぐ」をタップし 1234 を入力
+    alt PIN一致 (games.passcode == 1234)
+        B->>B: 新しいランダム4桁PIN（例: 5678）を自動生成
+        B->>S: UPDATE games SET passcode = '5678' WHERE game_id = ...
+        B->>B: localStorage に 5678 を保存し isRecorder = true (入力活性化)
+        S-->>A: Realtimeブロードキャスト (passcode = '5678')
+        Note over A: 保持PIN(1234) != 新PIN(5678) を検知
+        A->>A: isRecorder = false (即座に閲覧専用モードへ自動降格・入力UI消去)
     else PIN不一致
-        S-->>B: エラー (引き継ぎ拒否)
+        B-->>B: エラー表示「4桁PINコードが一致しません」
     end
 ```
 
-#### PostgreSQL RPC関数（ストアドプロシージャ）定義
-```sql
-CREATE OR REPLACE FUNCTION transfer_recorder(p_game_id UUID, p_pin TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_correct_pin TEXT;
-BEGIN
-    SELECT passcode INTO v_correct_pin FROM games WHERE game_id = p_game_id;
-    IF v_correct_pin IS NULL OR v_correct_pin != p_pin THEN
-        RAISE EXCEPTION '無効な対局PINコードです';
-    END IF;
-    
-    UPDATE games 
-    SET recorder_id = auth.uid() 
-    WHERE game_id = p_game_id;
-    
-    RETURN TRUE;
-END;
-$$;
+#### 引き継ぎ時のデータ整合性と排他制御の仕様
+1. **二重操作の物理的防止**:
+   - 新端末Bが引き継ぎに成功すると、DBの `games.passcode` が新PIN（`5678`）にインプレース更新される。
+   - 旧端末Aは保持しているローカルPIN（`1234`）が無効化されるため、Supabase Realtime（`postgres_changes`）通知を受けた瞬間に画面リロード不要で即座に「閲覧専用モード」へ降格し、二人同時に操作できる状態を物理的に排除する。
+2. **確定局データの完全保持**:
+   - 過去の全局結果（スコア・和了・放銃・供託）はすべてクラウドDB（`rounds`, `round_seats`）に永続化されているため、新端末Bへ移行後も1点・1局の欠落もなく完全に引き継がれ、前局取り消しや局修正も新端末Bからそのまま実行可能。
 
 -- 局確定アトミックトランザクション
 CREATE OR REPLACE FUNCTION public.commit_round_transaction(

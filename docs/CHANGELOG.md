@@ -301,3 +301,18 @@
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全11ルート正常出力完了。
 
+## Phase 5-Q 完了（モバイルステータスバー被り解消 & 記録係引き継ぎ単一端末排他制御）
+- **モバイルステータスバー被り解消（`src/app/layout.tsx`）**:
+  - `statusBarStyle: "black-translucent"` および `viewportFit: "cover"` を削除し、以前の標準設定（`width: "device-width", initialScale: 1`）へ復元。
+  - スマートフォンの時計、バッテリー、ノッチ・インカメラ領域とヘッダー操作ボタンが重なって操作不能になる不具合を完全解消。
+- **4桁PIN引き継ぎ時の単一端末排他制御・二重操作防止（`useGameActions.ts`, `useGameData.ts`）**:
+  - 新端末でのPIN引き継ぎ成功時に新しいランダム4桁PINを自動発行し、DB（`games.passcode`）をインプレース更新。
+  - Supabase Realtimeの更新通知（`postgres_changes`）受信時、保持するPINが新PINと不一致となった旧端末を即座に `setIsRecorder(false)`（閲覧専用モード）へ自動降格。
+  - 端末間の二重操作・同時入力を物理的に遮断し、常に引き継ぎ後の1台のみが操作権限を持つ排他制御を確立。
+  - 確定済みの過去全局データ・持ち点はクラウドDBにより完全保持され、前局取り消し・局修正・精算が新端末から問題なく実行可能なことを保証。
+- `npm test`（Vitest）: 全110件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全11ルート正常出力完了。
+- 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
+
