@@ -67,10 +67,14 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
     setLoser(target.loser);
     setScore(target.score || 0);
     setHan(target.han || 1);
-    setFu(target.fu || 30);
-    setRiichi(target.riichi || []);
+    const initialRiichi = target.riichi || [];
+    setRiichi(initialRiichi);
     setFuro(target.furo || []);
-    setTenpai(target.tenpai || []);
+    setTenpai(
+      target.win_type === 'ryukyoku'
+        ? Array.from(new Set([...(target.tenpai || []), ...initialRiichi]))
+        : target.tenpai || []
+    );
 
     if (target.win_type === 'multi_ron' && target.multi_wins) {
       setMultiWinners(
@@ -113,7 +117,7 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
       fu: fu,
       riichi: riichi,
       furo: furo,
-      tenpai: winType === 'ryukyoku' ? tenpai : [],
+      tenpai: winType === 'ryukyoku' ? Array.from(new Set([...tenpai, ...riichi])) : [],
       multi_wins:
         winType === 'multi_ron'
           ? multiWinners.map((mw) => ({
@@ -314,7 +318,9 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
                     type="button"
                     onClick={() => {
                       setWinType(item.type);
-                      if (item.type === 'multi_ron' && multiWinners.length === 0) {
+                      if (item.type === 'ryukyoku') {
+                        setTenpai((prev) => Array.from(new Set([...prev, ...riichi])));
+                      } else if (item.type === 'multi_ron' && multiWinners.length === 0) {
                         const w1 = winner || players[0];
                         const w2 = players.find((p) => p !== w1 && p !== loser) || players[1];
                         setMultiWinners([
@@ -598,23 +604,28 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
                 </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {players.map((p) => {
-                    const isT = tenpai.includes(p);
+                    const isR = riichi.includes(p);
+                    const isT = isR || tenpai.includes(p);
                     return (
                       <button
                         key={p}
                         type="button"
+                        disabled={isR}
                         onClick={() =>
+                          !isR &&
                           setTenpai((prev) =>
                             isT ? prev.filter((name) => name !== p) : [...prev, p]
                           )
                         }
                         className={`py-2 rounded-lg text-xs font-bold border transition-colors ${
-                          isT
+                          isR
+                            ? 'bg-amber-500 text-black border-amber-400 cursor-default opacity-90'
+                            : isT
                             ? 'bg-amber-500 text-black border-amber-400'
                             : 'bg-neutral-900 text-neutral-400 border-neutral-800'
                         }`}
                       >
-                        {p} ({isT ? '聴牌' : '不聴'})
+                        {p} {isR ? '(立直・聴牌)' : isT ? '(聴牌)' : '(不聴)'}
                       </button>
                     );
                   })}
@@ -659,11 +670,15 @@ export const RoundEditModal: React.FC<RoundEditModalProps> = ({
                       <button
                         key={p}
                         type="button"
-                        onClick={() =>
-                          setRiichi((prev) =>
-                            isR ? prev.filter((x) => x !== p) : [...prev, p]
-                          )
-                        }
+                        onClick={() => {
+                          setRiichi((prev) => {
+                            const next = isR ? prev.filter((x) => x !== p) : [...prev, p];
+                            if (!isR && winType === 'ryukyoku') {
+                              setTenpai((t) => Array.from(new Set([...t, p])));
+                            }
+                            return next;
+                          });
+                        }}
                         className={`py-1.5 rounded text-xs font-bold border ${
                           isR
                             ? 'bg-amber-500 text-black border-amber-400'

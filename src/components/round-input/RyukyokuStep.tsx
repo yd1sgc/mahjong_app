@@ -108,19 +108,19 @@ export const RyukyokuStep: React.FC<RyukyokuStepProps> = ({
                   onClick={() => !isRiichi && onToggleTenpai(p)}
                   className={`h-14 rounded-xl text-sm flex items-center justify-center transition-all touch-manipulation ${
                     isRiichi
-                      ? 'bg-neutral-900 border border-neutral-700 text-neutral-300 cursor-default opacity-80'
+                      ? 'bg-amber-500 border border-amber-400 text-black font-black shadow-xs cursor-default'
                       : isTenpai
-                      ? 'bg-neutral-800 border-2 border-white text-white font-black shadow-xs'
+                      ? 'bg-amber-500 border border-amber-400 text-black font-black shadow-xs'
                       : 'bg-neutral-900 border border-neutral-800 text-neutral-400 font-bold hover:border-neutral-700'
                   }`}
                 >
                   <span>{p}</span>
                   {isRiichi ? (
-                    <span className="text-xs ml-1.5 text-neutral-300 font-bold">
+                    <span className="text-xs ml-1.5 font-black text-black">
                       (立直・聴牌)
                     </span>
                   ) : (
-                    <span className={`text-xs ml-1.5 font-black ${isTenpai ? 'text-white' : 'text-neutral-500'}`}>
+                    <span className={`text-xs ml-1.5 font-black ${isTenpai ? 'text-black' : 'text-neutral-500'}`}>
                       ({isTenpai ? '聴牌' : '不聴'})
                     </span>
                   )}
