@@ -266,8 +266,24 @@
   - 確定ボタン（全幅・最優先）と「点数選択に戻る」ナビゲーションを縦並びで分離し、片手操作時の押しやすさ向上と誤タップ防止を両立。
 - **戻る導線のボタン化（`ScoreStep.tsx`）**:
   - 目立たない下線リンクだった「関係者を変更」を枠線付きの戻るボタン（`← 戻る`）へ改修。
-- `npx vitest run`: 全59件 ALL PASS。
+- `npx vitest run`: 全104件 ALL PASS。
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全11ルート正常出力完了。
 - 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
+## Phase 5-O 完了（局修正一括UPSERT化 & 簡易入力ロールバック保護 & デッドコード一掃）
+- **局修正の直列多重更新解消 & 一括UPSERT化（`src/hooks/useGameActions.ts`）**:
+  - 過去局修正時に局ごとに直列実行されていた個別UPDATE（最大30回超のHTTPリクエスト）を完全廃止。
+  - 再計算対象の全局データを集約し、`rounds` テーブル1回 ＋ `round_seats` テーブル1回（複合主キー `round_id,seat` による一括UPSERT）の計2回のリクエストへ集約。
+  - モバイル回線におけるレイテンシを数十倍短縮し、通信瞬断時の座席欠損・ゼロサム崩壊リスクを構造的に排除。
+  - `updateRoundAndRecalculate` の依存配列に `participants` と `gameId` を補完。
+- **簡易入力（結果のみ入力）のロールバック保護（`src/components/SimpleGameInputModal.tsx`）**:
+  - `games` 作成後に `game_participants` の登録が失敗した場合、作成済みの `games` レコードをDELETEするロールバック処理を追加。孤立レコードの発生を防止。
+- **デッドコード（`undoRound`）の完全削除（`useGameActions.ts`, `useGame.ts`, `src/app/game/page.tsx`）**:
+  - `undoLastAction` に統合され、呼び出しが一切存在しなかった旧関数 `undoRound` をフック・画面インターフェースから一掃。
+- **ドキュメントの最新化（`docs/AI_HANDOVER.md`）**:
+  - Phase 5-L〜5-O の実績およびシステム状態・品質基準を最新同期。
+- `npx vitest run`: 全104件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全11ルート正常出力完了。
 

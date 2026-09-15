@@ -39,7 +39,6 @@ function GameContent() {
     toggleFuro,
     declareRiichi,
     commitRound,
-    undoRound,
     undoLastAction,
     updateRoundAndRecalculate,
     canUndo,

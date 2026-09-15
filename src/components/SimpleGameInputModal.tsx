@@ -126,7 +126,11 @@ export function SimpleGameInputModal({
       const { error: pErr } = await supabase.from('game_participants').insert(
         payload.participants
       );
-      if (pErr) throw new Error(pErr.message || JSON.stringify(pErr));
+      if (pErr) {
+        // ロールバック: game_participants 登録失敗時に games レコードを削除して孤立・不整合を防ぐ
+        await supabase.from('games').delete().eq('game_id', gameId);
+        throw new Error(`参加者データの保存に失敗したためロールバックしました: ${pErr.message || JSON.stringify(pErr)}`);
+      }
 
       // 完了結果の表示
       const resList = payload.participants

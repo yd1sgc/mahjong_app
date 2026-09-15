@@ -21,6 +21,7 @@ import {
 import {
   GameParticipantRow,
   GameRow,
+  RoundInsert,
   RoundSeatInsert,
   Json,
 } from '@/types/database';
@@ -453,35 +454,6 @@ export function useGameActions({
     setError,
   ]);
 
-  // 6. 1局巻き戻し（従来互換・直接局削除）
-  const undoRound = useCallback(async (): Promise<boolean> => {
-    if (!gameState || !isRecorder || gameState.roundHistory.length === 0) {
-      return false;
-    }
-
-    try {
-      setLoading(true);
-      const lastIndex = gameState.roundHistory.length - 1;
-
-      const { error: delErr } = await supabase
-        .from('rounds')
-        .delete()
-        .eq('game_id', gameId)
-        .eq('round_index', lastIndex);
-
-      if (delErr) throw new Error(delErr.message);
-
-      clearRoundDeclarations();
-      await fetchGameData();
-      return true;
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Undoに失敗しました';
-      setError(msg);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [gameState, isRecorder, gameId, clearRoundDeclarations, fetchGameData, setLoading, setError]);
 
   // 6. 対局の確定・精算終了
   const finishGame = useCallback(async (): Promise<boolean> => {
@@ -666,52 +638,66 @@ export function useGameActions({
           newHistory
         );
 
-        // 3. 修正対象局 targetRoundIndex から最新局までの rounds & round_seats をインプレース UPDATE
-        // （DELETEは1行も実行しないため、通信切断時でもデータ消失リスクゼロ）
+        // 3. 修正対象局 targetRoundIndex から最新局までの rounds & round_seats を一括 UPSERT
+        // （直列多重ループを廃止し、rounds 1回 ＋ round_seats 1回 の計2リクエストで高速・不可分更新）
+        const roundsToUpsert: RoundInsert[] = [];
+        const seatsToUpsert: RoundSeatInsert[] = [];
+
         for (let i = targetRoundIndex; i < allDetails.length; i++) {
           const det = allDetails[i];
           const roundId = oldHistory[i].round_id;
           if (!roundId) continue;
 
-          // (1) rounds テーブル更新
+          roundsToUpsert.push({
+            round_id: roundId,
+            game_id: gameId,
+            round_index: i,
+            kyoku_name: det.kyokuName,
+            honba: det.honba,
+            riichi_sticks: det.riichiSticks,
+            result_type: det.resultType,
+          });
+
+          for (const s of det.seatDetails) {
+            const part = participants.find((pt) => pt.seat === s.seat);
+            const memberId = part?.member_id || s.player;
+
+            seatsToUpsert.push({
+              round_id: roundId,
+              seat: s.seat,
+              member_id: memberId,
+              base_point: s.basePoint,
+              honba_point: s.honbaPoint,
+              kyotaku_point: s.kyotakuPoint,
+              penalty_point: s.penaltyPoint,
+              score_delta: s.scoreDelta,
+              chip_delta: 0,
+              is_winner: s.isWinner ? 1 : 0,
+              is_loser: s.isLoser ? 1 : 0,
+              is_riichi: s.isRiichi ? 1 : 0,
+              is_furo: s.isFuro ? 1 : 0,
+              is_tenpai: s.isTenpai ? 1 : 0,
+              han: s.han ?? null,
+              fu: s.fu ?? null,
+            });
+          }
+        }
+
+        if (roundsToUpsert.length > 0) {
           const { error: rErr } = await supabase
             .from('rounds')
-            .update({
-              kyoku_name: det.kyokuName,
-              honba: det.honba,
-              riichi_sticks: det.riichiSticks,
-              result_type: det.resultType,
-            })
-            .eq('round_id', roundId);
-
+            .upsert(roundsToUpsert, { onConflict: 'round_id' });
           if (rErr) {
-            throw new Error(`第${i + 1}局の更新に失敗しました: ${rErr.message}`);
+            throw new Error(`局データの更新に失敗しました: ${rErr.message}`);
           }
+        }
 
-          // (2) round_seats テーブル更新（4座席それぞれ）
-          for (const s of det.seatDetails) {
-            const { error: sErr } = await supabase
-              .from('round_seats')
-              .update({
-                base_point: s.basePoint,
-                honba_point: s.honbaPoint,
-                kyotaku_point: s.kyotakuPoint,
-                penalty_point: s.penaltyPoint,
-                score_delta: s.scoreDelta,
-                is_winner: s.isWinner ? 1 : 0,
-                is_loser: s.isLoser ? 1 : 0,
-                is_riichi: s.isRiichi ? 1 : 0,
-                is_furo: s.isFuro ? 1 : 0,
-                is_tenpai: s.isTenpai ? 1 : 0,
-                han: s.han,
-                fu: s.fu,
-              })
-              .eq('round_id', roundId)
-              .eq('seat', s.seat);
-
-            if (sErr) {
-              throw new Error(`第${i + 1}局(座席${s.seat})の更新に失敗しました: ${sErr.message}`);
-            }
+        if (seatsToUpsert.length > 0) {
+          const { error: sErr } = await supabase
+            .from('round_seats')
+            .upsert(seatsToUpsert, { onConflict: 'round_id,seat' });
+          if (sErr) {
+            throw new Error(`座席データの更新に失敗しました: ${sErr.message}`);
           }
         }
 
@@ -733,8 +719,10 @@ export function useGameActions({
       gameState,
       game,
       isRecorder,
+      gameId,
       ruleConfig,
       players,
+      participants,
       resetAllRoundData,
       fetchGameData,
       setLoading,
@@ -747,7 +735,6 @@ export function useGameActions({
     toggleFuro,
     declareRiichi,
     commitRound,
-    undoRound,
     undoLastAction,
     updateRoundAndRecalculate,
     finishGame,
