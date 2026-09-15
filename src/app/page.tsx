@@ -50,46 +50,41 @@ export default function HomePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
-        // (1) 直近対局取得
-        const { data: gData } = await supabase
-          .from('games')
-          .select('*')
-          .order('played_at', { ascending: false })
-          .limit(30);
+        // 5つのテーブル・クエリをPromise.allで一括並列取得
+        const [
+          { data: gData },
+          { data: mData },
+          { data: grpData },
+          { data: gmData },
+          { data: rData },
+        ] = await Promise.all([
+          supabase
+            .from('games')
+            .select('*')
+            .order('played_at', { ascending: false })
+            .limit(30),
+          supabase
+            .from('members')
+            .select('*')
+            .eq('is_archived', 0)
+            .order('member_name'),
+          supabase
+            .from('groups')
+            .select('*')
+            .eq('is_archived', 0),
+          supabase
+            .from('group_memberships')
+            .select('group_id, member_id'),
+          supabase
+            .from('rule_templates')
+            .select('*')
+            .eq('is_archived', 0),
+        ]);
 
         if (gData) setGames(gData);
-
-        // (2) メンバー取得
-        const { data: mData } = await supabase
-          .from('members')
-          .select('*')
-          .eq('is_archived', 0)
-          .order('member_name');
-
         if (mData) setMembers(mData);
-
-        // (3) グループ取得
-        const { data: grpData } = await supabase
-          .from('groups')
-          .select('*')
-          .eq('is_archived', 0);
-
         if (grpData) setGroups(grpData);
-
-        // (4) グループメンバーシップ取得
-        const { data: gmData } = await supabase
-          .from('group_memberships')
-          .select('group_id, member_id');
-
         if (gmData) setGroupMemberships(gmData as GroupMembership[]);
-
-        // (5) ルールテンプレート取得
-        const { data: rData } = await supabase
-          .from('rule_templates')
-          .select('*')
-          .eq('is_archived', 0);
-
         if (rData && rData.length > 0) {
           setRules(rData);
         }

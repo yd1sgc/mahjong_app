@@ -64,15 +64,41 @@ export function useGameData(
       setLoading(true);
       setError(null);
 
-      // (1) games 取得
-      const { data: gameData, error: gameErr } = await supabase
-        .from('games')
-        .select('*')
-        .eq('game_id', gameId)
-        .single();
+      // (1)〜(4) games, game_participants, rounds, auth をPromise.allで一括並列取得
+      const [
+        { data: gameData, error: gameErr },
+        { data: partData, error: partErr },
+        { data: roundRows, error: roundErr },
+        { data: authData },
+      ] = await Promise.all([
+        supabase
+          .from('games')
+          .select('*')
+          .eq('game_id', gameId)
+          .single(),
+        supabase
+          .from('game_participants')
+          .select('*')
+          .eq('game_id', gameId)
+          .order('seat', { ascending: true }),
+        supabase
+          .from('rounds')
+          .select('*, round_seats(*)')
+          .eq('game_id', gameId)
+          .order('round_index', { ascending: true }),
+        supabase.auth.getUser(),
+      ]);
 
       if (gameErr || !gameData) {
         throw new Error(gameErr?.message || '対局が見つかりません');
+      }
+
+      if (partErr) {
+        throw new Error(partErr.message);
+      }
+
+      if (roundErr) {
+        throw new Error(roundErr.message);
       }
 
       const gRow = gameData as GameRow;
@@ -80,32 +106,10 @@ export function useGameData(
       const parsedRule = (gRow.rule_config_snapshot as unknown as RuleConfig) || {};
       setRuleConfig(parsedRule);
 
-      // (2) 参加者（game_participants）取得（座順 1..4）
-      const { data: partData, error: partErr } = await supabase
-        .from('game_participants')
-        .select('*')
-        .eq('game_id', gameId)
-        .order('seat', { ascending: true });
-
-      if (partErr) {
-        throw new Error(partErr.message);
-      }
-
       const partList = (partData || []) as GameParticipantRow[];
       setParticipants(partList);
       const playerList = partList.map((p) => p.player_name_snapshot);
       setPlayers(playerList);
-
-      // (3) 局データ（rounds, round_seats）取得
-      const { data: roundRows, error: roundErr } = await supabase
-        .from('rounds')
-        .select('*, round_seats(*)')
-        .eq('game_id', gameId)
-        .order('round_index', { ascending: true });
-
-      if (roundErr) {
-        throw new Error(roundErr.message);
-      }
 
       type RoundWithSeats = RoundRow & { round_seats: RoundSeatRow[] };
       const typedRounds = (roundRows || []) as unknown as RoundWithSeats[];
@@ -168,8 +172,7 @@ export function useGameData(
         history
       );
 
-      // (4) 記録係判定
-      const { data: authData } = await supabase.auth.getUser();
+      // (4) 記録係判定（authDataはPromise.allで取得済み）
       const currentUserId = authData?.user?.id;
       const localToken =
         typeof window !== 'undefined'

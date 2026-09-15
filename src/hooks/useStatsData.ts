@@ -47,36 +47,29 @@ export function useStatsData(): UseStatsDataReturn {
       setLoading(true);
       setError(null);
 
-      // 1. games 取得
-      const { data: gData, error: gErr } = await supabase
-        .from('games')
-        .select('*')
-        .order('played_at', { ascending: false });
+      // 全7テーブルのデータをPromise.allで一括並列取得
+      const [
+        { data: gData, error: gErr },
+        { data: pData, error: pErr },
+        { data: rData, error: rErr },
+        { data: sData, error: sErr },
+        { data: grpData },
+        { data: ruleData },
+        { data: memData },
+      ] = await Promise.all([
+        supabase.from('games').select('*').order('played_at', { ascending: false }),
+        supabase.from('game_participants').select('*'),
+        supabase.from('rounds').select('*').order('round_index', { ascending: true }),
+        supabase.from('round_seats').select('*'),
+        supabase.from('groups').select('*').eq('is_archived', 0),
+        supabase.from('rule_templates').select('*').eq('is_archived', 0),
+        supabase.from('members').select('*').eq('is_archived', 0),
+      ]);
+
       if (gErr) throw new Error(`games取得失敗: ${gErr.message}`);
-
-      // 2. game_participants 取得
-      const { data: pData, error: pErr } = await supabase
-        .from('game_participants')
-        .select('*');
       if (pErr) throw new Error(`game_participants取得失敗: ${pErr.message}`);
-
-      // 3. rounds 取得
-      const { data: rData, error: rErr } = await supabase
-        .from('rounds')
-        .select('*')
-        .order('round_index', { ascending: true });
       if (rErr) throw new Error(`rounds取得失敗: ${rErr.message}`);
-
-      // 4. round_seats 取得
-      const { data: sData, error: sErr } = await supabase
-        .from('round_seats')
-        .select('*');
       if (sErr) throw new Error(`round_seats取得失敗: ${sErr.message}`);
-
-      // 5. groups / rules / members 取得
-      const { data: grpData } = await supabase.from('groups').select('*').eq('is_archived', 0);
-      const { data: ruleData } = await supabase.from('rule_templates').select('*').eq('is_archived', 0);
-      const { data: memData } = await supabase.from('members').select('*').eq('is_archived', 0);
 
       if (grpData) setGroups(grpData);
       if (ruleData) setRules(ruleData);
