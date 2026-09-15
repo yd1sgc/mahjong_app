@@ -15,18 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "百年麻雀",
   description: "クラウド同期 麻雀スコア管理Webシステム",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "百年麻雀",
-  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
