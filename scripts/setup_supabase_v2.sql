@@ -393,4 +393,10 @@ CREATE POLICY "anon_all_round_seats" ON public.round_seats FOR ALL TO anon, auth
 DROP POLICY IF EXISTS "anon_all_drafts" ON public.drafts;
 CREATE POLICY "anon_all_drafts" ON public.drafts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
+-- 10. Supabase Realtime パブリケーション設定（対局リアルタイム同期・単一端末排他制御用）
+ALTER PUBLICATION supabase_realtime ADD TABLE public.games;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.rounds;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.round_seats;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.game_participants;
+
 COMMIT;
