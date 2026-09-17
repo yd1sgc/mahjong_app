@@ -222,6 +222,18 @@ export default function StatsPage() {
     };
   }, [rawRecords, includeGuests, guestNames]);
 
+  // ── フィルター適用後の役満記録 ──
+  const effectiveYakumanRecords = useMemo(() => {
+    const validGameIds = new Set(effectiveGames.map((g) => g.game_id));
+    return yakumanRecords.filter((yr) => {
+      // 1. 試合フィルター（グループ・ルール・年・試合個別選択）
+      if (!validGameIds.has(yr.game_id)) return false;
+      // 2. ゲストフィルター
+      if (!includeGuests && guestNames.has(yr.member_name)) return false;
+      return true;
+    });
+  }, [yakumanRecords, effectiveGames, includeGuests, guestNames]);
+
   // ── 相性マトリクス ──
   const matrixData = useMemo(() => {
     return calculateCompatibilityMatrix(effectiveGames, matrixMembers);
@@ -381,7 +393,7 @@ export default function StatsPage() {
       />
 
       {/* ─── レコード ─── */}
-      <StatsRecords records={records} yakumanRecords={yakumanRecords} />
+      <StatsRecords records={records} yakumanRecords={effectiveYakumanRecords} />
 
       {/* ─── 相性マトリクス（直接対決） ─── */}
       <CompatibilityMatrix
