@@ -5,6 +5,7 @@ import {
   recalculateState,
   calculateGameSettlement,
   getClosestWinner,
+  canDeclareRiichi,
 } from '../src/lib/mahjong/rules';
 import { generateRuleDescription } from '../src/lib/mahjong/ruleDescription';
 import { RoundRecord, RuleConfig } from '../src/types/mahjong';
@@ -967,5 +968,80 @@ describe('Layer 4: 麻雀ドメイン境界値・エッジケース網羅検証'
       expect(endReason).toBeNull();
     });
   });
+
+  describe('4. canDeclareRiichi（立直宣言可否判定）', () => {
+    const defaultRule: RuleConfig = {
+      basic: { init_score: 25000, return_score: 30000 },
+      detail: { riichi_pt: 1000, tobi_end: 'under_zero' },
+    };
+
+    it('副露（チー・ポン・カン）しているプレイヤーは点数に関わらず立直不可', () => {
+      expect(canDeclareRiichi(25000, defaultRule, true)).toBe(false);
+      expect(canDeclareRiichi(1000, defaultRule, true)).toBe(false);
+      expect(canDeclareRiichi(-1000, { ...defaultRule, detail: { ...defaultRule.detail, tobi_end: 'none' } }, true)).toBe(false);
+    });
+
+    describe('飛びなし（tobi_end: none）の場合', () => {
+      const noneRule: RuleConfig = {
+        ...defaultRule,
+        detail: { ...defaultRule.detail, tobi_end: 'none' },
+      };
+
+      it('十分な点数がある場合は立直可能', () => {
+        expect(canDeclareRiichi(25000, noneRule)).toBe(true);
+      });
+
+      it('1000点ちょうどの場合は立直可能', () => {
+        expect(canDeclareRiichi(1000, noneRule)).toBe(true);
+      });
+
+      it('1000点未満（例: 500点）でも点棒を借りて立直可能', () => {
+        expect(canDeclareRiichi(500, noneRule)).toBe(true);
+      });
+
+      it('0点でも立直可能', () => {
+        expect(canDeclareRiichi(0, noneRule)).toBe(true);
+      });
+
+      it('箱下（マイナス点、例: -3000点）でも立直可能', () => {
+        expect(canDeclareRiichi(-3000, noneRule)).toBe(true);
+      });
+    });
+
+    describe('飛びあり・0点未満終了（tobi_end: under_zero、デフォルト）の場合', () => {
+      it('1000点ちょうどは供託後0点でセーフのため立直可能', () => {
+        expect(canDeclareRiichi(1000, defaultRule)).toBe(true);
+      });
+
+      it('1000点未満（例: 900点）は供託後マイナスになりトビ終了するため立直不可', () => {
+        expect(canDeclareRiichi(900, defaultRule)).toBe(false);
+      });
+
+      it('0点やマイナス点では立直不可', () => {
+        expect(canDeclareRiichi(0, defaultRule)).toBe(false);
+        expect(canDeclareRiichi(-1000, defaultRule)).toBe(false);
+      });
+    });
+
+    describe('飛びあり・0点以下終了（tobi_end: zero_or_less）の場合', () => {
+      const zeroOrLessRule: RuleConfig = {
+        ...defaultRule,
+        detail: { ...defaultRule.detail, tobi_end: 'zero_or_less' },
+      };
+
+      it('1000点超（例: 1100点）であれば立直可能', () => {
+        expect(canDeclareRiichi(1100, zeroOrLessRule)).toBe(true);
+      });
+
+      it('1000点ちょうどは供託後0点でトビ終了するため立直不可', () => {
+        expect(canDeclareRiichi(1000, zeroOrLessRule)).toBe(false);
+      });
+
+      it('1000点未満は立直不可', () => {
+        expect(canDeclareRiichi(900, zeroOrLessRule)).toBe(false);
+      });
+    });
+  });
 });
+
 

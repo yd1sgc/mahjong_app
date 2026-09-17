@@ -840,3 +840,37 @@ export function computeAllRoundsDetails(
 
   return results;
 }
+
+/**
+ * プレイヤーが立直宣言可能かどうかを判定する純粋関数
+ *
+ * @param score 現在の持ち点
+ * @param ruleConfig ルール設定
+ * @param isFuro 副露中かどうか
+ * @returns boolean 立直可能なら true
+ */
+export function canDeclareRiichi(
+  score: number,
+  ruleConfig: RuleConfig,
+  isFuro: boolean = false
+): boolean {
+  if (isFuro) return false;
+
+  const detail = ruleConfig.detail || {};
+  const riichiPt = detail.riichi_pt ?? 1000;
+  const tobiEnd = detail.tobi_end ?? 'under_zero';
+
+  // トビなし（none）の場合は、箱下（マイナス）や1000点未満であっても点棒を借りて立直可能
+  if (tobiEnd === 'none') {
+    return true;
+  }
+
+  // 0点以下で飛び終了の場合、供託後に0点になると即トビになるため、1000点超が必要
+  if (tobiEnd === 'zero_or_less') {
+    return score > riichiPt;
+  }
+
+  // 0点未満で飛び終了（under_zero: デフォルト）の場合、供託後に0点になってもセーフ
+  return score >= riichiPt;
+}
+

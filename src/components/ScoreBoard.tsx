@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { GameStateSnapshot, RuleConfig } from '@/types/mahjong';
-import { getDealer, getRoundName } from '@/lib/mahjong/rules';
+import { getDealer, getRoundName, canDeclareRiichi } from '@/lib/mahjong/rules';
 
 interface ScoreBoardProps {
   players: string[];
@@ -86,8 +86,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           }
 
           // 副露と立直の相互排他および最低持ち点チェック
-          const riichiPt = ruleConfig?.detail?.riichi_pt ?? 1000;
-          const canRiichi = isRecorder && !isRiichi && !isFuro && score >= riichiPt;
+          const canRiichi = isRecorder && !isRiichi && canDeclareRiichi(score, ruleConfig || {}, isFuro);
           const canFuro = isRecorder && !isRiichi;
 
           return (

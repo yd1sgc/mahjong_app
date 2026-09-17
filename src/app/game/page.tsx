@@ -129,7 +129,7 @@ function GameContent() {
       const ok = await finishGame();
       if (ok) {
         setSettleModalOpen(false);
-        setToast({ type: 'success', message: '対局を精算・確定しました' });
+        router.push('/');
       } else {
         setToast({
           type: 'error',

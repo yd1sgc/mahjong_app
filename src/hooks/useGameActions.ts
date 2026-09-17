@@ -11,6 +11,7 @@ import {
   computeAllRoundsDetails,
   getClosestWinner,
   recalculateState,
+  canDeclareRiichi,
 } from '@/lib/mahjong/rules';
 import {
   GameStateSnapshot,
@@ -161,15 +162,13 @@ export function useGameActions({
   const declareRiichi = useCallback(
     (player: string) => {
       if (!gameState || !isRecorder) return;
-      // 副露済みのプレイヤーは立直不可
-      if (furoDeclared.includes(player)) return;
 
-      const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
-      const currentScore = gameState.scores[player] ?? 0;
       const isAlready = riichiDeclared.includes(player);
+      const isFuro = furoDeclared.includes(player);
+      const currentScore = gameState.scores[player] ?? 0;
 
-      // 未立直の場合は持ち点がリーチ点以上必要
-      if (!isAlready && currentScore < riichiPt) {
+      // 未立直からの新規宣言時は立直可否（点数および副露）を検証
+      if (!isAlready && !canDeclareRiichi(currentScore, ruleConfig, isFuro)) {
         return;
       }
 
