@@ -18,14 +18,15 @@ import {
   HAN_OPTIONS,
   FU_OPTIONS,
 } from '@/lib/mahjong/presets';
+import { YakumanSelectModal } from './YakumanSelectModal';
 
 interface ScoreStepProps {
   winner: string | null;
   winType: WinType;
   currentDealer: string;
   multiWinners: MultiWinnerDraft[];
-  onSelectSingleScore: (p: { pts: number; han: number; fu: number }) => void;
-  onUpdateMultiWinnerScore: (winner: string, pts: number, han: number, fu: number) => void;
+  onSelectSingleScore: (p: { pts: number; han: number; fu: number; yakumanNames?: string[] }) => void;
+  onUpdateMultiWinnerScore: (winner: string, pts: number, han: number, fu: number, yakumanNames?: string[]) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -44,6 +45,8 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
   const [activeMultiIdx, setActiveMultiIdx] = useState(0);
   // 「倍満〜 / その他」展開モーダル
   const [showHighOrCustomModal, setShowHighOrCustomModal] = useState(false);
+  // 役満選択モーダル
+  const [showYakumanModal, setShowYakumanModal] = useState(false);
   const [customHan, setCustomHan] = useState(1);
   const [customFu, setCustomFu] = useState(30);
 
@@ -86,6 +89,13 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
 
   // 高打点・手動計算適用ハンドラ
   const handleApplyCustom = (pts: number, han: number, fu: number) => {
+    // 役満（13翻以上）の場合は役満選択モーダルへ誘導
+    if (han >= 13) {
+      setShowHighOrCustomModal(false);
+      setShowYakumanModal(true);
+      return;
+    }
+
     if (isMulti) {
       onUpdateMultiWinnerScore(currentTargetWinner, pts, han, fu);
       setShowHighOrCustomModal(false);
@@ -95,6 +105,26 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
     } else {
       onSelectSingleScore({ pts, han, fu });
       setShowHighOrCustomModal(false);
+      onNext();
+    }
+  };
+
+  // 役満選択モーダル適用ハンドラ
+  const handleApplyYakuman = (
+    selectedNames: string[],
+    pts: number,
+    han: number,
+    fu: number
+  ) => {
+    if (isMulti) {
+      onUpdateMultiWinnerScore(currentTargetWinner, pts, han, fu, selectedNames);
+      setShowYakumanModal(false);
+      if (activeMultiIdx < multiWinners.length - 1) {
+        setActiveMultiIdx((prev) => prev + 1);
+      }
+    } else {
+      onSelectSingleScore({ pts, han, fu, yakumanNames: selectedNames });
+      setShowYakumanModal(false);
       onNext();
     }
   };
@@ -358,6 +388,16 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
           </div>
         </div>
       )}
+
+      {/* ─── モーダル: 役満選択 ─── */}
+      <YakumanSelectModal
+        isOpen={showYakumanModal}
+        onClose={() => setShowYakumanModal(false)}
+        winnerName={currentTargetWinner}
+        isDealer={isTargetDealer}
+        isTsumo={winType === 'tsumo'}
+        onApply={handleApplyYakuman}
+      />
     </div>
   );
 };

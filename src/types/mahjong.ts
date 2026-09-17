@@ -91,6 +91,7 @@ export interface MultiWinnerDraft {
   han: number;
   fu: number;
   score: number;
+  yakuman_names?: string[];
 }
 
 /** ルール設定全体 */
@@ -132,6 +133,7 @@ export interface MultiWinDetail {
     total: number;
     han?: number;
     fu?: number;
+    yakuman_names?: string[];
   };
 }
 
@@ -153,7 +155,35 @@ export interface RoundRecord {
   honba?: number;
   multi_wins?: MultiWinDetail[];
   ryukyoku_type?: string;
+  yakuman_names?: string[];
 }
+
+/** 役満候補定義 */
+export interface YakumanCandidate {
+  name: string;
+  mult: number; // 1: 通常役満, 2: ダブル役満
+  category?: 'single' | 'double' | 'special';
+}
+
+/** 役満マスタ一覧 */
+export const YAKUMAN_CANDIDATES: YakumanCandidate[] = [
+  { name: '四暗刻', mult: 1, category: 'single' },
+  { name: '国士無双', mult: 1, category: 'single' },
+  { name: '大三元', mult: 1, category: 'single' },
+  { name: '字一色', mult: 1, category: 'single' },
+  { name: '緑一色', mult: 1, category: 'single' },
+  { name: '清老頭', mult: 1, category: 'single' },
+  { name: '九蓮宝燈', mult: 1, category: 'single' },
+  { name: '小四喜', mult: 1, category: 'single' },
+  { name: '四槓子', mult: 1, category: 'single' },
+  { name: '天和', mult: 1, category: 'single' },
+  { name: '地和', mult: 1, category: 'single' },
+  { name: '四暗刻単騎', mult: 2, category: 'double' },
+  { name: '国士無双十三面待ち', mult: 2, category: 'double' },
+  { name: '純正九蓮宝燈', mult: 2, category: 'double' },
+  { name: '大四喜', mult: 2, category: 'double' },
+  { name: '数え役満', mult: 1, category: 'special' },
+];
 
 /** 対局状態スナップショット */
 export interface GameStateSnapshot {

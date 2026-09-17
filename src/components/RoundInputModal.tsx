@@ -122,6 +122,7 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
         score: baseScore,
         riichi: [...riichiDeclared],
         tenpai: [],
+        yakuman_names: draft.yakumanNames && draft.yakumanNames.length > 0 ? draft.yakumanNames : undefined,
       };
     } else if (winType === 'multi_ron') {
       record = {
@@ -137,6 +138,7 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
             total: w.score,
             han: w.han,
             fu: w.fu,
+            yakuman_names: w.yakuman_names,
           },
         })),
       };
@@ -205,10 +207,18 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
   };
 
   // ダブロン時の特定和了者の打点更新
-  const handleUpdateMultiScore = (pName: string, pts: number, h: number, f: number) => {
+  const handleUpdateMultiScore = (
+    pName: string,
+    pts: number,
+    h: number,
+    f: number,
+    yakumanNames?: string[]
+  ) => {
     updateDraft({
       multiWinners: multiWinners.map((w) =>
-        w.winner === pName ? { ...w, score: pts, han: h, fu: f } : w
+        w.winner === pName
+          ? { ...w, score: pts, han: h, fu: f, yakuman_names: yakumanNames }
+          : w
       ),
     });
   };
@@ -267,7 +277,13 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
                 winType={winType}
                 currentDealer={currentDealer}
                 multiWinners={multiWinners}
-                onSelectSingleScore={(p) => updateDraft({ han: p.han, fu: p.fu })}
+                onSelectSingleScore={(p) =>
+                  updateDraft({
+                    han: p.han,
+                    fu: p.fu,
+                    yakumanNames: p.yakumanNames || [],
+                  })
+                }
                 onUpdateMultiWinnerScore={handleUpdateMultiScore}
                 onBack={() => setStep(0)}
                 onNext={() => setStep(2)}

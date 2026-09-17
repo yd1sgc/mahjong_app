@@ -26,7 +26,7 @@ import { GameHistoryTable } from '@/components/stats/GameHistoryTable';
 import { GameDetailModal } from '@/components/stats/GameDetailModal';
 
 export default function StatsPage() {
-  const { games, rounds, groups, rules, members, loading, error } = useStatsData();
+  const { games, rounds, groups, rules, members, yakumanRecords, loading, error } = useStatsData();
 
   // フィルター状態
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -381,7 +381,7 @@ export default function StatsPage() {
       />
 
       {/* ─── レコード ─── */}
-      <StatsRecords records={records} />
+      <StatsRecords records={records} yakumanRecords={yakumanRecords} />
 
       {/* ─── 相性マトリクス（直接対決） ─── */}
       <CompatibilityMatrix

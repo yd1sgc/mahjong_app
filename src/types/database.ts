@@ -301,6 +301,33 @@ export interface Database {
         };
         Relationships: [];
       };
+      yakuman_records: {
+        Row: {
+          id: string;
+          game_id: string;
+          round_id: string | null;
+          member_id: string;
+          yakuman_name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          game_id: string;
+          round_id?: string | null;
+          member_id: string;
+          yakuman_name: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          game_id?: string;
+          round_id?: string | null;
+          member_id?: string;
+          yakuman_name?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -360,4 +387,6 @@ export type GroupInsert = Database['public']['Tables']['groups']['Insert'];
 export type RoundRow = Database['public']['Tables']['rounds']['Row'];
 export type RoundSeatRow = Database['public']['Tables']['round_seats']['Row'];
 export type RoundSeatInsert = Database['public']['Tables']['round_seats']['Insert'];
+export type YakumanRecordRow = Database['public']['Tables']['yakuman_records']['Row'];
+export type YakumanRecordInsert = Database['public']['Tables']['yakuman_records']['Insert'];
 export type RoundInsert = Database['public']['Tables']['rounds']['Insert'];

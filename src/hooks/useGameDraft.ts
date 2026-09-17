@@ -16,6 +16,7 @@ export interface RoundInputDraft {
   chomboPlayer: string | null;
   multiWinners?: MultiWinnerDraft[];
   ryukyokuType?: string;
+  yakumanNames?: string[];
 }
 
 export const DEFAULT_DRAFT: RoundInputDraft = {
@@ -28,6 +29,7 @@ export const DEFAULT_DRAFT: RoundInputDraft = {
   chomboPlayer: null,
   multiWinners: [],
   ryukyokuType: 'kyushu',
+  yakumanNames: [],
 };
 
 export function useGameDraft(gameId: string) {

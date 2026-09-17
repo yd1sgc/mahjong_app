@@ -347,6 +347,54 @@ export function useGameActions({
           }
         }
 
+        // 3. 役満記録の保存（単一和了またはダブロン）
+        const yakumanPayloads: {
+          game_id: string;
+          round_id: string;
+          member_id: string;
+          yakuman_name: string;
+        }[] = [];
+
+        if (newRound.win_type === 'ron' || newRound.win_type === 'tsumo') {
+          if (newRound.winner && newRound.yakuman_names && newRound.yakuman_names.length > 0) {
+            const winnerPart = participants.find((p) => p.player_name_snapshot === newRound.winner);
+            if (winnerPart) {
+              newRound.yakuman_names.forEach((yName) => {
+                yakumanPayloads.push({
+                  game_id: gameId,
+                  round_id: roundId,
+                  member_id: winnerPart.member_id,
+                  yakuman_name: yName,
+                });
+              });
+            }
+          }
+        } else if (newRound.win_type === 'multi_ron' && newRound.multi_wins) {
+          newRound.multi_wins.forEach((mw) => {
+            const yNames = mw.points_data.yakuman_names;
+            if (yNames && yNames.length > 0) {
+              const winnerPart = participants.find((p) => p.player_name_snapshot === mw.winner);
+              if (winnerPart) {
+                yNames.forEach((yName) => {
+                  yakumanPayloads.push({
+                    game_id: gameId,
+                    round_id: roundId,
+                    member_id: winnerPart.member_id,
+                    yakuman_name: yName,
+                  });
+                });
+              }
+            }
+          });
+        }
+
+        if (yakumanPayloads.length > 0) {
+          const { error: yErr } = await supabase.from('yakuman_records').insert(yakumanPayloads);
+          if (yErr) {
+            console.error('Failed to insert yakuman_records:', yErr);
+          }
+        }
+
         clearDraft();
         clearRoundDeclarations();
 
@@ -703,6 +751,55 @@ export function useGameActions({
             .upsert(seatsToUpsert, { onConflict: 'round_id,seat' });
           if (sErr) {
             throw new Error(`座席データの更新に失敗しました: ${sErr.message}`);
+          }
+        }
+
+        // 3.5. 役満レコードの同期（対象局の既存レコードを削除し、最新内容で再登録）
+        if (targetRoundId) {
+          await supabase.from('yakuman_records').delete().eq('round_id', targetRoundId);
+
+          const editYakumanPayloads: {
+            game_id: string;
+            round_id: string;
+            member_id: string;
+            yakuman_name: string;
+          }[] = [];
+
+          if (updatedRoundData.win_type === 'ron' || updatedRoundData.win_type === 'tsumo') {
+            if (updatedRoundData.winner && updatedRoundData.yakuman_names && updatedRoundData.yakuman_names.length > 0) {
+              const winnerPart = participants.find((p) => p.player_name_snapshot === updatedRoundData.winner);
+              if (winnerPart) {
+                updatedRoundData.yakuman_names.forEach((yName) => {
+                  editYakumanPayloads.push({
+                    game_id: gameId,
+                    round_id: targetRoundId,
+                    member_id: winnerPart.member_id,
+                    yakuman_name: yName,
+                  });
+                });
+              }
+            }
+          } else if (updatedRoundData.win_type === 'multi_ron' && updatedRoundData.multi_wins) {
+            updatedRoundData.multi_wins.forEach((mw) => {
+              const yNames = mw.points_data.yakuman_names;
+              if (yNames && yNames.length > 0) {
+                const winnerPart = participants.find((p) => p.player_name_snapshot === mw.winner);
+                if (winnerPart) {
+                  yNames.forEach((yName) => {
+                    editYakumanPayloads.push({
+                      game_id: gameId,
+                      round_id: targetRoundId,
+                      member_id: winnerPart.member_id,
+                      yakuman_name: yName,
+                    });
+                  });
+                }
+              }
+            });
+          }
+
+          if (editYakumanPayloads.length > 0) {
+            await supabase.from('yakuman_records').insert(editYakumanPayloads);
           }
         }
 
