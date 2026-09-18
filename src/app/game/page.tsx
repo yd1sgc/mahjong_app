@@ -199,9 +199,9 @@ function GameContent() {
   }
 
   return (
-    <main className="w-full h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden">
+    <main className="w-full h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden md:max-w-5xl md:h-auto md:min-h-[100dvh] md:max-h-none md:justify-start md:p-6 md:overflow-y-auto">
       {/* 上部ヘッダー */}
-      <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0">
+      <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0 md:pb-3 md:mb-4">
         <Link
           href="/"
           className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 font-bold py-1 px-1.5 rounded-lg hover:bg-neutral-900 transition-colors"
@@ -214,7 +214,7 @@ function GameContent() {
             onClick={() => setRuleDetailOpen(true)}
             className="flex items-center gap-1 mx-auto hover:opacity-80 transition-opacity"
           >
-            <h1 className="text-sm font-black text-neutral-100">
+            <h1 className="text-sm font-black text-neutral-100 md:text-base">
               {game?.rule_name_snapshot || '対局'}
             </h1>
             <span className="text-[10px] text-amber-400 font-bold underline">
@@ -244,7 +244,7 @@ function GameContent() {
 
       {/* 終局・サドンデス・飛び通知バナー */}
       {gameEndReason && game?.status !== 'completed' && (
-        <div className="my-1 p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-between px-3 shrink-0">
+        <div className="my-1 p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-between px-3 shrink-0 md:mb-4">
           <span className="font-black text-xs">[終局条件] {gameEndReason}</span>
           {isRecorder && (
             <button
@@ -258,55 +258,58 @@ function GameContent() {
         </div>
       )}
 
-      {/* スコアボード (中央メイン・4行リスト) */}
-      <div className="flex-1 flex flex-col justify-center my-auto overflow-hidden">
-        <ScoreBoard
-          players={players}
-          gameState={gameState}
-          ruleConfig={ruleConfig}
-          onRiichiClick={declareRiichi}
-          onFuroClick={toggleFuro}
-          isRecorder={isRecorder && game?.status !== 'completed'}
-        />
-      </div>
-
-      {/* 下部パネル（対局完了時と進行中で分岐） */}
-      <footer className="mt-2">
-        {game?.status === 'completed' ? (
-          <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-md text-center">
-            <div className="text-xs font-bold text-emerald-400">
-              対局終了・成績確定済み
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                href="/"
-                className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs flex items-center justify-center border border-neutral-700 transition-colors"
-              >
-                ホームへ戻る
-              </Link>
-              <Link
-                href="/stats"
-                className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs flex items-center justify-center transition-colors shadow"
-              >
-                成績集計を見る &rarr;
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <ActionPanel
-            isRecorder={isRecorder}
-            passcode={game?.passcode || '0000'}
-            onOpenWinModal={handleOpenWinModal}
-            onOpenRyukyokuModal={handleOpenRyukyokuModal}
-            onOpenChomboModal={handleOpenChomboModal}
-            onOpenRoundEditModal={() => setRoundEditModalOpen(true)}
-            onUndoClick={handleUndoWithToast}
-            onOpenTransferModal={() => setPinModalOpen(true)}
-            canUndo={canUndo}
-            hasIntraRoundAction={hasIntraRoundAction}
+      {/* 対局メインコンテンツ (モバイル: 縦並び1画面 / PC: 左右2カラム) */}
+      <div className="flex-1 flex flex-col justify-between overflow-hidden md:flex-row md:items-start md:gap-8 md:overflow-visible">
+        {/* 左カラム: スコアボード (中央メイン・4行リスト) */}
+        <div className="flex-1 flex flex-col justify-center my-auto overflow-hidden md:my-0 md:overflow-visible md:w-[60%]">
+          <ScoreBoard
+            players={players}
+            gameState={gameState}
+            ruleConfig={ruleConfig}
+            onRiichiClick={declareRiichi}
+            onFuroClick={toggleFuro}
+            isRecorder={isRecorder && game?.status !== 'completed'}
           />
-        )}
-      </footer>
+        </div>
+
+        {/* 右カラム: 下部パネル（対局完了時と進行中で分岐） */}
+        <footer className="mt-2 shrink-0 md:mt-0 md:w-[40%] md:sticky md:top-6">
+          {game?.status === 'completed' ? (
+            <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-md text-center">
+              <div className="text-xs font-bold text-emerald-400">
+                対局終了・成績確定済み
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href="/"
+                  className="h-11 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-white font-bold text-xs flex items-center justify-center border border-neutral-700 transition-colors"
+                >
+                  ホームへ戻る
+                </Link>
+                <Link
+                  href="/stats"
+                  className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs flex items-center justify-center transition-colors shadow"
+                >
+                  成績集計を見る &rarr;
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <ActionPanel
+              isRecorder={isRecorder}
+              passcode={game?.passcode || '0000'}
+              onOpenWinModal={handleOpenWinModal}
+              onOpenRyukyokuModal={handleOpenRyukyokuModal}
+              onOpenChomboModal={handleOpenChomboModal}
+              onOpenRoundEditModal={() => setRoundEditModalOpen(true)}
+              onUndoClick={handleUndoWithToast}
+              onOpenTransferModal={() => setPinModalOpen(true)}
+              canUndo={canUndo}
+              hasIntraRoundAction={hasIntraRoundAction}
+            />
+          )}
+        </footer>
+      </div>
 
       {/* 入力モーダル */}
       <RoundInputModal
