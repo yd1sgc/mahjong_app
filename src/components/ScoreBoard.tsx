@@ -51,20 +51,36 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   return (
     <div className="w-full flex flex-col gap-2 select-none">
       {/* 局情報ヘッダー */}
-      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2.5 shadow-sm">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="text-lg sm:text-xl font-black text-white tracking-wide">
+      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 sm:py-3 shadow-md">
+        <div className="flex items-center gap-3">
+          {/* 局名（24px〜28px・白極太） */}
+          <span className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
             {roundName}
           </span>
-          <span className="text-xs sm:text-sm font-black px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
-            {gameState.honba}本場
-          </span>
-          <span className="text-xs sm:text-sm font-black px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-            供託{gameState.riichiStick}
-          </span>
-        </div>
-        <div className="text-xs sm:text-sm font-bold text-neutral-400 ml-auto">
-          親: <span className="text-white font-black">{currentDealer}</span>
+
+          {/* ディバイダー（縦の仕切り線） */}
+          <div className="h-6 w-[1.5px] bg-neutral-700/80 rounded-full mx-0.5 shrink-0" />
+
+          {/* バッジ群（文字15px太字 ＋ 数字22px〜24px超極太） */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-baseline gap-1 px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 leading-none shadow-sm">
+              <span className="text-xl sm:text-2xl font-black font-mono leading-none tracking-tight">
+                {gameState.honba}
+              </span>
+              <span className="text-sm sm:text-base font-black leading-none">
+                本場
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-1 px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 leading-none shadow-sm">
+              <span className="text-sm sm:text-base font-black leading-none">
+                供託
+              </span>
+              <span className="text-xl sm:text-2xl font-black font-mono leading-none tracking-tight">
+                {gameState.riichiStick}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
