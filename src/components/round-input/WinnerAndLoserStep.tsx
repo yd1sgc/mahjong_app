@@ -65,6 +65,9 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
       ? multiWinners.length >= 2 && Boolean(loser)
       : false;
 
+  // 選択完了時の減光判定 (ツモ時は和了者決定時、ロン時は両者決定時)
+  const isDimmed = winType === 'tsumo' ? Boolean(winner) : isBothSelected;
+
   // 矢印ポリゴンの頂点計算ヘルパー
   const computeArrowPoints = useCallback(
     (wIdx: number, lIdx: number): string | null => {
@@ -294,17 +297,17 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
                   seatStyle = 'text-neutral-600';
                   dealerStyle = 'bg-rose-600 text-white shadow-sm';
                 }
-              } else if (isBothSelected) {
-                // 両者選択完了時: 枠線ノイズを消去して文字のみ薄く浮かす
+              } else if (isDimmed) {
+                // 選択完了時: 枠線ノイズを消去して文字のみ薄く浮かす
                 btnStyle =
                   'border border-transparent bg-transparent opacity-15 z-0';
-                nameStyle = 'text-neutral-200 font-bold';
-                seatStyle = 'text-neutral-500';
-                dealerStyle = 'bg-rose-600 text-white shadow-sm';
+                nameStyle = 'text-neutral-400 font-bold';
+                seatStyle = 'text-neutral-600';
+                dealerStyle = 'bg-rose-600 text-white shadow-sm opacity-40';
               } else {
                 btnStyle =
                   'border border-neutral-800 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 z-10';
-                nameStyle = 'text-neutral-200 font-bold';
+                nameStyle = 'text-neutral-100 font-black';
                 seatStyle = 'text-neutral-500';
                 dealerStyle = 'bg-rose-600 text-white shadow-sm';
               }
@@ -331,7 +334,7 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
                     >
                       {SEAT_NAMES[idx] || ''}
                     </span>
-                    <span className={`truncate text-sm ${nameStyle}`}>{p}</span>
+                    <span className={`truncate text-base ${nameStyle}`}>{p}</span>
                   </div>
                   {isDealer && (
                     <span
@@ -346,86 +349,91 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
           </div>
         </div>
 
-        {/* ─── 放銃者選択エリア (ロン / ダブロン時のみ) ─── */}
-        {winType !== 'tsumo' && (
-          <div className="flex flex-col gap-1.5 pt-2 border-t border-neutral-800">
-            <span className="text-xs font-black text-neutral-300">放銃者</span>
-            <div className="grid grid-cols-2 gap-2">
-              {players.map((p, idx) => {
-                const isSelected = loser === p;
-                const isDealer = p === currentDealer;
-                const isWinnerSelected =
-                  winType === 'multi_ron'
-                    ? multiWinners.includes(p)
-                    : winner === p;
+        {/* ─── 放銃者選択エリア (ツモ時は領域・高さを完全に維持したまま不可視化) ─── */}
+        <div
+          className={`flex flex-col gap-1.5 pt-2 border-t transition-all ${
+            winType === 'tsumo'
+              ? 'invisible pointer-events-none border-transparent select-none'
+              : 'border-neutral-800'
+          }`}
+          aria-hidden={winType === 'tsumo'}
+        >
+          <span className="text-xs font-black text-neutral-300">放銃者</span>
+          <div className="grid grid-cols-2 gap-2">
+            {players.map((p, idx) => {
+              const isSelected = loser === p;
+              const isDealer = p === currentDealer;
+              const isWinnerSelected =
+                winType === 'multi_ron'
+                  ? multiWinners.includes(p)
+                  : winner === p;
 
-                let btnStyle: string;
-                let nameStyle: string;
-                let seatStyle: string;
-                let dealerStyle: string;
+              let btnStyle: string;
+              let nameStyle: string;
+              let seatStyle: string;
+              let dealerStyle: string;
 
-                if (isSelected) {
-                  // 放銃者: 白太枠 ＋ 黒背景
-                  btnStyle =
-                    'border-2 border-white bg-neutral-950 text-white shadow-2xl z-30 scale-[1.02]';
-                  nameStyle = 'text-white font-black';
-                  seatStyle = 'text-neutral-300';
-                  dealerStyle = 'bg-rose-600 text-white shadow-sm';
-                } else if (isWinnerSelected) {
-                  btnStyle =
-                    'border border-transparent bg-transparent opacity-10 cursor-not-allowed z-0';
-                  nameStyle = 'text-neutral-600 font-bold';
-                  seatStyle = 'text-neutral-700';
-                  dealerStyle = 'bg-rose-600 text-white shadow-sm';
-                } else if (isBothSelected) {
-                  // 両者選択完了時: 枠線ノイズを消去
-                  btnStyle =
-                    'border border-transparent bg-transparent opacity-15 z-0';
-                  nameStyle = 'text-neutral-200 font-bold';
-                  seatStyle = 'text-neutral-500';
-                  dealerStyle = 'bg-rose-600 text-white shadow-sm';
-                } else {
-                  btnStyle =
-                    'border border-neutral-800 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 z-10';
-                  nameStyle = 'text-neutral-200 font-bold';
-                  seatStyle = 'text-neutral-500';
-                  dealerStyle = 'bg-rose-600 text-white shadow-sm';
-                }
+              if (isSelected) {
+                // 放銃者: 白太枠 ＋ 黒背景
+                btnStyle =
+                  'border-2 border-white bg-neutral-950 text-white shadow-2xl z-30 scale-[1.02]';
+                nameStyle = 'text-white font-black';
+                seatStyle = 'text-neutral-300';
+                dealerStyle = 'bg-rose-600 text-white shadow-sm';
+              } else if (isWinnerSelected) {
+                btnStyle =
+                  'border border-transparent bg-transparent opacity-10 cursor-not-allowed z-0';
+                nameStyle = 'text-neutral-600 font-bold';
+                seatStyle = 'text-neutral-700';
+                dealerStyle = 'bg-rose-600 text-white shadow-sm';
+              } else if (isDimmed) {
+                // 両者選択完了時: 枠線ノイズを消去
+                btnStyle =
+                  'border border-transparent bg-transparent opacity-15 z-0';
+                nameStyle = 'text-neutral-400 font-bold';
+                seatStyle = 'text-neutral-600';
+                dealerStyle = 'bg-rose-600 text-white shadow-sm opacity-40';
+              } else {
+                btnStyle =
+                  'border border-neutral-800 bg-neutral-900 hover:bg-neutral-850 text-neutral-300 z-10';
+                nameStyle = 'text-neutral-100 font-black';
+                seatStyle = 'text-neutral-500';
+                dealerStyle = 'bg-rose-600 text-white shadow-sm';
+              }
 
-                return (
-                  <button
-                    key={`loser-${p}`}
-                    ref={(el) => {
-                      loserBtnRefs.current[idx] = el;
-                    }}
-                    type="button"
-                    disabled={isWinnerSelected}
-                    onClick={() => onSelectLoser(p)}
-                    className={`h-14 rounded-xl flex items-center justify-between px-3 border transition-all touch-manipulation ${btnStyle}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`text-xs font-bold w-4 text-center shrink-0 ${seatStyle}`}
-                      >
-                        {SEAT_NAMES[idx] || ''}
-                      </span>
-                      <span className={`truncate text-sm ${nameStyle}`}>
-                        {p}
-                      </span>
-                    </div>
-                    {isDealer && (
-                      <span
-                        className={`text-xs font-black px-2 py-0.5 rounded shrink-0 ${dealerStyle}`}
-                      >
-                        親
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={`loser-${p}`}
+                  ref={(el) => {
+                    loserBtnRefs.current[idx] = el;
+                  }}
+                  type="button"
+                  disabled={isWinnerSelected}
+                  onClick={() => onSelectLoser(p)}
+                  className={`h-14 rounded-xl flex items-center justify-between px-3 border transition-all touch-manipulation ${btnStyle}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`text-xs font-bold w-4 text-center shrink-0 ${seatStyle}`}
+                    >
+                      {SEAT_NAMES[idx] || ''}
+                    </span>
+                    <span className={`truncate text-base ${nameStyle}`}>
+                      {p}
+                    </span>
+                  </div>
+                  {isDealer && (
+                    <span
+                      className={`text-xs font-black px-2 py-0.5 rounded shrink-0 ${dealerStyle}`}
+                    >
+                      親
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
 
       {/* ─── 次へ進むボタン ─── */}
