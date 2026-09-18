@@ -199,7 +199,7 @@ function GameContent() {
   }
 
   return (
-    <main className="w-full h-[100dvh] max-h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2.5 sm:p-3 select-none touch-manipulation overflow-hidden">
+    <main className="w-full h-[100dvh] bg-black text-white flex flex-col justify-between max-w-xl mx-auto p-2 sm:p-3 select-none touch-manipulation overflow-y-auto overflow-x-hidden">
       {/* 上部ヘッダー */}
       <header className="flex items-center justify-between py-1.5 border-b border-neutral-800 shrink-0">
         <Link
@@ -259,7 +259,7 @@ function GameContent() {
       )}
 
       {/* スコアボード (中央メイン・4行リスト) */}
-      <div className="flex-1 flex flex-col justify-center my-auto overflow-hidden">
+      <div className="flex-1 flex flex-col justify-center my-1 sm:my-auto min-h-0 shrink-0">
         <ScoreBoard
           players={players}
           gameState={gameState}
@@ -271,7 +271,7 @@ function GameContent() {
       </div>
 
       {/* 下部パネル（対局完了時と進行中で分岐） */}
-      <footer className="mt-2">
+      <footer className="mt-1 sm:mt-2 shrink-0">
         {game?.status === 'completed' ? (
           <div className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-md text-center">
             <div className="text-xs font-bold text-emerald-400">

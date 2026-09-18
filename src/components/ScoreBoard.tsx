@@ -49,17 +49,17 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col gap-2 select-none">
+    <div className="w-full flex flex-col gap-1.5 sm:gap-2 select-none">
       {/* 局情報ヘッダー */}
-      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2.5 shadow-sm">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-lg sm:text-xl font-black text-white tracking-wide">
+      <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 shadow-sm shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <span className="text-base sm:text-lg md:text-xl font-black text-white tracking-wide">
             {roundName}
           </span>
-          <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-500/40">
+          <span className="text-xs sm:text-sm font-bold px-2 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-500/40">
             {gameState.honba}本場
           </span>
-          <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-md bg-cyan-950/70 text-cyan-300 border border-cyan-500/40">
+          <span className="text-xs sm:text-sm font-bold px-2 py-0.5 rounded-md bg-cyan-950/70 text-cyan-300 border border-cyan-500/40">
             供託{gameState.riichiStick}本
           </span>
         </div>
@@ -69,7 +69,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
       </div>
 
       {/* 4名スコアボード (縦4行リスト) */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1 sm:gap-1.5">
         {players.map((player, idx) => {
           const score = gameState.scores[player] ?? 0;
           const isDealer = player === currentDealer;
@@ -92,7 +92,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           return (
             <div
               key={player}
-              className={`flex items-stretch gap-2 p-1.5 rounded-xl transition-colors ${
+              className={`flex items-stretch gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-xl transition-colors ${
                 isDiffBase
                   ? 'bg-amber-500/10 border border-amber-500/40'
                   : 'bg-neutral-900/90 border border-neutral-800'
@@ -102,37 +102,37 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
               <button
                 type="button"
                 onClick={() => toggleDiffTarget(player)}
-                className="flex-1 min-h-[70px] sm:min-h-[72px] px-3.5 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-800 active:scale-[0.99] transition-all flex flex-col justify-between text-left touch-manipulation"
+                className="flex-1 min-h-[58px] sm:min-h-[64px] px-3 py-1.5 sm:py-2 rounded-lg bg-neutral-850 hover:bg-neutral-800 active:scale-[0.99] transition-all flex flex-col justify-between text-left touch-manipulation"
               >
                 {/* 上段: 席・名前・各種状態バッジ */}
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-5 h-5 shrink-0 rounded bg-neutral-800 text-neutral-300 text-xs font-black flex items-center justify-center border border-neutral-700">
+                  <span className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 rounded bg-neutral-800 text-neutral-300 text-[11px] sm:text-xs font-black flex items-center justify-center border border-neutral-700">
                     {SEAT_NAMES[idx]}
                   </span>
-                  <span className="font-black text-sm sm:text-base text-neutral-200 truncate max-w-[110px] sm:max-w-[150px]">
+                  <span className="font-black text-xs sm:text-sm md:text-base text-neutral-200 truncate max-w-[100px] sm:max-w-[150px]">
                     {player}
                   </span>
                   {isDealer && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-rose-700 text-white font-black text-[10px] leading-none">
+                    <span className="shrink-0 px-1 sm:px-1.5 py-0.5 rounded bg-rose-700 text-white font-black text-[9px] sm:text-[10px] leading-none">
                       親
                     </span>
                   )}
                   {isDiffBase && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold text-[10px] leading-none">
+                    <span className="shrink-0 px-1 sm:px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold text-[9px] sm:text-[10px] leading-none">
                       基準
                     </span>
                   )}
                 </div>
 
-                {/* 下段: 点数または点差表示 (text-3xl 特大フォント) */}
-                <div className="text-right leading-none pt-1">
+                {/* 下段: 点数または点差表示 (特大フォント) */}
+                <div className="text-right leading-none pt-0.5 sm:pt-1">
                   {inDiffMode ? (
-                    <div className="flex items-baseline justify-end gap-2">
-                      <span className="text-xs font-mono font-bold text-neutral-400">
+                    <div className="flex items-baseline justify-end gap-1.5 sm:gap-2">
+                      <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400">
                         {score.toLocaleString()}
                       </span>
                       <span
-                        className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+                        className={`text-xl sm:text-2xl md:text-3xl font-black font-mono tracking-tight ${
                           diffValue >= 0 ? 'text-cyan-400' : 'text-rose-500'
                         }`}
                       >
@@ -141,7 +141,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     </div>
                   ) : (
                     <span
-                      className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
+                      className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono tracking-tight ${
                         score < 0
                           ? 'text-rose-500'
                           : isDealer
@@ -155,12 +155,12 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 </div>
               </button>
 
-              {/* 副露ボタン (幅68px・大型化) */}
+              {/* 副露ボタン */}
               <button
                 type="button"
                 disabled={!canFuro && !isFuro}
                 onClick={() => onFuroClick && onFuroClick(player)}
-                className={`w-[68px] sm:w-[72px] rounded-xl font-black flex flex-col items-center justify-center transition-all touch-manipulation border ${
+                className={`w-[60px] sm:w-[68px] rounded-xl font-black flex flex-col items-center justify-center transition-all touch-manipulation border ${
                   isFuro
                     ? 'bg-cyan-600 border-cyan-400 text-white shadow-sm'
                     : canFuro
@@ -174,12 +174,12 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 </span>
               </button>
 
-              {/* 立直ボタン (幅68px・大型化) */}
+              {/* 立直ボタン */}
               <button
                 type="button"
                 disabled={!canRiichi && !isRiichi}
                 onClick={() => onRiichiClick && onRiichiClick(player)}
-                className={`w-[68px] sm:w-[72px] rounded-xl font-black flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation border ${
+                className={`w-[60px] sm:w-[68px] rounded-xl font-black flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation border ${
                   isRiichi
                     ? 'bg-amber-500 border-amber-400 text-black shadow-sm'
                     : canRiichi
