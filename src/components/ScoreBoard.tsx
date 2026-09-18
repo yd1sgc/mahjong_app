@@ -109,8 +109,6 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
             <div
               key={player}
               className={`flex items-stretch gap-2 p-1.5 rounded-xl transition-colors border ${
-                isDealer ? 'border-l-4 border-l-rose-500' : ''
-              } ${
                 isDiffBase
                   ? 'bg-amber-500/10 border-amber-500/40'
                   : 'bg-neutral-900/90 border-neutral-800'
@@ -122,16 +120,18 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 onClick={() => toggleDiffTarget(player)}
                 className="flex-1 h-[72px] sm:h-[76px] px-3.5 py-2 rounded-lg bg-neutral-850 hover:bg-neutral-800 active:scale-[0.99] transition-all flex flex-col justify-between text-left touch-manipulation"
               >
-                {/* 上段: 席・名前・各種状態バッジ */}
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-5 h-5 shrink-0 rounded bg-neutral-800 text-neutral-300 text-xs font-black flex items-center justify-center border border-neutral-700">
-                    {SEAT_NAMES[idx]}
-                  </span>
-                  <span className="font-black text-sm sm:text-base text-neutral-200 truncate max-w-[110px] sm:max-w-[150px]">
-                    {player}
-                  </span>
+                {/* 上段: 席・名前・親バッジ (親バッジは右端固定) */}
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-6 h-6 shrink-0 rounded-md bg-neutral-800 text-neutral-200 text-sm font-black flex items-center justify-center border border-neutral-700 shadow-inner">
+                      {SEAT_NAMES[idx]}
+                    </span>
+                    <span className="font-bold text-base text-neutral-300 truncate max-w-[130px] sm:max-w-[170px] tracking-tight">
+                      {player}
+                    </span>
+                  </div>
                   {isDealer && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-xs leading-none shadow-sm">
+                    <span className="shrink-0 px-2.5 py-1 rounded-md bg-rose-600 text-white font-black text-xs leading-none shadow-sm">
                       親
                     </span>
                   )}
