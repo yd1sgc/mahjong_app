@@ -52,7 +52,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
         {isRecorder ? (
           <div className="text-[11px] font-mono text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded border border-neutral-700">
-            PIN: <span className="font-bold text-amber-300">{passcode}</span>
+            PIN: <span className="font-bold text-white">{passcode}</span>
           </div>
         ) : (
           <button

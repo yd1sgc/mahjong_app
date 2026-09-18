@@ -217,7 +217,7 @@ function GameContent() {
             <h1 className="text-sm font-black text-neutral-100 md:text-base">
               {game?.rule_name_snapshot || '対局'}
             </h1>
-            <span className="text-[10px] text-amber-400 font-bold underline">
+            <span className="text-[10px] font-bold text-neutral-300 bg-neutral-850 hover:bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
               詳細
             </span>
           </button>
@@ -231,7 +231,7 @@ function GameContent() {
           <button
             type="button"
             onClick={() => setSettleModalOpen(true)}
-            className="text-xs font-black px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-amber-500/40 transition-colors shadow-sm"
+            className="text-xs font-bold px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-600 transition-colors shadow-sm"
           >
             精算・終了
           </button>

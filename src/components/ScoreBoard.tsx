@@ -52,19 +52,25 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
     <div className="w-full flex flex-col gap-2 select-none">
       {/* 局情報ヘッダー */}
       <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2.5 shadow-sm">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-lg sm:text-xl font-black text-white tracking-wide">
             {roundName}
           </span>
-          <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-500/40">
-            {gameState.honba}本場
-          </span>
-          <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-md bg-cyan-950/70 text-cyan-300 border border-cyan-500/40">
-            供託{gameState.riichiStick}本
-          </span>
+          <div className="flex items-baseline gap-1 bg-neutral-950 px-2 py-1 rounded-md border border-neutral-800">
+            <span className="text-[11px] font-bold text-neutral-400">本場</span>
+            <span className="text-base sm:text-lg font-black text-white font-mono leading-none">
+              {gameState.honba}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1 bg-neutral-950 px-2 py-1 rounded-md border border-neutral-800">
+            <span className="text-[11px] font-bold text-neutral-400">供託</span>
+            <span className="text-base sm:text-lg font-black text-white font-mono leading-none">
+              {gameState.riichiStick}
+            </span>
+          </div>
         </div>
-        <div className="text-xs sm:text-sm font-bold text-neutral-300 ml-auto">
-          親: <span className="text-amber-300 font-black">{currentDealer}</span>
+        <div className="text-xs sm:text-sm font-bold text-neutral-400 ml-auto">
+          親: <span className="text-white font-black">{currentDealer}</span>
         </div>
       </div>
 
@@ -124,7 +130,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                   )}
                 </div>
 
-                {/* 下段: 点数または点差表示 (text-3xl 特大フォント) */}
+                {/* 下段: 点数または点差表示 (text-3xl 特大フォント・白統一) */}
                 <div className="text-right leading-none pt-1">
                   {inDiffMode ? (
                     <div className="flex items-baseline justify-end gap-2">
@@ -140,15 +146,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       </span>
                     </div>
                   ) : (
-                    <span
-                      className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
-                        score < 0
-                          ? 'text-rose-500'
-                          : isDealer
-                          ? 'text-amber-300'
-                          : 'text-white'
-                      }`}
-                    >
+                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
                       {score.toLocaleString()}
                     </span>
                   )}
@@ -162,9 +160,9 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 onClick={() => onFuroClick && onFuroClick(player)}
                 className={`w-[68px] sm:w-[72px] rounded-xl font-black flex flex-col items-center justify-center transition-all touch-manipulation border ${
                   isFuro
-                    ? 'bg-cyan-600 border-cyan-400 text-white shadow-sm'
+                    ? 'bg-cyan-400 border-cyan-300 text-black shadow-sm'
                     : canFuro
-                    ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-300 border-neutral-700'
+                    ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-400 border-neutral-700'
                     : 'bg-neutral-900 text-neutral-600 border-neutral-800 opacity-40 cursor-not-allowed'
                 }`}
                 title={isFuro ? '副露中（タップで解除）' : '副露を宣言'}
@@ -179,24 +177,17 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 type="button"
                 disabled={!canRiichi && !isRiichi}
                 onClick={() => onRiichiClick && onRiichiClick(player)}
-                className={`w-[68px] sm:w-[72px] rounded-xl font-black flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation border ${
+                className={`w-[68px] sm:w-[72px] rounded-xl font-black flex flex-col items-center justify-center transition-all touch-manipulation border ${
                   isRiichi
                     ? 'bg-amber-500 border-amber-400 text-black shadow-sm'
                     : canRiichi
-                    ? 'bg-neutral-800 hover:bg-neutral-750 text-amber-300 border-neutral-700'
+                    ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-400 border-neutral-700'
                     : 'bg-neutral-900 text-neutral-600 border-neutral-800 opacity-40 cursor-not-allowed'
                 }`}
-                title={isRiichi ? '立直宣言済み' : '立直を宣言 (1000点供託)'}
+                title={isRiichi ? '立直宣言済み' : '立直を宣言'}
               >
                 <span className="text-xs font-black leading-none">
                   {isRiichi ? '立直済' : '立直'}
-                </span>
-                <span
-                  className={`text-[9px] font-mono leading-none ${
-                    isRiichi ? 'text-neutral-900 font-bold' : 'text-neutral-400'
-                  }`}
-                >
-                  1000
                 </span>
               </button>
             </div>
