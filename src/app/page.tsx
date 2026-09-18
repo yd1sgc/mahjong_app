@@ -29,6 +29,14 @@ interface GroupMembership {
   member_id: string;
 }
 
+const LAST_GAME_SETUP_KEY = 'mahjong_last_game_setup';
+
+interface LastGameSetup {
+  groupId: string;
+  ruleId: string;
+  members: string[];
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [games, setGames] = useState<GameRow[]>([]);
@@ -87,6 +95,78 @@ export default function HomePage() {
         if (gmData) setGroupMemberships(gmData as GroupMembership[]);
         if (rData && rData.length > 0) {
           setRules(rData);
+        }
+
+        // 直前の対局設定（グループ・ルール・メンバー4名）の自動復元
+        try {
+          let restored = false;
+
+          // 1. localStorage からの復元試行
+          if (typeof window !== 'undefined') {
+            const raw = localStorage.getItem(LAST_GAME_SETUP_KEY);
+            if (raw) {
+              const saved: LastGameSetup = JSON.parse(raw);
+              const groupExists =
+                saved.groupId === 'free' ||
+                grpData?.some((g) => g.group_id === saved.groupId);
+              const ruleExists = rData?.some((r) => r.rule_id === saved.ruleId);
+              const validMembers =
+                Array.isArray(saved.members) &&
+                saved.members.length === 4 &&
+                saved.members.every((mId) =>
+                  mData?.some((m) => m.member_id === mId && m.is_archived === 0)
+                );
+
+              if (groupExists && ruleExists && validMembers) {
+                setSelectedGroupId(saved.groupId);
+                setSelectedRuleId(saved.ruleId);
+                setSelectedMembers(saved.members);
+                restored = true;
+              }
+            }
+          }
+
+          // 2. localStorage に無い場合、DB上の直近対局レコードから復元
+          if (!restored && gData && gData.length > 0) {
+            const latestGame = gData[0];
+            const { data: pData } = await supabase
+              .from('game_participants')
+              .select('seat, member_id')
+              .eq('game_id', latestGame.game_id)
+              .order('seat');
+
+            if (pData && pData.length === 4) {
+              const participantIds = pData.map((p) => p.member_id);
+              const allMembersValid = participantIds.every((mId) =>
+                mData?.some((m) => m.member_id === mId && m.is_archived === 0)
+              );
+
+              if (allMembersValid) {
+                const targetGroupId = latestGame.group_id || '';
+                const targetRule =
+                  rData?.find((r) => r.name === latestGame.rule_name_snapshot) ||
+                  rData?.[0];
+                const targetRuleId = targetRule?.rule_id || '';
+
+                setSelectedGroupId(targetGroupId);
+                if (targetRuleId) setSelectedRuleId(targetRuleId);
+                setSelectedMembers(participantIds);
+
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem(
+                    LAST_GAME_SETUP_KEY,
+                    JSON.stringify({
+                      groupId: targetGroupId,
+                      ruleId: targetRuleId,
+                      members: participantIds,
+                    })
+                  );
+                }
+              }
+            }
+          }
+        } catch (restoreErr) {
+          console.warn('Failed to restore last game setup:', restoreErr);
         }
       } finally {
         setLoading(false);
@@ -214,6 +294,20 @@ export default function HomePage() {
   // 結果のみ入力モード開始
   const handleStartSimpleGame = () => {
     if (!validateSelectedPlayers()) return;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          LAST_GAME_SETUP_KEY,
+          JSON.stringify({
+            groupId: selectedGroupId,
+            ruleId: selectedRuleId,
+            members: selectedMembers,
+          })
+        );
+      } catch {
+        // ignore
+      }
+    }
     setShowNewGameModal(false);
     setShowSimpleModal(true);
   };
@@ -277,9 +371,21 @@ export default function HomePage() {
         throw new Error(pErr.message || JSON.stringify(pErr));
       }
 
-      // 3. この端末を記録係としてトークン保存
+      // 3. この端末を記録係としてトークン保存 ＆ 直前設定として保存
       if (typeof window !== 'undefined') {
         localStorage.setItem(`mahjong_recorder_${gameId}`, pin);
+        try {
+          localStorage.setItem(
+            LAST_GAME_SETUP_KEY,
+            JSON.stringify({
+              groupId: selectedGroupId,
+              ruleId: selectedRuleId,
+              members: selectedMembers,
+            })
+          );
+        } catch {
+          // ignore
+        }
       }
 
       // 対局画面へ遷移
@@ -399,14 +505,36 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col gap-4 max-h-[92dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <h3 className="text-base font-black text-white">新規対局の開始</h3>
-              <button
-                type="button"
-                onClick={() => setShowNewGameModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800 text-neutral-400 hover:text-white text-sm font-bold"
-              >
-                ✕
-              </button>
+              <div>
+                <h3 className="text-base font-black text-white">新規対局の開始</h3>
+                {selectedGroupId && selectedMembers.filter(Boolean).length === 4 && (
+                  <span className="text-[10px] text-amber-400 font-bold block mt-0.5">
+                    直前の対局設定を自動反映中
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedGroupId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedGroupId('');
+                      setSelectedRuleId('');
+                      setSelectedMembers(['', '', '', '']);
+                    }}
+                    className="text-[11px] font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-750 transition-colors"
+                  >
+                    リセット
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNewGameModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800 text-neutral-400 hover:text-white text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* グループ選択 (初期未選択 ＋ フリー対局選択肢) */}
@@ -496,6 +624,19 @@ export default function HomePage() {
                 <label className="text-xs font-black text-neutral-300">
                   対局者 (東・南・西・北の座順)
                 </label>
+                {selectedMembers.filter(Boolean).length === 4 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // 時計回りに1席ローテーション: [東, 南, 西, 北] -> [南, 西, 北, 東]
+                      setSelectedMembers(([e, s, w, n]) => [s, w, n, e]);
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
+                    title="4名の座順を時計回りに1席ずらします"
+                  >
+                    席をローテーション
+                  </button>
+                )}
               </div>
 
               {!selectedGroupId ? (
