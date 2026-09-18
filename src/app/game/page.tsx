@@ -373,15 +373,15 @@ function GameContent() {
             </p>
 
             {/* 成績プレビューリスト */}
-            <div className="flex flex-col gap-1.5 bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
+            <div className="flex flex-col gap-2 bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
               {settlement?.map((s) => (
                 <div
                   key={s.player}
-                  className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-neutral-900/60 border border-neutral-800/80 text-xs"
+                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-neutral-900/80 border border-neutral-800/90 text-xs"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className={`w-5 h-5 rounded-md flex items-center justify-center font-black text-[11px] ${
+                      className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-xs shrink-0 ${
                         s.rank === 1
                           ? 'bg-amber-400 text-black'
                           : s.rank === 2
@@ -393,32 +393,54 @@ function GameContent() {
                     >
                       {s.rank}
                     </span>
-                    <span className="font-black text-neutral-200">
+                    <span className="font-black text-sm text-neutral-100 truncate max-w-[100px] sm:max-w-[130px]">
                       {s.player}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-neutral-400 font-mono">
-                      {s.finalScore.toLocaleString()}点
-                    </span>
-                    <span
-                      className={`font-black font-mono w-14 text-right ${
-                        s.point > 0
-                          ? 'text-cyan-400'
-                          : s.point < 0
-                          ? 'text-rose-400'
-                          : 'text-neutral-400'
-                      }`}
-                    >
-                      {s.point > 0 ? `+${s.point.toFixed(1)}` : s.point.toFixed(1)}
-                    </span>
+                  <div className="flex items-center gap-4 shrink-0">
+                    {/* 素点（点棒照合用・大フォント白太字） */}
+                    <div className="text-right">
+                      <span className="text-[10px] text-neutral-500 font-bold block leading-none mb-0.5">
+                        素点
+                      </span>
+                      <span
+                        className={`font-black font-mono text-base sm:text-lg tracking-tight ${
+                          s.finalScore < 0 ? 'text-rose-400' : 'text-white'
+                        }`}
+                      >
+                        {s.finalScore.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* ポイント（計算結果・大フォントカラー） */}
+                    <div className="text-right w-20">
+                      <span className="text-[10px] text-neutral-500 font-bold block leading-none mb-0.5">
+                        ポイント
+                      </span>
+                      <span
+                        className={`font-black font-mono text-base tracking-tight ${
+                          s.point > 0
+                            ? 'text-cyan-400'
+                            : s.point < 0
+                            ? 'text-rose-400'
+                            : 'text-neutral-400'
+                        }`}
+                      >
+                        {s.point > 0 ? `+${s.point.toFixed(1)}` : s.point.toFixed(1)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
 
-              <div className="text-[11px] font-mono text-neutral-500 text-right pt-1 border-t border-neutral-800">
-                合計pt検算: {settlement?.reduce((acc, r) => acc + r.point, 0).toFixed(1)}pt (ゼロ和)
+              <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-xs font-mono px-1">
+                <span className="text-neutral-400 font-bold">
+                  点棒合計: <span className="text-emerald-400 font-black">{settlement?.reduce((acc, r) => acc + r.finalScore, 0).toLocaleString()}点</span>
+                </span>
+                <span className="text-neutral-400">
+                  合計pt: <span className="text-cyan-400 font-bold">{settlement?.reduce((acc, r) => acc + r.point, 0).toFixed(1)}pt</span> (ゼロ和)
+                </span>
               </div>
             </div>
 
