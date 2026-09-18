@@ -349,9 +349,9 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
           </div>
         </div>
 
-        {/* ─── 放銃者選択エリア (ツモ時は領域・高さを完全に維持したまま不可視化) ─── */}
+        {/* ─── 放銃者選択エリア (ツモ時は領域・高さを完全に維持したまま瞬時に不可視化) ─── */}
         <div
-          className={`flex flex-col gap-1.5 pt-2 border-t transition-all ${
+          className={`flex flex-col gap-1.5 pt-2 border-t ${
             winType === 'tsumo'
               ? 'invisible pointer-events-none border-transparent select-none'
               : 'border-neutral-800'
