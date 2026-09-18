@@ -108,10 +108,12 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
           return (
             <div
               key={player}
-              className={`flex items-stretch gap-2 p-1.5 rounded-xl transition-colors ${
+              className={`flex items-stretch gap-2 p-1.5 rounded-xl transition-colors border ${
+                isDealer ? 'border-l-4 border-l-rose-500' : ''
+              } ${
                 isDiffBase
-                  ? 'bg-amber-500/10 border border-amber-500/40'
-                  : 'bg-neutral-900/90 border border-neutral-800'
+                  ? 'bg-amber-500/10 border-amber-500/40'
+                  : 'bg-neutral-900/90 border-neutral-800'
               }`}
             >
               {/* 名前 ＆ 点数/点差ボタン (2段化・タップで点差トグル) */}
@@ -129,22 +131,17 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     {player}
                   </span>
                   {isDealer && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-rose-700 text-white font-black text-[10px] leading-none">
+                    <span className="shrink-0 px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-xs leading-none shadow-sm">
                       親
-                    </span>
-                  )}
-                  {isDiffBase && (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold text-[10px] leading-none">
-                      基準
                     </span>
                   )}
                 </div>
 
-                {/* 下段: 点数または点差表示 (高さ固定・底辺揃えで完全静止) */}
-                <div className="h-8 sm:h-9 flex items-end justify-end leading-none">
+                {/* 下段: 点数または点差表示 (高さ固定・底辺揃えで完全静止、点差時は素点左・点差右の両端配置) */}
+                <div className={`h-8 sm:h-9 flex items-end leading-none ${inDiffMode ? 'justify-between' : 'justify-end'}`}>
                   {inDiffMode ? (
-                    <div className="flex items-baseline justify-end gap-2">
-                      <span className="text-xs font-mono font-bold text-neutral-400">
+                    <>
+                      <span className="text-xs sm:text-sm font-mono font-bold text-neutral-400 pb-0.5">
                         {score.toLocaleString()}
                       </span>
                       <span
@@ -154,7 +151,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                       >
                         {diffValue >= 0 ? `+${diffValue.toLocaleString()}` : diffValue.toLocaleString()}
                       </span>
-                    </div>
+                    </>
                   ) : (
                     <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white leading-none">
                       {score.toLocaleString()}
@@ -163,7 +160,7 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 </div>
               </button>
 
-              {/* 副露ボタン (幅68px・大型化) */}
+              {/* 副露ボタン (幅68px・大型化・2文字固定) */}
               <button
                 type="button"
                 disabled={!canFuro && !isFuro}
@@ -175,14 +172,14 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-400 border-neutral-700'
                     : 'bg-neutral-900 text-neutral-600 border-neutral-800 opacity-40 cursor-not-allowed'
                 }`}
-                title={isFuro ? '副露中（タップで解除）' : '副露を宣言'}
+                title={isFuro ? '副露（タップで解除）' : '副露を宣言'}
               >
                 <span className="text-xs font-black leading-none">
-                  {isFuro ? '副露中' : '副露'}
+                  副露
                 </span>
               </button>
 
-              {/* 立直ボタン (幅68px・大型化) */}
+              {/* 立直ボタン (幅68px・大型化・2文字固定) */}
               <button
                 type="button"
                 disabled={!canRiichi && !isRiichi}
@@ -194,10 +191,10 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                     ? 'bg-neutral-800 hover:bg-neutral-750 text-neutral-400 border-neutral-700'
                     : 'bg-neutral-900 text-neutral-600 border-neutral-800 opacity-40 cursor-not-allowed'
                 }`}
-                title={isRiichi ? '立直宣言済み' : '立直を宣言'}
+                title={isRiichi ? '立直（タップで解除）' : '立直を宣言'}
               >
                 <span className="text-xs font-black leading-none">
-                  {isRiichi ? '立直済' : '立直'}
+                  立直
                 </span>
               </button>
             </div>
