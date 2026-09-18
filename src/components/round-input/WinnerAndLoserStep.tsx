@@ -23,6 +23,8 @@ interface WinnerAndLoserStepProps {
   onNext: () => void;
 }
 
+const SEAT_NAMES = ['東', '南', '西', '北'];
+
 export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
   players,
   currentDealer,
@@ -54,61 +56,53 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
   return (
     <div className="flex flex-col gap-3.5">
       {/* ─── 最上部: 和了種別タブ ─── */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-bold text-neutral-400">
-          Step 1/3: 和了種別と関係者を選択
-        </span>
-        <div className="grid grid-cols-3 gap-1.5 p-1 bg-neutral-950 rounded-xl border border-neutral-800">
+      <div
+        className={`grid gap-1.5 p-1 bg-neutral-950 rounded-xl border border-neutral-800 ${
+          allowMultiRon ? 'grid-cols-3' : 'grid-cols-2'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onSelectWinType('ron')}
+          className={`h-11 rounded-lg font-black text-sm transition-all flex items-center justify-center ${
+            winType === 'ron'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          ロン
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelectWinType('tsumo')}
+          className={`h-11 rounded-lg font-black text-sm transition-all flex items-center justify-center ${
+            winType === 'tsumo'
+              ? 'bg-cyan-600 text-white shadow-md'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          ツモ
+        </button>
+        {allowMultiRon && (
           <button
             type="button"
-            onClick={() => onSelectWinType('ron')}
+            onClick={() => onSelectWinType('multi_ron')}
             className={`h-11 rounded-lg font-black text-sm transition-all flex items-center justify-center ${
-              winType === 'ron'
-                ? 'bg-rose-600 text-white shadow-md'
+              winType === 'multi_ron'
+                ? 'bg-amber-600 text-white shadow-md'
                 : 'text-neutral-400 hover:text-white'
             }`}
           >
-            ロン和了
+            ダブロン
           </button>
-          <button
-            type="button"
-            onClick={() => onSelectWinType('tsumo')}
-            className={`h-11 rounded-lg font-black text-sm transition-all flex items-center justify-center ${
-              winType === 'tsumo'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            ツモ和了
-          </button>
-          {/* ルールで許可されている場合のみダブロンタブを表示（方式A） */}
-          {allowMultiRon ? (
-            <button
-              type="button"
-              onClick={() => onSelectWinType('multi_ron')}
-              className={`h-11 rounded-lg font-black text-sm transition-all flex items-center justify-center ${
-                winType === 'multi_ron'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              ダブロン
-            </button>
-          ) : (
-            <div className="flex items-center justify-center text-[11px] text-neutral-600 font-bold">
-              ダブロン無効
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* ─── 和了者選択エリア ─── */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-black text-neutral-200">
-            {winType === 'multi_ron'
-              ? '和了者（2名または3名選択）'
-              : '和了者を選択'}
+            {winType === 'multi_ron' ? '和了者（2〜3名）' : '和了者'}
           </span>
           {winType === 'multi_ron' && (
             <span className="text-[11px] text-amber-400 font-bold">
@@ -118,7 +112,7 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          {players.map((p) => {
+          {players.map((p, idx) => {
             const isDealer = p === currentDealer;
             const isSelected =
               winType === 'multi_ron'
@@ -139,24 +133,30 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
                 className={`h-14 rounded-xl font-black text-sm flex items-center justify-between px-3 border transition-all touch-manipulation ${
                   isSelected
                     ? winType === 'tsumo'
-                      ? 'bg-cyan-600/30 border-cyan-400 text-cyan-200 shadow-sm'
+                      ? 'bg-cyan-600 border-cyan-400 text-white shadow-md'
                       : winType === 'multi_ron'
-                      ? 'bg-amber-600/30 border-amber-400 text-amber-200 shadow-sm'
-                      : 'bg-rose-600/30 border-rose-400 text-rose-200 shadow-sm'
-                    : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-700/80 text-neutral-300'
+                      ? 'bg-amber-600 border-amber-400 text-white shadow-md'
+                      : 'bg-rose-600 border-rose-400 text-white shadow-md'
+                    : 'bg-neutral-900 hover:bg-neutral-850 border-neutral-800 text-neutral-300'
                 }`}
               >
-                <div className="flex items-center gap-1.5">
-                  <span>{p}</span>
-                  {isDealer && (
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      親
-                    </span>
-                  )}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-neutral-500 w-4 text-center shrink-0">
+                    {SEAT_NAMES[idx] || ''}
+                  </span>
+                  <span className="truncate">{p}</span>
                 </div>
-                <span className="text-xs font-bold opacity-80">
-                  {isSelected ? '和了' : ''}
-                </span>
+                {isDealer && (
+                  <span
+                    className={`text-xs font-black px-2 py-0.5 rounded shrink-0 ${
+                      isSelected
+                        ? 'bg-black/30 text-white border border-white/30'
+                        : 'bg-rose-600 text-white shadow-sm'
+                    }`}
+                  >
+                    親
+                  </span>
+                )}
               </button>
             );
           })}
@@ -165,13 +165,14 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
 
       {/* ─── 放銃者選択エリア (ロン / ダブロン時のみ) ─── */}
       {winType !== 'tsumo' && (
-        <div className="flex flex-col gap-1.5 pt-2 border-t border-neutral-800/80">
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-neutral-800">
           <span className="text-xs font-black text-neutral-200">
-            放銃者（ロンされた人）を選択
+            放銃者
           </span>
           <div className="grid grid-cols-2 gap-2">
-            {players.map((p) => {
+            {players.map((p, idx) => {
               const isSelected = loser === p;
+              const isDealer = p === currentDealer;
               // 和了者は放銃者として選択不可
               const isWinnerSelected =
                 winType === 'multi_ron'
@@ -184,18 +185,31 @@ export const WinnerAndLoserStep: React.FC<WinnerAndLoserStepProps> = ({
                   type="button"
                   disabled={isWinnerSelected}
                   onClick={() => onSelectLoser(p)}
-                  className={`h-13 rounded-xl font-black text-sm flex items-center justify-between px-3 border transition-all touch-manipulation ${
+                  className={`h-14 rounded-xl font-black text-sm flex items-center justify-between px-3 border transition-all touch-manipulation ${
                     isWinnerSelected
-                      ? 'bg-neutral-900 border-neutral-850 text-neutral-650 cursor-not-allowed opacity-40'
+                      ? 'bg-neutral-950 border-neutral-900 text-neutral-700 cursor-not-allowed opacity-30'
                       : isSelected
-                      ? 'bg-orange-600/30 border-orange-500 text-orange-200 shadow-sm'
-                      : 'bg-neutral-850 hover:bg-neutral-800 border-neutral-700/80 text-neutral-300'
+                      ? 'bg-orange-600 border-orange-400 text-white shadow-md'
+                      : 'bg-neutral-900 hover:bg-neutral-850 border-neutral-800 text-neutral-300'
                   }`}
                 >
-                  <span>{p}</span>
-                  <span className="text-xs font-bold opacity-80">
-                    {isSelected ? '放銃' : ''}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-bold text-neutral-500 w-4 text-center shrink-0">
+                      {SEAT_NAMES[idx] || ''}
+                    </span>
+                    <span className="truncate">{p}</span>
+                  </div>
+                  {isDealer && (
+                    <span
+                      className={`text-xs font-black px-2 py-0.5 rounded shrink-0 ${
+                        isSelected
+                          ? 'bg-black/30 text-white border border-white/30'
+                          : 'bg-rose-600 text-white shadow-sm'
+                      }`}
+                    >
+                      親
+                    </span>
+                  )}
                 </button>
               );
             })}
