@@ -355,132 +355,167 @@ function GameContent() {
       />
 
       {/* 対局終了・精算確認モーダル */}
-      {settleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
-          <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md rounded-2xl p-4 shadow-2xl flex flex-col gap-3 text-white">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-              <h2 className="text-base font-black text-white">
-                対局終了・精算確認
-              </h2>
-              <button
-                type="button"
-                onClick={() => setSettleModalOpen(false)}
-                className="text-neutral-400 hover:text-white text-lg font-bold leading-none p-1"
-              >
-                &times;
-              </button>
-            </div>
+      {settleModalOpen && (() => {
+        const totalScore = settlement?.reduce((acc, r) => acc + r.finalScore, 0) ?? 0;
+        const totalPt = settlement?.reduce((acc, r) => acc + r.point, 0) ?? 0;
+        const initScore = Number(ruleConfig?.basic?.init_score ?? ruleConfig?.init_score ?? 25000);
+        const expectedTotalScore = initScore * (players.length || 4);
+        const isScoreMismatch = totalScore !== expectedTotalScore;
+        const isPtMismatch = Math.abs(totalPt) > 0.05;
+        const hasMismatch = isScoreMismatch || isPtMismatch;
 
-            <p className="text-xs text-neutral-400">
-              現在の素点およびウマオカ計算結果です。確定すると戦績（/stats）に公式反映されます。
-            </p>
-
-            {/* 成績プレビューリスト */}
-            <div className="flex flex-col gap-2 bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
-              {settlement?.map((s) => (
-                <div
-                  key={s.player}
-                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-neutral-900/80 border border-neutral-800/90 text-xs"
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+            <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md rounded-2xl p-4 shadow-2xl flex flex-col gap-3 text-white">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                <h2 className="text-sm font-black text-white">
+                  対局終了・精算
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setSettleModalOpen(false)}
+                  className="text-neutral-400 hover:text-white text-lg font-bold leading-none p-1"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-xs shrink-0 ${
-                        s.rank === 1
-                          ? 'bg-amber-400 text-black'
-                          : s.rank === 2
-                          ? 'bg-neutral-300 text-black'
-                          : s.rank === 3
-                          ? 'bg-amber-800 text-amber-100'
-                          : 'bg-neutral-800 text-neutral-400'
-                      }`}
-                    >
-                      {s.rank}
-                    </span>
-                    <span className="font-black text-sm text-neutral-100 truncate max-w-[100px] sm:max-w-[130px]">
-                      {s.player}
-                    </span>
-                  </div>
+                  &times;
+                </button>
+              </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
-                    {/* 素点（点棒照合用・大フォント白太字） */}
-                    <div className="text-right">
-                      <span className="text-[10px] text-neutral-500 font-bold block leading-none mb-0.5">
-                        素点
-                      </span>
+              {/* 表頭ヘッダー */}
+              <div className="flex items-center justify-between px-3 text-[11px] font-bold text-neutral-500 font-sans">
+                <span>順位 / プレイヤー</span>
+                <div className="flex items-center gap-4 font-mono text-right">
+                  <span className="w-24 text-right">素点</span>
+                  <span className="w-16 text-right">ポイント</span>
+                </div>
+              </div>
+
+              {/* 成績プレビューリスト */}
+              <div className="flex flex-col gap-1.5">
+                {settlement?.map((s) => (
+                  <div
+                    key={s.player}
+                    className={`flex items-center justify-between py-2.5 px-3 rounded-xl bg-neutral-950 border ${
+                      s.rank === 1 ? 'border-neutral-700 shadow-sm' : 'border-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span
-                        className={`font-black font-mono text-base sm:text-lg tracking-tight ${
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
+                          s.rank === 1
+                            ? 'bg-white text-black'
+                            : s.rank === 2
+                            ? 'bg-neutral-800 text-neutral-300'
+                            : s.rank === 3
+                            ? 'bg-neutral-800 text-neutral-400'
+                            : 'bg-neutral-800 text-neutral-500'
+                        }`}
+                      >
+                        {s.rank}
+                      </span>
+                      <span className="font-black text-base text-white truncate max-w-[110px] sm:max-w-[140px]">
+                        {s.player}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0 font-mono text-right">
+                      {/* 素点（点棒照合用・大フォント白太字） */}
+                      <span
+                        className={`w-24 font-black text-2xl tracking-tight leading-none ${
                           s.finalScore < 0 ? 'text-rose-400' : 'text-white'
                         }`}
                       >
                         {s.finalScore.toLocaleString()}
                       </span>
-                    </div>
 
-                    {/* ポイント（計算結果・大フォントカラー） */}
-                    <div className="text-right w-20">
-                      <span className="text-[10px] text-neutral-500 font-bold block leading-none mb-0.5">
-                        ポイント
-                      </span>
+                      {/* ポイント（計算結果） */}
                       <span
-                        className={`font-black font-mono text-base tracking-tight ${
+                        className={`w-16 text-base font-bold leading-none ${
                           s.point > 0
-                            ? 'text-cyan-400'
+                            ? 'text-amber-300'
                             : s.point < 0
-                            ? 'text-rose-400'
-                            : 'text-neutral-400'
+                            ? 'text-neutral-400'
+                            : 'text-neutral-500'
                         }`}
                       >
                         {s.point > 0 ? `+${s.point.toFixed(1)}` : s.point.toFixed(1)}
                       </span>
                     </div>
                   </div>
-                </div>
-              ))}
-
-              <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-xs font-mono px-1">
-                <span className="text-neutral-400 font-bold">
-                  点棒合計: <span className="text-emerald-400 font-black">{settlement?.reduce((acc, r) => acc + r.finalScore, 0).toLocaleString()}点</span>
-                </span>
-                <span className="text-neutral-400">
-                  合計pt: <span className="text-cyan-400 font-bold">{settlement?.reduce((acc, r) => acc + r.point, 0).toFixed(1)}pt</span> (ゼロ和)
-                </span>
+                ))}
               </div>
-            </div>
 
-            {/* ボタン群 */}
-            <div className="flex flex-col gap-2 pt-1">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleConfirmFinish}
-                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-black text-sm shadow transition-all flex items-center justify-center disabled:opacity-50"
+              {/* 検算フッター（不一致時は警告表示） */}
+              <div
+                className={`bg-neutral-950 border rounded-xl p-2.5 px-3 flex flex-col gap-1 text-xs font-mono transition-colors ${
+                  hasMismatch ? 'border-rose-900 bg-rose-950/20' : 'border-neutral-800'
+                }`}
               >
-                {submitting ? '保存中...' : '成績を確定して保存'}
-              </button>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-neutral-500 font-sans">点棒合計</span>
+                    <span className={`font-bold ${isScoreMismatch ? 'text-rose-400 font-black' : 'text-white'}`}>
+                      {totalScore.toLocaleString()}点
+                    </span>
+                    {isScoreMismatch && (
+                      <span className="text-[10px] font-sans font-black px-1.5 py-0.2 rounded bg-rose-600 text-white">
+                        基準 {expectedTotalScore.toLocaleString()}点と不一致
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-neutral-500 font-sans">合計</span>
+                    <span className={`font-bold ${isPtMismatch ? 'text-rose-400 font-black' : 'text-neutral-400'}`}>
+                      {totalPt > 0 ? `+${totalPt.toFixed(1)}` : totalPt.toFixed(1)}pt
+                    </span>
+                    {isPtMismatch && (
+                      <span className="text-[10px] font-sans font-black px-1.5 py-0.2 rounded bg-rose-600 text-white">
+                        不一致
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {hasMismatch && (
+                  <div className="text-[11px] font-sans text-rose-400 font-bold pt-1 border-t border-rose-900/40">
+                    点棒またはポイントの合計が一致していません。局修正で入力内容をご確認ください。
+                  </div>
+                )}
+              </div>
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => setSettleModalOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold text-xs transition-colors"
-              >
-                対局に戻る
-              </button>
-
-              <div className="pt-2 border-t border-neutral-800/80 text-center">
+              {/* ボタン群 */}
+              <div className="flex flex-col gap-2 pt-1">
                 <button
                   type="button"
                   disabled={submitting}
-                  onClick={handleConfirmAbort}
-                  className="text-xs text-rose-400 hover:text-rose-300 hover:underline py-1"
+                  onClick={handleConfirmFinish}
+                  className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white font-black text-sm shadow-md transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer"
                 >
-                  この対局を破棄（データを残さず削除）
+                  {submitting ? '保存中...' : '成績を確定して保存 →'}
                 </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setSettleModalOpen(false)}
+                    className="h-12 rounded-xl bg-neutral-950 hover:bg-neutral-800 active:bg-neutral-700 border border-neutral-800 text-neutral-200 font-black text-sm transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    ← 対局に戻る
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleConfirmAbort}
+                    className="h-12 rounded-xl bg-neutral-950 hover:bg-rose-950/40 active:bg-rose-900/50 border border-neutral-800 hover:border-rose-800/80 text-rose-400 font-black text-sm transition-all cursor-pointer flex items-center justify-center"
+                  >
+                    対局を破棄
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 詳細ルール確認モーダル */}
       {ruleDetailOpen && (
