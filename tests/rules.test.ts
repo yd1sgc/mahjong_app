@@ -1042,6 +1042,115 @@ describe('Layer 4: 麻雀ドメイン境界値・エッジケース網羅検証'
       });
     });
   });
+
+  describe('途中流局（mid_ryukyoku）と親進行・精算エッジケース検証', () => {
+    const players = ['P1', 'P2', 'P3', 'P4'];
+
+    it('途中流局（九種九牌等）: デフォルト設定では連荘（本場+1、親番維持）', () => {
+      const defaultRule: RuleConfig = {
+        basic: { init_score: 25000, return_score: 30000 },
+        detail: {
+          honba_pt: 300,
+          riichi_pt: 1000,
+          kyushu_kyuhai: 'renchan',
+        },
+      };
+
+      const history: RoundRecord[] = [
+        {
+          round_id: 'r1',
+          kyoku_name: '東1局',
+          winner: null,
+          loser: null,
+          win_type: 'mid_ryukyoku',
+          ryukyoku_type: 'kyushu_kyuhai',
+          score: 0,
+          riichi: [],
+        },
+      ];
+
+      const details = computeAllRoundsDetails(players, 25000, defaultRule, history);
+      expect(details.length).toBe(1);
+      expect(details[0].resultType).toBe('mid_ryukyoku');
+      // 親連荘のため次局は東1局1本場
+      const state = recalculateState(players, 25000, defaultRule, history);
+      expect(state.roundIdx).toBe(0);
+      expect(state.honba).toBe(1);
+    });
+
+    it('途中流局: ルールで親流れ（ryukyoku）指定時は次局へ親が流れること', () => {
+      const oyaNagareRule: RuleConfig = {
+        basic: { init_score: 25000, return_score: 30000 },
+        detail: {
+          honba_pt: 300,
+          riichi_pt: 1000,
+          kyushu_kyuhai: 'ryukyoku',
+        },
+      };
+
+      const history: RoundRecord[] = [
+        {
+          round_id: 'r1',
+          kyoku_name: '東1局',
+          winner: null,
+          loser: null,
+          win_type: 'mid_ryukyoku',
+          ryukyoku_type: 'kyushu_kyuhai',
+          score: 0,
+          riichi: [],
+        },
+      ];
+
+      const details = computeAllRoundsDetails(players, 25000, oyaNagareRule, history);
+      expect(details.length).toBe(1);
+      // 親流れだが流局のため本場は+1加算され、次局は東2局1本場
+      const state = recalculateState(players, 25000, oyaNagareRule, history);
+      expect(state.roundIdx).toBe(1);
+      expect(state.honba).toBe(1);
+    });
+
+    it('精算計算: 4名全員同点（25000点）の場合、起家優先順位と合計0.0pt整合性', () => {
+      const equalScores = { P1: 25000, P2: 25000, P3: 25000, P4: 25000 };
+      const settlement = calculateGameSettlement(players, equalScores, {
+        basic: { init_score: 25000, return_score: 30000, uma: [20, 10, -10, -20] },
+      });
+
+      // 起家（座席）順に1〜4位が割り振られる
+      expect(settlement[0].player).toBe('P1');
+      expect(settlement[0].rank).toBe(1);
+      expect(settlement[1].player).toBe('P2');
+      expect(settlement[1].rank).toBe(2);
+      expect(settlement[2].player).toBe('P3');
+      expect(settlement[2].rank).toBe(3);
+      expect(settlement[3].player).toBe('P4');
+      expect(settlement[3].rank).toBe(4);
+
+      // 合計ポイントが完全ゼロサム（0.0）であること
+      const totalPt = settlement.reduce((acc, s) => acc + s.point, 0);
+      expect(Math.round(totalPt * 10) / 10).toBe(0);
+    });
+
+    it('精算計算: 残留供託棒がある場合、トップ（1位）が総取りすること', () => {
+      // 4名の持ち点合計98,000点 ＋ 残留供託2本（2,000点） ＝ 100,000点
+      const scores = { P1: 35000, P2: 29000, P3: 20000, P4: 14000 };
+      // Mリーグルール（ウマ: [50, 10, -10, -30]、オカ込み）
+      const settlement = calculateGameSettlement(players, scores, {
+        basic: { init_score: 25000, return_score: 30000, uma: [50, 10, -10, -30] },
+        detail: { riichi_pt: 1000 },
+      }, 2);
+
+      const p1 = settlement.find((s) => s.player === 'P1')!;
+      expect(p1.rawScore).toBe(35000);
+      expect(p1.finalScore).toBe(37000); // 35000 + 2000
+      expect(p1.rank).toBe(1);
+      // (37000 - 30000)/1000 + 50(オカ+ウマ) = 57.0pt
+      expect(p1.point).toBe(57.0);
+
+      // 全員合計が完全ゼロサム（0.0pt）になること
+      const totalPt = settlement.reduce((acc, s) => acc + s.point, 0);
+      expect(Math.round(totalPt * 10) / 10).toBe(0);
+    });
+  });
 });
 
 

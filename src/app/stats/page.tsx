@@ -19,6 +19,7 @@ import {
 import { GameFilterAccordion } from '@/components/stats/GameFilterAccordion';
 import { GameStatsTable } from '@/components/stats/GameStatsTable';
 import { StatsDetailsTab } from '@/components/stats/StatsDetailsTab';
+import { StyleScatterChart } from '@/components/stats/StyleScatterChart';
 import { ScoreTrendChart } from '@/components/stats/ScoreTrendChart';
 import { StatsRecords } from '@/components/stats/StatsRecords';
 import { CompatibilityMatrix } from '@/components/stats/CompatibilityMatrix';
@@ -383,6 +384,9 @@ export default function StatsPage() {
         activeDetailTab={activeDetailTab}
         setActiveDetailTab={setActiveDetailTab}
       />
+
+      {/* ─── 雀風スタイル分析（立直率×副露率） ─── */}
+      <StyleScatterChart roundStats={roundStats} />
 
       {/* ─── 総合ポイント推移グラフ ─── */}
       <ScoreTrendChart

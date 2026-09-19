@@ -272,5 +272,24 @@ describe('Score Presets (点数プリセット定義の整合性)', () => {
       const pt2 = calcPoint(30000, 2, ruleWithPtPenalty as any, 2);
       expect(pt2).toBe(-30);
     });
+
+    it('calcOkaNashiPoint: オカなし設定時のポイント計算が正確に行われること', () => {
+      // DEFAULT_UMA = [50, 10, -10, -30], oka = 20.0
+      // 1位: 40,000点
+      // basePt = (40000 - 25000)/1000 = 15.0, umaPt = 50 - 20 = 30 -> 45.0pt
+      expect(calcOkaNashiPoint(40000, 1)).toBe(45.0);
+
+      // 2位: 30,000点
+      // basePt = (30000 - 25000)/1000 = 5.0, umaPt = 10 -> 15.0pt
+      expect(calcOkaNashiPoint(30000, 2)).toBe(15.0);
+
+      // 3位: 20,000点
+      // basePt = (20000 - 25000)/1000 = -5.0, umaPt = -10 -> -15.0pt
+      expect(calcOkaNashiPoint(20000, 3)).toBe(-15.0);
+
+      // 4位: 10,000点
+      // basePt = (10000 - 25000)/1000 = -15.0, umaPt = -30 -> -45.0pt
+      expect(calcOkaNashiPoint(10000, 4)).toBe(-45.0);
+    });
   });
 });
