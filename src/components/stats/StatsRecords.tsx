@@ -48,72 +48,70 @@ export const StatsRecords: React.FC<StatsRecordsProps> = ({ records, yakumanReco
     <section className="flex flex-col gap-3 p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xs">
       <h2 className="text-base font-black text-white">レコード</h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        {/* 最高・最低スコア */}
-        <div className="flex flex-col gap-3">
-          <div>
-            <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
-              最高スコア
-            </span>
-            <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <tbody>
-                  {records.top5.map((r, i) => (
-                    <tr key={i} className="border-b border-neutral-850 last:border-0">
-                      <td className="py-1.5 px-2.5 w-7 text-center">
-                        <div className="flex justify-center">{renderRankBadge(i + 1)}</div>
-                      </td>
-                      <td className="py-1.5 px-2 font-black text-white">{r.name}</td>
-                      <td className="py-1.5 px-2 text-right font-black font-mono text-white">
-                        {r.score.toLocaleString()}
-                      </td>
-                      <td className="py-1.5 px-2.5 text-right text-[10px] text-neutral-500 font-mono">
-                        {r.date}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      <div className="flex flex-col gap-3.5">
+        {/* 最高スコア */}
+        <div>
+          <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
+            最高スコア
+          </span>
+          <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <tbody>
+                {records.top5.map((r, i) => (
+                  <tr key={i} className="border-b border-neutral-850 last:border-0">
+                    <td className="py-1.5 px-2.5 w-8 text-center">
+                      <div className="flex justify-center">{renderRankBadge(i + 1)}</div>
+                    </td>
+                    <td className="py-1.5 px-3 font-black text-white">{r.name}</td>
+                    <td className="py-1.5 px-3 text-right font-black font-mono text-white">
+                      {r.score.toLocaleString()}
+                    </td>
+                    <td className="py-1.5 px-3 text-right text-[10px] text-neutral-500 font-mono">
+                      {r.date}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        </div>
 
-          <div>
-            <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
-              最低スコア
-            </span>
-            <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <tbody>
-                  {records.bottom5.map((r, i) => (
-                    <tr key={i} className="border-b border-neutral-850 last:border-0">
-                      <td className="py-1.5 px-2.5 w-7 text-center">
-                        <div className="flex justify-center">{renderRankBadge(i + 1)}</div>
-                      </td>
-                      <td className="py-1.5 px-2 font-black text-white">{r.name}</td>
-                      <td className="py-1.5 px-2 text-right font-bold font-mono text-neutral-300">
-                        {r.score.toLocaleString()}
-                      </td>
-                      <td className="py-1.5 px-2.5 text-right text-[10px] text-neutral-500 font-mono">
-                        {r.date}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {/* 最低スコア */}
+        <div>
+          <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
+            最低スコア
+          </span>
+          <div className="bg-neutral-950 rounded-xl border border-neutral-800 overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <tbody>
+                {records.bottom5.map((r, i) => (
+                  <tr key={i} className="border-b border-neutral-850 last:border-0">
+                    <td className="py-1.5 px-2.5 w-8 text-center">
+                      <div className="flex justify-center">{renderRankBadge(i + 1)}</div>
+                    </td>
+                    <td className="py-1.5 px-3 font-black text-white">{r.name}</td>
+                    <td className="py-1.5 px-3 text-right font-bold font-mono text-neutral-300">
+                      {r.score.toLocaleString()}
+                    </td>
+                    <td className="py-1.5 px-3 text-right text-[10px] text-neutral-500 font-mono">
+                      {r.date}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* 連勝記録（案B: 上部に現在連勝中・最大5名 ＋ 下に歴代Top記録） */}
-        <div className="flex flex-col">
+        <div>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-black text-neutral-400">連勝記録</span>
-            <span className="text-[10px] text-neutral-500 font-mono">2連勝以上</span>
           </div>
 
           {/* ★案B: 現在更新中（activeStreaks: 最大5名） */}
           {records.activeStreaks && records.activeStreaks.length > 0 && (
-            <div className="mb-2.5 p-2 rounded-xl bg-cyan-950/30 border border-cyan-800/50 space-y-1.5">
+            <div className="mb-2 p-2 rounded-xl bg-cyan-950/30 border border-cyan-800/50 space-y-1.5">
               {records.activeStreaks.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -141,23 +139,23 @@ export const StatsRecords: React.FC<StatsRecordsProps> = ({ records, yakumanReco
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-neutral-800 text-[10px] text-neutral-500 font-black">
-                    <th className="py-1.5 px-2.5 w-7 text-center">#</th>
-                    <th className="py-1.5 px-2">名前</th>
-                    <th className="py-1.5 px-2 text-right">連勝数</th>
-                    <th className="py-1.5 px-2.5 text-right">達成日</th>
+                    <th className="py-1.5 px-2.5 w-8 text-center">#</th>
+                    <th className="py-1.5 px-3">名前</th>
+                    <th className="py-1.5 px-3 text-right">連勝数</th>
+                    <th className="py-1.5 px-3 text-right">達成日</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.streaks.map((s, i) => (
                     <tr key={i} className="border-b border-neutral-850 last:border-0">
-                      <td className="py-1.5 px-2.5 w-7 text-center">
+                      <td className="py-1.5 px-2.5 w-8 text-center">
                         <div className="flex justify-center">{renderRankBadge(i + 1)}</div>
                       </td>
-                      <td className="py-1.5 px-2 font-black text-white">{s.name}</td>
-                      <td className="py-1.5 px-2 text-right font-black font-mono text-white">
+                      <td className="py-1.5 px-3 font-black text-white">{s.name}</td>
+                      <td className="py-1.5 px-3 text-right font-black font-mono text-white">
                         {s.maxStreak} <span className="text-[10px] font-normal text-neutral-400">連勝</span>
                       </td>
-                      <td className="py-1.5 px-2.5 text-right text-[10px] text-neutral-500 font-mono">
+                      <td className="py-1.5 px-3 text-right text-[10px] text-neutral-500 font-mono">
                         {s.achievedDate || '-'}
                       </td>
                     </tr>
@@ -169,7 +167,7 @@ export const StatsRecords: React.FC<StatsRecordsProps> = ({ records, yakumanReco
         </div>
 
         {/* 役満記録 */}
-        <div className="sm:col-span-2 pt-3 border-t border-neutral-800">
+        <div className="pt-2 border-t border-neutral-800">
           <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
             役満記録
           </span>
