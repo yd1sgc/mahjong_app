@@ -3,14 +3,17 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { RoundStatsRow } from '@/lib/mahjong/statsCalc';
+import { calculatePcaStyles, PcaResult } from '@/lib/mahjong/pcaCalc';
 
 interface StyleScatterChartProps {
   roundStats: RoundStatsRow[];
 }
 
+type ChartType = 'riichi_furo' | 'agari_houju' | 'pca';
+
 export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
-  const [chartType, setChartType] = useState<'riichi_furo' | 'agari_houju' | 'power_speed'>('riichi_furo');
+  const [chartType, setChartType] = useState<ChartType>('riichi_furo');
   const [minKyoku, setMinKyoku] = useState<'all' | '100' | '500' | '1000'>('all');
   const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
 
@@ -30,90 +33,309 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
     return found || filteredPlayers[0];
   }, [filteredPlayers, selectedPlayerName]);
 
-  // 全体平均値
-  const { avgRiichi, avgFuro } = useMemo(() => {
-    if (filteredPlayers.length === 0) return { avgRiichi: 0, avgFuro: 0 };
+  // PCA主成分分析の計算
+  const pcaResult: PcaResult | null = useMemo(() => {
+    if (chartType !== 'pca' || filteredPlayers.length < 3) return null;
+    return calculatePcaStyles(filteredPlayers);
+  }, [chartType, filteredPlayers]);
+
+  // 各種平均値
+  const averages = useMemo(() => {
+    if (filteredPlayers.length === 0) {
+      return { avgRiichi: 0, avgFuro: 0, avgAgariRate: 0, avgHoujuRate: 0 };
+    }
+    const n = filteredPlayers.length;
     const rSum = filteredPlayers.reduce((acc, p) => acc + p.riichiRate, 0);
     const fSum = filteredPlayers.reduce((acc, p) => acc + p.furoRate, 0);
+    const aSum = filteredPlayers.reduce((acc, p) => acc + p.agariRate, 0);
+    const hSum = filteredPlayers.reduce((acc, p) => acc + p.houjuRate, 0);
     return {
-      avgRiichi: Math.round((rSum / filteredPlayers.length) * 10) / 10,
-      avgFuro: Math.round((fSum / filteredPlayers.length) * 10) / 10,
+      avgRiichi: Math.round((rSum / n) * 10) / 10,
+      avgFuro: Math.round((fSum / n) * 10) / 10,
+      avgAgariRate: Math.round((aSum / n) * 10) / 10,
+      avgHoujuRate: Math.round((hSum / n) * 10) / 10,
     };
   }, [filteredPlayers]);
 
-  // SVG座標マッピング (viewBox: 0 0 480 410)
+  // SVG座標マッピング設定 (viewBox: 0 0 480 410)
   // 枠エリア: X 46..446 (幅400), Y 30..360 (高さ330)
-  const minX = 10, maxX = 45;
-  const minY = 5, maxY = 38;
-  const mapX = (furo: number) => 46 + ((furo - minX) / (maxX - minX)) * 400;
-  const mapY = (riichi: number) => 360 - ((riichi - minY) / (maxY - minY)) * 330;
+  const chartConfig = useMemo(() => {
+    if (chartType === 'agari_houju') {
+      const minX = 6;
+      const maxX = 20;
+      const minY = 12;
+      const maxY = 32;
+      const mapX = (houju: number) => 46 + ((houju - minX) / (maxX - minX)) * 400;
+      const mapY = (agari: number) => 360 - ((agari - minY) / (maxY - minY)) * 330;
+      const avgX = Math.max(46, Math.min(446, mapX(averages.avgHoujuRate)));
+      const avgY = Math.max(30, Math.min(360, mapY(averages.avgAgariRate)));
+      return {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        mapX,
+        mapY,
+        avgX,
+        avgY,
+        xTitle: '放銃率 (%)',
+        yTitle: '和了率 (%)',
+        xMinLabel: '6%',
+        xAvgLabel: `${averages.avgHoujuRate}%`,
+        xMaxLabel: '20%',
+        yMinLabel: '12%',
+        yAvgLabel: `${averages.avgAgariRate}%`,
+        yMaxLabel: '32%',
+        qTopLeft: '鉄壁好調',
+        qTopRight: '超乱打戦',
+        qBottomLeft: '慎重守備',
+        qBottomRight: '苦戦被弾',
+      };
+    }
 
-  const avgX = Math.max(46, Math.min(446, mapX(avgFuro)));
-  const avgY = Math.max(30, Math.min(360, mapY(avgRiichi)));
+    if (chartType === 'pca') {
+      const maxScore = pcaResult ? Math.max(pcaResult.maxAbsScore, 2.5) : 3.0;
+      const minX = -maxScore;
+      const maxX = maxScore;
+      const minY = -maxScore;
+      const maxY = maxScore;
+      const mapX = (score1: number) => 46 + ((score1 - minX) / (maxX - minX)) * 400;
+      const mapY = (score2: number) => 360 - ((score2 - minY) / (maxY - minY)) * 330;
+      const avgX = 246; // 原点 0
+      const avgY = 195; // 原点 0
+      return {
+        minX,
+        maxX,
+        minY,
+        maxY,
+        mapX,
+        mapY,
+        avgX,
+        avgY,
+        xTitle: `PC1: 手役・仕掛け (${pcaResult ? pcaResult.pc1Ratio : 0}%)`,
+        yTitle: `PC2: 参加・粘り (${pcaResult ? pcaResult.pc2Ratio : 0}%)`,
+        xMinLabel: `-${maxScore}`,
+        xAvgLabel: '0',
+        xMaxLabel: `+${maxScore}`,
+        yMinLabel: `-${maxScore}`,
+        yAvgLabel: '0',
+        yMaxLabel: `+${maxScore}`,
+        qTopLeft: '速攻手筋',
+        qTopRight: '面前重厚',
+        qBottomLeft: '守備オリ',
+        qBottomRight: '慎重ダマ',
+      };
+    }
 
-  // 各プロット点の座標、端の見切れ防止アンカー、および近接ラベル自動分散（衝突回避）
+    // デフォルト: riichi_furo
+    const minX = 10;
+    const maxX = 45;
+    const minY = 5;
+    const maxY = 38;
+    const mapX = (furo: number) => 46 + ((furo - minX) / (maxX - minX)) * 400;
+    const mapY = (riichi: number) => 360 - ((riichi - minY) / (maxY - minY)) * 330;
+    const avgX = Math.max(46, Math.min(446, mapX(averages.avgFuro)));
+    const avgY = Math.max(30, Math.min(360, mapY(averages.avgRiichi)));
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      mapX,
+      mapY,
+      avgX,
+      avgY,
+      xTitle: '副露率 (%)',
+      yTitle: '立直率 (%)',
+      xMinLabel: '10%',
+      xAvgLabel: `${averages.avgFuro}%`,
+      xMaxLabel: '45%',
+      yMinLabel: '5%',
+      yAvgLabel: `${averages.avgRiichi}%`,
+      yMaxLabel: '38%',
+      qTopLeft: '面前リーチ',
+      qTopRight: '超積極',
+      qBottomLeft: '慎重ダマ',
+      qBottomRight: '副露スピード',
+    };
+  }, [chartType, averages, pcaResult]);
+
+  // 各プロット点の座標・衝突回避・ラベル位置計算
   const placedPoints = useMemo(() => {
+    if (chartType === 'pca') {
+      if (!pcaResult) return [];
+      const list = pcaResult.players.map((p) => {
+        const rawCx = chartConfig.mapX(p.pc1);
+        const rawCy = chartConfig.mapY(p.pc2);
+        const cx = Math.max(52, Math.min(440, rawCx));
+        const cy = Math.max(38, Math.min(352, rawCy));
+
+        let anchor: 'middle' | 'start' | 'end' = 'middle';
+        let labelDx = 0;
+        if (cx > 415) {
+          anchor = 'end';
+          labelDx = -6;
+        } else if (cx < 78) {
+          anchor = 'start';
+          labelDx = 6;
+        }
+
+        // 基本オフセット: 点の上部
+        const labelDy = cy < 50 ? 15 : -10;
+
+        return {
+          ...p.stats,
+          pc1: p.pc1,
+          pc2: p.pc2,
+          cx,
+          cy,
+          labelDx,
+          labelDy,
+          anchor,
+        };
+      });
+
+      // 衝突回避
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const dx = list[i].cx - list[j].cx;
+          const dy = list[i].cy - list[j].cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 26) {
+            if (list[i].cy <= list[j].cy) {
+              list[i].labelDy = -10;
+              list[j].labelDy = 15;
+            } else {
+              list[i].labelDy = 15;
+              list[j].labelDy = -10;
+            }
+          }
+        }
+      }
+      return list;
+    }
+
+    // riichi_furo または agari_houju
     const list = filteredPlayers.map((p) => {
-      const cx = Math.max(46, Math.min(446, mapX(p.furoRate)));
-      const cy = Math.max(30, Math.min(360, mapY(p.riichiRate)));
-      
+      const rawX = chartType === 'agari_houju' ? p.houjuRate : p.furoRate;
+      const rawY = chartType === 'agari_houju' ? p.agariRate : p.riichiRate;
+      const rawCx = chartConfig.mapX(rawX);
+      const rawCy = chartConfig.mapY(rawY);
+      const cx = Math.max(52, Math.min(440, rawCx));
+      const cy = Math.max(38, Math.min(352, rawCy));
+
       let anchor: 'middle' | 'start' | 'end' = 'middle';
       let labelDx = 0;
-      if (cx > 425) {
+      if (cx > 415) {
         anchor = 'end';
-        labelDx = -5;
-      } else if (cx < 75) {
+        labelDx = -6;
+      } else if (cx < 78) {
         anchor = 'start';
-        labelDx = 5;
+        labelDx = 6;
       }
+
+      // 基本オフセット: 点の上部 (上端付近なら下部)
+      const labelDy = cy < 50 ? 15 : -10;
 
       return {
         ...p,
         cx,
         cy,
         labelDx,
-        labelDy: -8,
+        labelDy,
         anchor,
       };
     });
 
+    // 衝突回避
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const dx = list[i].cx - list[j].cx;
         const dy = list[i].cy - list[j].cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 28) {
+        if (dist < 26) {
           if (list[i].cy <= list[j].cy) {
-            list[i].labelDy = -9;
-            list[j].labelDy = 13;
+            list[i].labelDy = -10;
+            list[j].labelDy = 15;
           } else {
-            list[i].labelDy = 13;
-            list[j].labelDy = -9;
+            list[i].labelDy = 15;
+            list[j].labelDy = -10;
           }
         }
       }
     }
 
     return list;
-  }, [filteredPlayers]);
+  }, [chartType, filteredPlayers, chartConfig, pcaResult]);
 
   // タイプ分類
-  const getTypeTitle = (riichi: number, furo: number) => {
-    if (riichi >= avgRiichi && furo < avgFuro) return '面前リーチ派';
-    if (riichi >= avgRiichi && furo >= avgFuro) return '超積極参加派';
-    if (riichi < avgRiichi && furo >= avgFuro) return '副露スピード派';
+  const getPlayerTypeTitle = (player: RoundStatsRow) => {
+    if (chartType === 'agari_houju') {
+      const isHighAgari = player.agariRate >= averages.avgAgariRate;
+      const isLowHouju = player.houjuRate < averages.avgHoujuRate;
+      if (isHighAgari && isLowHouju) return '鉄壁好調型';
+      if (isHighAgari && !isLowHouju) return '超乱打戦型';
+      if (!isHighAgari && isLowHouju) return '慎重守備型';
+      return '苦戦被弾型';
+    }
+
+    if (chartType === 'pca') {
+      const pScore = pcaResult?.players.find((item) => item.name === player.name);
+      if (!pScore) return '';
+      if (pScore.pc1 >= 0 && pScore.pc2 >= 0) return '重厚面前攻撃型';
+      if (pScore.pc1 < 0 && pScore.pc2 >= 0) return '速攻手筋参加型';
+      if (pScore.pc1 >= 0 && pScore.pc2 < 0) return '面前ダマ慎重型';
+      return '守備オリ重視型';
+    }
+
+    // riichi_furo
+    if (player.riichiRate >= averages.avgRiichi && player.furoRate < averages.avgFuro) {
+      return '面前リーチ派';
+    }
+    if (player.riichiRate >= averages.avgRiichi && player.furoRate >= averages.avgFuro) {
+      return '超積極参加派';
+    }
+    if (player.riichiRate < averages.avgRiichi && player.furoRate >= averages.avgFuro) {
+      return '副露スピード派';
+    }
     return '慎重・ダマ派';
   };
 
-  const activeTypeTitle = activePlayer
-    ? getTypeTitle(activePlayer.riichiRate, activePlayer.furoRate)
-    : '';
+  const activeTypeTitle = activePlayer ? getPlayerTypeTitle(activePlayer) : '';
 
-  // 打点に応じた色
+  // 打点の動的閾値（母集団の3分位: 上位1/3・下位1/3）
+  const { highThreshold, lowThreshold } = useMemo(() => {
+    if (filteredPlayers.length < 3) {
+      return { highThreshold: 7200, lowThreshold: 6500 };
+    }
+    const scores = filteredPlayers
+      .map((p) => p.avgAgari)
+      .filter((s) => s > 0)
+      .sort((a, b) => b - a);
+
+    if (scores.length < 3) {
+      return { highThreshold: 7200, lowThreshold: 6500 };
+    }
+
+    const n = scores.length;
+    const highIdx = Math.floor(n / 3);
+    const lowIdx = Math.floor((n * 2) / 3);
+
+    let high = Math.round(scores[highIdx] / 100) * 100;
+    let low = Math.round(scores[lowIdx] / 100) * 100;
+
+    if (high <= low) {
+      high = low + 100;
+    }
+
+    return { highThreshold: high, lowThreshold: low };
+  }, [filteredPlayers]);
+
+  // 打点に応じた動的色判定（母集団の上位1/3が赤、中位1/3が黄、下位1/3が緑）
   const getAgariColor = (avgAgari: number) => {
-    if (avgAgari >= 7200) return '#f43f5e'; // 赤
-    if (avgAgari >= 6500) return '#f59e0b'; // 黄
-    return '#10b981'; // 緑
+    if (avgAgari >= highThreshold) return '#f43f5e'; // 赤: 上位1/3 (高打点)
+    if (avgAgari >= lowThreshold) return '#f59e0b';  // 黄: 中位1/3 (標準)
+    return '#10b981';                              // 緑: 下位1/3 (安手)
   };
 
   // PC対応: マウスホイール横スクロール連動
@@ -134,6 +356,15 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
       chipsContainerRef.current.scrollLeft += 160;
     }
   };
+
+  // 選択プレイヤーを最前面にするためソート（非選択を先に、選択を最後に描画）
+  const sortedRenderPoints = useMemo(() => {
+    return [...placedPoints].sort((a, b) => {
+      const aSel = activePlayer?.name === a.name ? 1 : 0;
+      const bSel = activePlayer?.name === b.name ? 1 : 0;
+      return aSel - bSel;
+    });
+  }, [placedPoints, activePlayer]);
 
   return (
     <section className="rounded-2xl bg-neutral-900 border border-neutral-800 overflow-hidden shadow-xs">
@@ -164,14 +395,14 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
       {/* アコーディオン開時のみ描画（オンデマンド） */}
       {isOpen && (
         <div className="border-t border-neutral-800 p-4 flex flex-col gap-3">
-          {/* 上部コントロールバー（将来のグラフ追加対応 ＆ 局数フィルター） */}
+          {/* 上部コントロールバー（3チャート切り替え ＆ 局数フィルター） */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-neutral-800/80">
             {/* グラフ種類タブ */}
             <div className="flex gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-800 self-start">
               <button
                 type="button"
                 onClick={() => setChartType('riichi_furo')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   chartType === 'riichi_furo'
                     ? 'bg-amber-500 text-neutral-950 shadow-xs'
                     : 'text-neutral-400 hover:text-white'
@@ -181,19 +412,25 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
               </button>
               <button
                 type="button"
-                disabled
-                className="px-2.5 py-1 rounded-lg text-xs font-bold text-neutral-600 cursor-not-allowed"
-                title="将来追加予定"
+                onClick={() => setChartType('agari_houju')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  chartType === 'agari_houju'
+                    ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
               >
                 和了 × 放銃
               </button>
               <button
                 type="button"
-                disabled
-                className="px-2.5 py-1 rounded-lg text-xs font-bold text-neutral-600 cursor-not-allowed"
-                title="将来追加予定"
+                onClick={() => setChartType('pca')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  chartType === 'pca'
+                    ? 'bg-amber-500 text-neutral-950 shadow-xs'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
               >
-                打点 × 速度
+                主成分分析 (PCA)
               </button>
             </div>
 
@@ -204,7 +441,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 <button
                   type="button"
                   onClick={() => setMinKyoku('all')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     minKyoku === 'all'
                       ? 'bg-amber-500 text-neutral-950 font-black'
                       : 'bg-neutral-800 text-neutral-400 hover:text-white'
@@ -215,7 +452,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 <button
                   type="button"
                   onClick={() => setMinKyoku('100')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     minKyoku === '100'
                       ? 'bg-amber-500 text-neutral-950 font-black'
                       : 'bg-neutral-800 text-neutral-400 hover:text-white'
@@ -226,7 +463,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 <button
                   type="button"
                   onClick={() => setMinKyoku('500')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     minKyoku === '500'
                       ? 'bg-amber-500 text-neutral-950 font-black'
                       : 'bg-neutral-800 text-neutral-400 hover:text-white'
@@ -237,7 +474,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 <button
                   type="button"
                   onClick={() => setMinKyoku('1000')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     minKyoku === '1000'
                       ? 'bg-amber-500 text-neutral-950 font-black'
                       : 'bg-neutral-800 text-neutral-400 hover:text-white'
@@ -249,9 +486,11 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
             </div>
           </div>
 
-          {filteredPlayers.length === 0 ? (
+          {filteredPlayers.length === 0 || (chartType === 'pca' && !pcaResult) ? (
             <div className="py-12 text-center text-xs text-neutral-500 font-bold">
-              該当する局データがありません
+              {chartType === 'pca'
+                ? '主成分分析には最低3名以上の局データが必要です'
+                : '該当する局データがありません'}
             </div>
           ) : (
             <>
@@ -265,32 +504,32 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                   <rect
                     x="46"
                     y="30"
-                    width={Math.max(0, avgX - 46)}
-                    height={Math.max(0, avgY - 30)}
+                    width={Math.max(0, chartConfig.avgX - 46)}
+                    height={Math.max(0, chartConfig.avgY - 30)}
                     fill="#3b82f6"
                     fillOpacity="0.04"
                   />
                   <rect
-                    x={avgX}
+                    x={chartConfig.avgX}
                     y="30"
-                    width={Math.max(0, 446 - avgX)}
-                    height={Math.max(0, avgY - 30)}
+                    width={Math.max(0, 446 - chartConfig.avgX)}
+                    height={Math.max(0, chartConfig.avgY - 30)}
                     fill="#ef4444"
                     fillOpacity="0.04"
                   />
                   <rect
                     x="46"
-                    y={avgY}
-                    width={Math.max(0, avgX - 46)}
-                    height={Math.max(0, 360 - avgY)}
+                    y={chartConfig.avgY}
+                    width={Math.max(0, chartConfig.avgX - 46)}
+                    height={Math.max(0, 360 - chartConfig.avgY)}
                     fill="#8b5cf6"
                     fillOpacity="0.04"
                   />
                   <rect
-                    x={avgX}
-                    y={avgY}
-                    width={Math.max(0, 446 - avgX)}
-                    height={Math.max(0, 360 - avgY)}
+                    x={chartConfig.avgX}
+                    y={chartConfig.avgY}
+                    width={Math.max(0, 446 - chartConfig.avgX)}
+                    height={Math.max(0, 360 - chartConfig.avgY)}
                     fill="#10b981"
                     fillOpacity="0.04"
                   />
@@ -309,18 +548,18 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                   {/* 十字平均線 */}
                   <line
                     x1="46"
-                    y1={avgY}
+                    y1={chartConfig.avgY}
                     x2="446"
-                    y2={avgY}
+                    y2={chartConfig.avgY}
                     stroke="#38bdf8"
                     strokeWidth="1.5"
                     strokeDasharray="3 3"
                     opacity="0.7"
                   />
                   <line
-                    x1={avgX}
+                    x1={chartConfig.avgX}
                     y1="30"
-                    x2={avgX}
+                    x2={chartConfig.avgX}
                     y2="360"
                     stroke="#38bdf8"
                     strokeWidth="1.5"
@@ -328,50 +567,50 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     opacity="0.7"
                   />
 
-                  {/* 象限名 */}
+                  {/* 象限名（密集プロットと重ならないよう四隅に固定配置） */}
                   <text
-                    x={(46 + avgX) / 2}
-                    y="48"
-                    textAnchor="middle"
-                    fontSize="11"
+                    x="56"
+                    y="46"
+                    textAnchor="start"
+                    fontSize="10"
                     fontWeight="bold"
                     fill="#60a5fa"
-                    opacity="0.85"
+                    opacity="0.65"
                   >
-                    面前リーチ
+                    {chartConfig.qTopLeft}
                   </text>
                   <text
-                    x={(avgX + 446) / 2}
-                    y="48"
-                    textAnchor="middle"
-                    fontSize="11"
+                    x="436"
+                    y="46"
+                    textAnchor="end"
+                    fontSize="10"
                     fontWeight="bold"
                     fill="#f87171"
-                    opacity="0.85"
+                    opacity="0.65"
                   >
-                    超積極
+                    {chartConfig.qTopRight}
                   </text>
                   <text
-                    x={(46 + avgX) / 2}
-                    y="350"
-                    textAnchor="middle"
-                    fontSize="11"
+                    x="56"
+                    y="348"
+                    textAnchor="start"
+                    fontSize="10"
                     fontWeight="bold"
                     fill="#a78bfa"
-                    opacity="0.85"
+                    opacity="0.65"
                   >
-                    慎重ダマ
+                    {chartConfig.qBottomLeft}
                   </text>
                   <text
-                    x={(avgX + 446) / 2}
-                    y="350"
-                    textAnchor="middle"
-                    fontSize="11"
+                    x="436"
+                    y="348"
+                    textAnchor="end"
+                    fontSize="10"
                     fontWeight="bold"
                     fill="#34d399"
-                    opacity="0.85"
+                    opacity="0.65"
                   >
-                    副露スピード
+                    {chartConfig.qBottomRight}
                   </text>
 
                   {/* 軸タイトル（目盛と物理的重なりゼロの独立配置） */}
@@ -383,7 +622,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fontWeight="bold"
                     fill="#a3a3a3"
                   >
-                    立直率 (%)
+                    {chartConfig.yTitle}
                   </text>
                   <text
                     x="446"
@@ -393,7 +632,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fontWeight="bold"
                     fill="#a3a3a3"
                   >
-                    副露率 (%)
+                    {chartConfig.xTitle}
                   </text>
 
                   {/* X軸目盛（y=376: タイトル y=398 と22px分離） */}
@@ -405,10 +644,10 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fill="#737373"
                     className="font-mono"
                   >
-                    10%
+                    {chartConfig.xMinLabel}
                   </text>
                   <text
-                    x={avgX}
+                    x={chartConfig.avgX}
                     y="376"
                     textAnchor="middle"
                     fontSize="10"
@@ -416,7 +655,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fontWeight="bold"
                     className="font-mono"
                   >
-                    {avgFuro}%
+                    {chartConfig.xAvgLabel}
                   </text>
                   <text
                     x="446"
@@ -426,7 +665,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fill="#737373"
                     className="font-mono"
                   >
-                    45%
+                    {chartConfig.xMaxLabel}
                   </text>
 
                   {/* Y軸目盛（x=38: 枠線から8px離し、左端余白8px確保で見切れゼロ） */}
@@ -438,18 +677,18 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fill="#737373"
                     className="font-mono"
                   >
-                    5%
+                    {chartConfig.yMinLabel}
                   </text>
                   <text
                     x="38"
-                    y={avgY + 3}
+                    y={chartConfig.avgY + 3}
                     textAnchor="end"
                     fontSize="10"
                     fill="#38bdf8"
                     fontWeight="bold"
                     className="font-mono"
                   >
-                    {avgRiichi}%
+                    {chartConfig.yAvgLabel}
                   </text>
                   <text
                     x="38"
@@ -459,15 +698,15 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     fill="#737373"
                     className="font-mono"
                   >
-                    38%
+                    {chartConfig.yMaxLabel}
                   </text>
 
-                  {/* プロット点（小型ドット・黒フチ輪郭） */}
-                  {placedPoints.map((p) => {
+                  {/* プロット点（選択プレイヤーを最前面に描画） */}
+                  {sortedRenderPoints.map((p) => {
                     const isSel = activePlayer?.name === p.name;
                     const color = getAgariColor(p.avgAgari);
                     const textX = p.cx + p.labelDx;
-                    const textY = isSel ? p.cy - 10 : p.cy + p.labelDy;
+                    const textY = p.cy + p.labelDy;
 
                     return (
                       <g
@@ -501,7 +740,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                           fontWeight={isSel ? 'bold' : '600'}
                           fill={isSel ? '#fbbf24' : '#f5f5f5'}
                           stroke="#000000"
-                          strokeWidth={3}
+                          strokeWidth={3.5}
                           strokeLinejoin="round"
                           style={{ paintOrder: 'stroke fill' }}
                         >
@@ -513,26 +752,33 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 </svg>
               </div>
 
-              {/* 凡例（「平均打点」を明確に記載） */}
-              <div className="flex items-center justify-between text-[11px] text-neutral-400 px-1 border-b border-neutral-800/60 pb-2">
+              {/* 凡例（スマホ幅でも崩れないコンパクト1行レイアウト・動的3分位連動） */}
+              <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1 text-[11px] text-neutral-400 px-1 border-b border-neutral-800/60 pb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-neutral-300 font-bold">平均打点:</span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                    7,200点+
+                  <span className="flex items-center gap-1 font-mono">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block shrink-0" />
+                    ≥{highThreshold.toLocaleString()}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
-                    6,500〜7,199
+                  <span className="flex items-center gap-1 font-mono">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shrink-0" />
+                    {lowThreshold.toLocaleString()}~
                   </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                    6,500未満
+                  <span className="flex items-center gap-1 font-mono">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                    &lt;{lowThreshold.toLocaleString()}
                   </span>
                 </div>
-                <span className="text-[10px] text-neutral-500 font-mono">
-                  対象: <span className="text-white font-bold">{filteredPlayers.length}</span>名
-                </span>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-neutral-500 ml-auto">
+                  {chartType === 'pca' && pcaResult && (
+                    <span className="text-amber-400 font-bold bg-neutral-950 px-1.5 py-0.5 rounded border border-neutral-800">
+                      累積説明率: {pcaResult.cumulativeRatio}%
+                    </span>
+                  )}
+                  <span>
+                    対象: <span className="text-white font-bold">{filteredPlayers.length}</span>名
+                  </span>
+                </div>
               </div>
 
               {/* プレイヤー選択チップ一覧（横スクロール保持 ＋ PCホイール＆左右矢印対応） */}
@@ -580,7 +826,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                 </button>
               </div>
 
-              {/* 選択プレイヤー詳細カード（無駄なポエム全廃・数字とタイプのみ） */}
+              {/* 選択プレイヤー詳細カード（チャート種類に応じたスタッツ表示） */}
               {activePlayer && (
                 <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
                   <div className="flex items-center justify-between mb-2">
@@ -597,59 +843,201 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        立直率
-                      </span>
-                      <span className="text-sm font-bold font-mono text-white">
-                        {activePlayer.riichiRate}%
-                      </span>
+                  {chartType === 'pca' ? (
+                    <div className="space-y-2">
+                      {/* PCA主成分得点バッジ */}
+                      {(() => {
+                        const pScore = pcaResult?.players.find(
+                          (item) => item.name === activePlayer.name
+                        );
+                        return (
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs font-mono">
+                            <span className="text-neutral-400 font-bold">主成分得点:</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sky-400 font-bold">
+                                PC1: {pScore && pScore.pc1 > 0 ? '+' : ''}
+                                {pScore ? pScore.pc1 : 0}
+                              </span>
+                              <span className="text-amber-400 font-bold">
+                                PC2: {pScore && pScore.pc2 > 0 ? '+' : ''}
+                                {pScore ? pScore.pc2 : 0}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 主要6指標 */}
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            和了率
+                          </span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {activePlayer.agariRate}%
+                          </span>
+                        </div>
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            放銃率
+                          </span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {activePlayer.houjuRate}%
+                          </span>
+                        </div>
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            平均和了打点
+                          </span>
+                          <span
+                            className="text-sm font-bold font-mono"
+                            style={{ color: getAgariColor(activePlayer.avgAgari) }}
+                          >
+                            {activePlayer.avgAgari.toLocaleString()}点
+                          </span>
+                        </div>
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            立直率
+                          </span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {activePlayer.riichiRate}%
+                          </span>
+                        </div>
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            副露率
+                          </span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {activePlayer.furoRate}%
+                          </span>
+                        </div>
+                        <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                          <span className="text-[10px] text-neutral-400 block font-bold">
+                            流局聴牌率
+                          </span>
+                          <span className="text-sm font-bold font-mono text-white">
+                            {activePlayer.tenpaiRate}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        副露率
-                      </span>
-                      <span className="text-sm font-bold font-mono text-white">
-                        {activePlayer.furoRate}%
-                      </span>
+                  ) : chartType === 'agari_houju' ? (
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          和了率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.agariRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          放銃率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.houjuRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          和銃差
+                        </span>
+                        <span
+                          className={`text-sm font-bold font-mono ${
+                            activePlayer.agariHoujuDiff >= 0
+                              ? 'text-sky-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {activePlayer.agariHoujuDiff >= 0 ? '+' : ''}
+                          {activePlayer.agariHoujuDiff}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          平均和了打点
+                        </span>
+                        <span
+                          className="text-sm font-bold font-mono"
+                          style={{ color: getAgariColor(activePlayer.avgAgari) }}
+                        >
+                          {activePlayer.avgAgari.toLocaleString()}点
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          平均放銃打点
+                        </span>
+                        <span className="text-sm font-bold font-mono text-neutral-300">
+                          {activePlayer.avgHouju.toLocaleString()}点
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          ツモ率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.tsumoRate}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        平均和了打点
-                      </span>
-                      <span
-                        className="text-sm font-bold font-mono"
-                        style={{ color: getAgariColor(activePlayer.avgAgari) }}
-                      >
-                        {activePlayer.avgAgari.toLocaleString()}点
-                      </span>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          立直率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.riichiRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          副露率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.furoRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          平均和了打点
+                        </span>
+                        <span
+                          className="text-sm font-bold font-mono"
+                          style={{ color: getAgariColor(activePlayer.avgAgari) }}
+                        >
+                          {activePlayer.avgAgari.toLocaleString()}点
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          ダマ和了率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.damaAgariRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          和了率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.agariRate}%
+                        </span>
+                      </div>
+                      <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
+                        <span className="text-[10px] text-neutral-400 block font-bold">
+                          放銃率
+                        </span>
+                        <span className="text-sm font-bold font-mono text-white">
+                          {activePlayer.houjuRate}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        ダマ和了率
-                      </span>
-                      <span className="text-sm font-bold font-mono text-white">
-                        {activePlayer.damaAgariRate}%
-                      </span>
-                    </div>
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        和了率
-                      </span>
-                      <span className="text-sm font-bold font-mono text-white">
-                        {activePlayer.agariRate}%
-                      </span>
-                    </div>
-                    <div className="bg-neutral-900 p-2 rounded-lg border border-neutral-800">
-                      <span className="text-[10px] text-neutral-400 block font-bold">
-                        放銃率
-                      </span>
-                      <span className="text-sm font-bold font-mono text-white">
-                        {activePlayer.houjuRate}%
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </>
