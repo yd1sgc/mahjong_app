@@ -283,18 +283,25 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
                       const winnerName = winnerP?.name || '不明';
 
                       if (loserSeat) {
-                        // ロン和了 (← で放銃者を表示)
+                        // ロン和了 (← で放銃者を表示・矢印の位置を固定幅で整列)
                         const loserP = game.participants.find((p) => p.member_id === loserSeat.member_id);
                         const loserName = loserP?.name || '不明';
                         resultNode = (
-                          <span>
-                            <span className="text-white font-black">{winnerName}</span>{' '}
-                            <span className="text-neutral-500 text-[11px] font-normal">← {loserName}</span>
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-16 shrink-0 font-black text-white truncate">{winnerName}</span>
+                            <span className="text-neutral-500 text-[11px] font-normal flex items-center gap-1">
+                              <span>←</span>
+                              <span className="text-neutral-300">{loserName}</span>
+                            </span>
+                          </div>
                         );
                       } else {
                         // ツモ和了 (矢印なしで名前のみ)
-                        resultNode = <span className="text-white font-black">{winnerName}</span>;
+                        resultNode = (
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-16 shrink-0 font-black text-white truncate">{winnerName}</span>
+                          </div>
+                        );
                       }
 
                       const rawScore = winnerSeat.base_point > 0 ? winnerSeat.base_point : winnerSeat.score_delta;
@@ -317,7 +324,7 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
 
                     return (
                       <tr key={r.round_id || idx} className="hover:bg-neutral-900/40">
-                        <td className="py-2 px-3 font-bold text-neutral-300 w-24 whitespace-nowrap">
+                        <td className="py-2.5 px-3 font-bold text-neutral-300 w-20 whitespace-nowrap">
                           {r.kyoku_name}
                           {r.honba > 0 && (
                             <span className="ml-1 text-[10px] text-neutral-500 font-normal">
@@ -325,8 +332,8 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
                             </span>
                           )}
                         </td>
-                        <td className="py-2 px-3">{resultNode}</td>
-                        <td className="py-2 px-3 text-right whitespace-nowrap">{scoreNode}</td>
+                        <td className="py-2.5 px-3">{resultNode}</td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">{scoreNode}</td>
                       </tr>
                     );
                   })}
