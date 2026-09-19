@@ -335,6 +335,7 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
             }}
             onCommitNormal={handleCommitNormalRyukyoku}
             onCommitMid={handleCommitMidRyukyoku}
+            currentDealer={currentDealer}
           />
         )}
 
