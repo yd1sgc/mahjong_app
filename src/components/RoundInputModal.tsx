@@ -307,6 +307,10 @@ export const RoundInputModal: React.FC<RoundInputModalProps> = ({
                 submitting={submitting}
                 onCommit={handleFinalCommit}
                 onBack={() => setStep(1)}
+                players={players}
+                currentDealer={currentDealer}
+                han={han}
+                fu={fu}
               />
             )}
           </div>
