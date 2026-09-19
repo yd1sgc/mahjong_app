@@ -217,7 +217,7 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
             >
               <span
                 className={`font-black font-mono leading-tight tracking-tight text-white whitespace-nowrap ${
-                  isSlash ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'
+                  isSlash ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
                 }`}
               >
                 {preset.pointsLabel}
