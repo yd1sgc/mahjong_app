@@ -46,6 +46,24 @@ export interface UseStatsDataReturn {
   refetch: () => Promise<void>;
 }
 
+// Supabase (PostgREST) の1,000行取得上限を安全に突破する自動ページネーションヘルパー
+async function fetchAllRows<T>(
+  fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>
+): Promise<T[]> {
+  const PAGE_SIZE = 1000;
+  let allRows: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await fetcher(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return allRows;
+}
+
 export function useStatsData(): UseStatsDataReturn {
   const [games, setGames] = useState<GameData[]>([]);
   const [rounds, setRounds] = useState<RoundData[]>([]);
@@ -64,18 +82,24 @@ export function useStatsData(): UseStatsDataReturn {
       // 全8テーブルのデータをPromise.allで一括並列取得
       const [
         { data: gData, error: gErr },
-        { data: pData, error: pErr },
-        { data: rData, error: rErr },
-        { data: sData, error: sErr },
+        partList,
+        roundsList,
+        seatsList,
         { data: grpData },
         { data: ruleData },
         { data: memData },
         { data: yData },
       ] = await Promise.all([
         supabase.from('games').select('*').order('played_at', { ascending: false }),
-        supabase.from('game_participants').select('*'),
-        supabase.from('rounds').select('*').order('round_index', { ascending: true }),
-        supabase.from('round_seats').select('*'),
+        fetchAllRows<GameParticipantRow>((from, to) =>
+          supabase.from('game_participants').select('*').range(from, to)
+        ),
+        fetchAllRows<RoundRow>((from, to) =>
+          supabase.from('rounds').select('*').order('round_index', { ascending: true }).range(from, to)
+        ),
+        fetchAllRows<RoundSeatRow>((from, to) =>
+          supabase.from('round_seats').select('*').range(from, to)
+        ),
         supabase.from('groups').select('*').eq('is_archived', 0),
         supabase.from('rule_templates').select('*').eq('is_archived', 0),
         supabase.from('members').select('*').eq('is_archived', 0),
@@ -83,20 +107,13 @@ export function useStatsData(): UseStatsDataReturn {
       ]);
 
       if (gErr) throw new Error(`games取得失敗: ${gErr.message}`);
-      if (pErr) throw new Error(`game_participants取得失敗: ${pErr.message}`);
-      if (rErr) throw new Error(`rounds取得失敗: ${rErr.message}`);
-      if (sErr) throw new Error(`round_seats取得失敗: ${sErr.message}`);
 
       if (grpData) setGroups(grpData);
       if (ruleData) setRules(ruleData);
       if (memData) setMembers(memData);
 
       const yakumanList: YakumanRecordRow[] = yData || [];
-
       const gamesList: GameRow[] = gData || [];
-      const partList: GameParticipantRow[] = pData || [];
-      const roundsList: RoundRow[] = rData || [];
-      const seatsList: RoundSeatRow[] = sData || [];
 
       // ルールID -> ルール名の正規化マップ作成
       const ruleMap = new Map<string, string>();

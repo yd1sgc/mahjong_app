@@ -5,9 +5,10 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GameData, RoundData } from '@/lib/mahjong/statsCalc';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
+import { supabase } from '@/lib/supabase';
 
 interface GameDetailModalProps {
   game: GameData | null;
@@ -19,14 +20,103 @@ const PLAYER_COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
 
 export const GameDetailModal: React.FC<GameDetailModalProps> = ({
   game,
-  rounds,
+  rounds: initialRounds,
   onClose,
 }) => {
   const [showRuleDetail, setShowRuleDetail] = useState(false);
+  const [detailRounds, setDetailRounds] = useState<RoundData[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 対象試合の局詳細・席詳細データをピンポイントでオンデマンド取得
+  useEffect(() => {
+    if (!game) {
+      setDetailRounds([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchGameRounds = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('rounds')
+          .select('*, round_seats(*)')
+          .eq('game_id', game.game_id)
+          .order('round_index', { ascending: true });
+
+        if (error) throw error;
+
+        if (isMounted && data) {
+          type RoundWithSeats = {
+            round_id: string;
+            game_id: string;
+            round_index: number;
+            kyoku_name: string;
+            honba: number;
+            result_type: string;
+            round_seats: {
+              seat: number;
+              member_id: string;
+              base_point: number;
+              honba_point: number;
+              kyotaku_point: number;
+              penalty_point: number;
+              score_delta: number;
+              is_winner: number;
+              is_loser: number;
+              is_riichi: number;
+              is_furo: number;
+              is_tenpai: number;
+            }[];
+          };
+
+          const mapped: RoundData[] = (data as unknown as RoundWithSeats[]).map((r) => ({
+            round_id: r.round_id,
+            game_id: r.game_id,
+            round_index: r.round_index,
+            kyoku_name: r.kyoku_name,
+            honba: r.honba,
+            result_type: r.result_type,
+            seats: (r.round_seats || []).map((s) => ({
+              seat: s.seat,
+              member_id: s.member_id,
+              score_delta: s.score_delta || 0,
+              base_point: s.base_point || 0,
+              honba_point: s.honba_point || 0,
+              kyotaku_point: s.kyotaku_point || 0,
+              penalty_point: s.penalty_point || 0,
+              is_winner: Number(s.is_winner) || 0,
+              is_loser: Number(s.is_loser) || 0,
+              is_riichi: Number(s.is_riichi) || 0,
+              is_furo: Number(s.is_furo) || 0,
+              is_tenpai: Number(s.is_tenpai) || 0,
+            })),
+          }));
+
+          setDetailRounds(mapped);
+        }
+      } catch (err) {
+        console.error('局詳細のオンデマンド取得失敗:', err);
+        // 万が一通信失敗時は親から渡された初期roundsをフォールバックとして使用
+        if (isMounted) setDetailRounds(initialRounds);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchGameRounds();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [game?.game_id]);
+
+  // 表示・計算に使用する有効な局データ
+  const effectiveRounds = detailRounds.length > 0 ? detailRounds : initialRounds;
 
   // 局ごとの4名持ち点推移計算（グラフ用）
   const scoreTrends = useMemo(() => {
-    if (!game || rounds.length === 0) return null;
+    if (!game || effectiveRounds.length === 0) return null;
     const initialPoints: number =
       Number(game.rule_config?.basic?.init_score) ||
       Number(game.rule_config?.init_score) ||
@@ -49,11 +139,11 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
     steps.push({ label: '配給', scores: initialScoreMap });
 
     // 各局を順に累積
-    const sortedRounds = [...rounds].sort((a, b) => a.round_index - b.round_index);
+    const sorted = [...effectiveRounds].sort((a, b) => a.round_index - b.round_index);
     let minScore = initialPoints;
     let maxScore = initialPoints;
 
-    sortedRounds.forEach((r) => {
+    sorted.forEach((r) => {
       const stepScores: Record<string, number> = {};
       sortedParticipants.forEach((p) => {
         const seat = r.seats.find((s) => s.member_id === p.member_id);
@@ -78,11 +168,11 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
       minScore,
       maxScore,
     };
-  }, [game, rounds]);
+  }, [game, effectiveRounds]);
 
   if (!game) return null;
 
-  const sortedRounds = [...rounds].sort((a, b) => a.round_index - b.round_index);
+  const sortedRounds = [...effectiveRounds].sort((a, b) => a.round_index - b.round_index);
 
   // SVGグラフのスケール計算
   let chartLayout = null;
@@ -182,8 +272,8 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
               <table className="w-full text-left text-xs border-collapse">
                 <tbody className="divide-y divide-neutral-850">
                   {sortedRounds.map((r, idx) => {
-                    const winnerSeat = r.seats.find((s) => s.is_winner === 1);
-                    const loserSeat = r.seats.find((s) => s.is_loser === 1);
+                    const winnerSeat = r.seats.find((s) => Number(s.is_winner) === 1);
+                    const loserSeat = r.seats.find((s) => Number(s.is_loser) === 1);
 
                     let resultNode: React.ReactNode = null;
                     let scoreNode: React.ReactNode = null;
@@ -213,6 +303,12 @@ export const GameDetailModal: React.FC<GameDetailModalProps> = ({
                           {rawScore > 0 ? rawScore.toLocaleString() : '-'}
                         </span>
                       );
+                    } else if (r.result_type === 'tsumo') {
+                      resultNode = <span className="text-white font-bold">ツモ和了</span>;
+                      scoreNode = <span className="text-neutral-600 font-mono">-</span>;
+                    } else if (r.result_type === 'ron') {
+                      resultNode = <span className="text-white font-bold">ロン和了</span>;
+                      scoreNode = <span className="text-neutral-600 font-mono">-</span>;
                     } else {
                       // 流局
                       resultNode = <span className="text-neutral-400 font-bold">流局</span>;
