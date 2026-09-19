@@ -137,20 +137,26 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ─── ヘッダー ─── */}
-      <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-        <div>
-          <span className="text-xs font-black text-neutral-200">
-            Step 2/3: 点数を選択
+      {/* ─── ヘッダー（和了者を最大強調・冗長文全廃） ─── */}
+      <div className="flex items-center justify-between border-b border-neutral-800 pb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-lg font-black text-white tracking-tight truncate">
+            {currentTargetWinner}
           </span>
-          <span className="text-xs text-neutral-400 ml-1.5 font-bold">
-            ({currentTargetWinner} {isTargetDealer ? '親' : '子'})
-          </span>
+          {isTargetDealer ? (
+            <span className="text-xs font-black px-2 py-0.5 rounded bg-rose-600 text-white shadow-sm shrink-0">
+              親
+            </span>
+          ) : (
+            <span className="text-xs font-black px-2 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700 shrink-0">
+              子
+            </span>
+          )}
         </div>
         <button
           type="button"
           onClick={onBack}
-          className="text-xs px-2.5 py-1 rounded-lg bg-neutral-850 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-750 font-bold flex items-center gap-1 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-neutral-850 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-750 font-bold flex items-center gap-1 transition-colors shrink-0"
         >
           ← 戻る
         </button>
@@ -170,15 +176,25 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
                   onClick={() => setActiveMultiIdx(idx)}
                   className={`h-11 rounded-xl font-black text-xs px-2.5 flex items-center justify-between border transition-all ${
                     isSelected
-                      ? 'bg-amber-600/30 border-amber-400 text-amber-300 shadow-sm'
-                      : 'bg-neutral-850 border-neutral-750 text-neutral-400'
+                      ? 'bg-white border-white text-black shadow-md'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400'
                   }`}
                 >
-                  <div className="flex items-center gap-1">
-                    <span>{mw.winner}</span>
-                    {isOya && <span className="text-[10px] text-amber-400 font-bold">(親)</span>}
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="truncate">{mw.winner}</span>
+                    {isOya && (
+                      <span
+                        className={`text-[10px] font-black px-1.5 py-0.2 rounded shrink-0 ${
+                          isSelected
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-rose-600/30 text-rose-300'
+                        }`}
+                      >
+                        親
+                      </span>
+                    )}
                   </div>
-                  <span className="font-mono text-xs">
+                  <span className="font-mono text-xs shrink-0 ml-1">
                     {mw.score > 0 ? `${mw.score.toLocaleString()}点` : '未選択'}
                   </span>
                 </button>
@@ -189,18 +205,18 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
       )}
 
       {/* ─── 3x4 グリッド (11枠 + その他1枠 = 計12枠) ─── */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 py-0.5">
         {presets3x4.map((preset) => (
           <button
             key={preset.label}
             type="button"
             onClick={() => handleSelectPreset(preset)}
-            className="h-14 rounded-xl bg-neutral-850 hover:bg-neutral-800 active:bg-amber-500 active:text-black border border-neutral-700/80 text-neutral-100 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs px-1"
+            className="h-16 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:bg-white active:text-black border border-neutral-800 text-neutral-100 flex flex-col items-center justify-center transition-all touch-manipulation shadow-sm px-1"
           >
-            <span className="text-xs sm:text-sm font-black font-mono leading-tight whitespace-nowrap">
+            <span className="text-base sm:text-lg font-black font-mono leading-tight tracking-tight text-white whitespace-nowrap">
               {preset.pointsLabel}
             </span>
-            <span className="text-[10px] font-medium text-neutral-400 mt-0.5 whitespace-nowrap">
+            <span className="text-[11px] font-bold text-neutral-400 mt-0.5 whitespace-nowrap">
               {preset.hanFuLabel}
             </span>
           </button>
@@ -210,10 +226,12 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
         <button
           type="button"
           onClick={() => setShowHighOrCustomModal(true)}
-          className="h-14 rounded-xl bg-neutral-800 hover:bg-neutral-750 active:bg-neutral-700 border border-neutral-600 text-amber-300 font-black text-xs flex flex-col items-center justify-center transition-all touch-manipulation shadow-xs"
+          className="h-16 rounded-xl bg-neutral-850 hover:bg-neutral-800 active:bg-white active:text-black border border-neutral-750 text-neutral-200 font-black flex flex-col items-center justify-center transition-all touch-manipulation shadow-sm px-1"
         >
-          <span className="text-xs font-black">倍満〜 / その他</span>
-          <span className="text-[10px] font-normal text-neutral-400 mt-0.5">
+          <span className="text-sm font-black text-neutral-200 whitespace-nowrap">
+            倍満〜 / その他
+          </span>
+          <span className="text-[10px] font-bold text-neutral-400 mt-0.5 whitespace-nowrap">
             翻・符手動計算
           </span>
         </button>
