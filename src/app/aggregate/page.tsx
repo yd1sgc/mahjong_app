@@ -36,6 +36,7 @@ export default function AggregatePage() {
   const [loading, setLoading] = useState(true);
   const [showGameList, setShowGameList] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -149,18 +150,32 @@ export default function AggregatePage() {
   const totalPtSum = aggregatedPlayers.reduce((sum, p) => sum + p.totalPt, 0);
   const isZeroSumValid = Math.abs(totalPtSum) < 0.05;
 
+  // 結果コピー
+  const handleCopy = async () => {
+    if (aggregatedPlayers.length === 0) return;
+    const lines = [
+      `【合計集計】${selectedGames.length}試合`,
+      ...aggregatedPlayers.map((p, idx) => {
+        const ptStr = p.totalPt > 0 ? `+${p.totalPt.toFixed(1)}` : p.totalPt.toFixed(1);
+        return `${idx + 1}位 ${p.name} ${ptStr}pt`;
+      }),
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Failed to copy', e);
+    }
+  };
+
   return (
     <main className="w-full min-h-screen bg-black text-white max-w-xl mx-auto p-4 flex flex-col gap-4">
       {/* ヘッダー */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-            合計集計
-          </h1>
-          <p className="text-xs text-neutral-400 mt-0.5 font-bold">
-            選択した試合のポイント合計 ＆ 検算
-          </p>
-        </div>
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+          合計集計
+        </h1>
 
         <Link
           href="/"
@@ -173,11 +188,11 @@ export default function AggregatePage() {
       {/* 試合選択コントロール */}
       <div className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col gap-3 shadow-xs">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-black text-neutral-300">
-            集計対象の試合を選択
+          <span className="text-xs font-black text-neutral-400">
+            対象試合
           </span>
-          <span className="text-xs font-black px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-            選択中: {selectedGameIds.length} 試合
+          <span className="text-xs font-black px-2.5 py-0.5 rounded bg-neutral-800 text-neutral-200 border border-neutral-700 font-mono">
+            {selectedGameIds.length} 試合
           </span>
         </div>
 
@@ -190,18 +205,18 @@ export default function AggregatePage() {
               onChange={(e) => handleSelectRecent(Number(e.target.value))}
               className="w-full bg-transparent text-xs font-black text-white focus:outline-none cursor-pointer"
             >
-              <option value="1" className="bg-neutral-900 text-white">直近 1 試合</option>
-              <option value="2" className="bg-neutral-900 text-white">直近 2 試合</option>
-              <option value="3" className="bg-neutral-900 text-white">直近 3 試合</option>
-              <option value="4" className="bg-neutral-900 text-white">直近 4 試合</option>
-              <option value="5" className="bg-neutral-900 text-white">直近 5 試合</option>
-              <option value="6" className="bg-neutral-900 text-white">直近 6 試合</option>
-              <option value="8" className="bg-neutral-900 text-white">直近 8 試合</option>
-              <option value="10" className="bg-neutral-900 text-white">直近 10 試合</option>
-              <option value="12" className="bg-neutral-900 text-white">直近 12 試合</option>
-              <option value="16" className="bg-neutral-900 text-white">直近 16 試合</option>
-              <option value="20" className="bg-neutral-900 text-white">直近 20 試合</option>
-              <option value="-1" className="bg-neutral-900 text-white">全試合 ({games.length})</option>
+              <option value="1" className="bg-neutral-900 text-white">1 試合</option>
+              <option value="2" className="bg-neutral-900 text-white">2 試合</option>
+              <option value="3" className="bg-neutral-900 text-white">3 試合</option>
+              <option value="4" className="bg-neutral-900 text-white">4 試合</option>
+              <option value="5" className="bg-neutral-900 text-white">5 試合</option>
+              <option value="6" className="bg-neutral-900 text-white">6 試合</option>
+              <option value="8" className="bg-neutral-900 text-white">8 試合</option>
+              <option value="10" className="bg-neutral-900 text-white">10 試合</option>
+              <option value="12" className="bg-neutral-900 text-white">12 試合</option>
+              <option value="16" className="bg-neutral-900 text-white">16 試合</option>
+              <option value="20" className="bg-neutral-900 text-white">20 試合</option>
+              <option value="-1" className="bg-neutral-900 text-white">全 {games.length} 試合</option>
             </select>
           </div>
 
@@ -210,7 +225,7 @@ export default function AggregatePage() {
             onClick={handleClear}
             className="h-10 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 text-neutral-300 hover:text-white text-xs font-black transition-colors shrink-0"
           >
-            選択解除
+            解除
           </button>
         </div>
 
@@ -221,8 +236,8 @@ export default function AggregatePage() {
             onClick={() => setShowGameList((prev) => !prev)}
             className="w-full text-left text-xs font-bold text-neutral-400 hover:text-neutral-200 flex items-center justify-between py-1"
           >
-            <span>個別の試合を選んで調整する</span>
-            <span>{showGameList ? '▲ 閉じる' : '▼ 一覧を表示'}</span>
+            <span>個別選択</span>
+            <span>{showGameList ? '閉じる' : '表示'}</span>
           </button>
 
           {showGameList && (
@@ -236,24 +251,25 @@ export default function AggregatePage() {
                     key={g.game_id}
                     className={`flex items-center justify-between p-2 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-amber-500/10 text-white border border-amber-500/30'
+                        ? 'bg-neutral-800 text-white border border-neutral-600'
                         : 'bg-neutral-900/80 text-neutral-400 hover:bg-neutral-850'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleToggleGame(g.game_id)}
-                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                        className="w-4 h-4 rounded accent-neutral-300 cursor-pointer shrink-0"
                       />
-                      <span>#{games.length - idx}</span>
-                      <span>{g.played_at.slice(5, 16).replace('T', ' ')}</span>
-                      <span className="text-[11px] text-neutral-500">{g.rule_name}</span>
+                      <span className="w-8 shrink-0 text-neutral-400 font-mono">#{games.length - idx}</span>
+                      <span className="w-24 shrink-0 font-mono text-neutral-300">{g.played_at.slice(5, 16).replace('T', ' ')}</span>
+                      <span className="text-[11px] text-neutral-500 truncate">{g.rule_name}</span>
                     </div>
-                    <span className="text-[11px] text-amber-300">
-                      1位: {topPlayer}
-                    </span>
+                    <div className="w-28 shrink-0 flex items-center text-[11px]">
+                      <span className="text-neutral-400 shrink-0">1位:</span>
+                      <span className="font-bold text-white truncate ml-1">{topPlayer}</span>
+                    </div>
                   </label>
                 );
               })}
@@ -262,32 +278,38 @@ export default function AggregatePage() {
         </div>
       </div>
 
-      {/* ─── メイン集計テーブル（最重要: 名前・試合数・合計ポイント・ゼロ和検算） ─── */}
+      {/* ─── メイン集計テーブル（名前・試合数・合計ポイント・検算） ─── */}
       <section className="flex flex-col gap-2.5">
-        {/* 検算ステータスバー */}
+        {/* 検算ステータスバー ＆ コピーボタン */}
         <div
-          className={`p-3 rounded-xl border flex items-center justify-between ${
+          className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${
             isZeroSumValid
-              ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+              ? 'bg-neutral-900 border-neutral-800 text-neutral-300'
               : 'bg-rose-950/40 border-rose-500/50 text-rose-300'
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isZeroSumValid ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                isZeroSumValid ? 'bg-neutral-400' : 'bg-rose-500 animate-pulse'
               }`}
-            ></span>
-            <span className="text-xs font-black">
-              {isZeroSumValid
-                ? '精算検算: 正常（ゼロサム成立）'
-                : '精算検算: 不整合（合計が0になりません）'}
+            />
+            <span className="text-xs font-bold truncate">
+              {isZeroSumValid ? '検算正常' : '検算不整合'}
+            </span>
+            <span className="text-xs font-mono text-neutral-400">
+              ({totalPtSum > 0 ? `+${totalPtSum.toFixed(1)}` : totalPtSum.toFixed(1)} pt)
             </span>
           </div>
 
-          <span className="text-base font-black font-mono">
-            合計: {totalPtSum > 0 ? `+${totalPtSum.toFixed(1)}` : totalPtSum.toFixed(1)} pt
-          </span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={selectedGames.length === 0}
+            className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 disabled:opacity-40 disabled:pointer-events-none text-white text-xs font-bold transition-colors shrink-0"
+          >
+            {copied ? 'コピー完了' : '結果をコピー'}
+          </button>
         </div>
 
         {/* メインテーブル */}
@@ -297,7 +319,7 @@ export default function AggregatePage() {
           </div>
         ) : selectedGames.length === 0 ? (
           <div className="p-8 text-center text-neutral-500 text-xs font-bold bg-neutral-900 rounded-xl border border-neutral-800">
-            試合が選択されていません。上部で試合数を選択してください。
+            試合が選択されていません。
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-sm">
@@ -320,7 +342,7 @@ export default function AggregatePage() {
                       {p.name}
                     </td>
                     <td className="py-3 px-3 text-center text-xs font-bold text-neutral-300">
-                      {p.games} 試合
+                      {p.games}
                     </td>
                     <td
                       className={`py-3 px-4 text-right text-lg font-black font-mono ${
@@ -342,11 +364,11 @@ export default function AggregatePage() {
                     合計検算
                   </td>
                   <td className="py-3 px-3 text-center text-neutral-300">
-                    延べ {aggregatedPlayers.reduce((s, p) => s + p.games, 0)} 枠
+                    {aggregatedPlayers.reduce((s, p) => s + p.games, 0)}
                   </td>
                   <td
                     className={`py-3 px-4 text-right text-base font-mono ${
-                      isZeroSumValid ? 'text-emerald-400' : 'text-rose-400'
+                      isZeroSumValid ? 'text-white' : 'text-rose-400'
                     }`}
                   >
                     {totalPtSum > 0 ? `+${totalPtSum.toFixed(1)}` : totalPtSum.toFixed(1)} pt
@@ -358,7 +380,7 @@ export default function AggregatePage() {
         )}
       </section>
 
-      {/* ─── サブ情報: 平均順位・着順内訳（下部に配置） ─── */}
+      {/* ─── サブ情報: 着順内訳 ─── */}
       {selectedGames.length > 0 && (
         <section className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col gap-2">
           <button
@@ -366,8 +388,8 @@ export default function AggregatePage() {
             onClick={() => setShowDetails((prev) => !prev)}
             className="w-full text-left text-xs font-bold text-neutral-400 hover:text-white flex items-center justify-between py-1"
           >
-            <span>平均順位 ＆ 着順内訳の詳細を見る</span>
-            <span>{showDetails ? '▲ 閉じる' : '▼ 詳細を表示'}</span>
+            <span>着順内訳</span>
+            <span>{showDetails ? '閉じる' : '表示'}</span>
           </button>
 
           {showDetails && (
@@ -377,7 +399,7 @@ export default function AggregatePage() {
                   <tr className="border-b border-neutral-800 text-neutral-500 text-[10px]">
                     <th className="py-2 px-2">名前</th>
                     <th className="py-2 px-2 text-center">平均順位</th>
-                    <th className="py-2 px-2 text-center text-amber-300">1着</th>
+                    <th className="py-2 px-2 text-center text-white">1着</th>
                     <th className="py-2 px-2 text-center text-cyan-300">2着</th>
                     <th className="py-2 px-2 text-center text-neutral-300">3着</th>
                     <th className="py-2 px-2 text-center text-rose-400">4着</th>
@@ -390,7 +412,7 @@ export default function AggregatePage() {
                       <td className="py-2 px-2 text-center font-bold text-neutral-300">
                         {p.avgRank.toFixed(2)}
                       </td>
-                      <td className="py-2 px-2 text-center font-bold text-amber-300">{p.ranks[0]}</td>
+                      <td className="py-2 px-2 text-center font-bold text-white">{p.ranks[0]}</td>
                       <td className="py-2 px-2 text-center font-bold text-cyan-300">{p.ranks[1]}</td>
                       <td className="py-2 px-2 text-center font-bold text-neutral-300">{p.ranks[2]}</td>
                       <td className="py-2 px-2 text-center font-bold text-rose-400">{p.ranks[3]}</td>
