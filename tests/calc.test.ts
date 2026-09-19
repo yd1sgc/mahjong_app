@@ -208,7 +208,7 @@ describe('Score Presets (点数プリセット定義の整合性)', () => {
 
     // 子ツモの代表値が期待通り分割されていることの検証
     const koTsumo1 = presets.KO_TSUMO_PRESETS_3X4[0];
-    expect(koTsumo1.pointsLabel).toBe('300 / 500');
+    expect(koTsumo1.pointsLabel).toBe('300/500');
     expect(koTsumo1.hanFuLabel).toBe('1翻30符');
 
     // 親ツモの代表値が期待通り分割されていることの検証

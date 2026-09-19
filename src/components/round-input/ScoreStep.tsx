@@ -206,21 +206,28 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
 
       {/* ─── 3x4 グリッド (11枠 + その他1枠 = 計12枠) ─── */}
       <div className="grid grid-cols-3 gap-2 py-0.5">
-        {presets3x4.map((preset) => (
-          <button
-            key={preset.label}
-            type="button"
-            onClick={() => handleSelectPreset(preset)}
-            className="h-16 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:bg-white active:text-black border border-neutral-800 text-neutral-100 flex flex-col items-center justify-center transition-all touch-manipulation shadow-sm px-1"
-          >
-            <span className="text-base sm:text-lg font-black font-mono leading-tight tracking-tight text-white whitespace-nowrap">
-              {preset.pointsLabel}
-            </span>
-            <span className="text-[11px] font-bold text-neutral-400 mt-0.5 whitespace-nowrap">
-              {preset.hanFuLabel}
-            </span>
-          </button>
-        ))}
+        {presets3x4.map((preset) => {
+          const isSlash = preset.pointsLabel.includes('/');
+          return (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => handleSelectPreset(preset)}
+              className="h-16 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:bg-white active:text-black border border-neutral-800 text-neutral-100 flex flex-col items-center justify-center transition-all touch-manipulation shadow-sm px-1"
+            >
+              <span
+                className={`font-black font-mono leading-tight tracking-tight text-white whitespace-nowrap ${
+                  isSlash ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'
+                }`}
+              >
+                {preset.pointsLabel}
+              </span>
+              <span className="text-[11px] font-bold text-neutral-400 mt-0.5 whitespace-nowrap">
+                {preset.hanFuLabel}
+              </span>
+            </button>
+          );
+        })}
 
         {/* 12番目の枠: 倍満〜 / その他 */}
         <button
@@ -246,7 +253,7 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
             onClick={onNext}
             className={`w-full h-13 rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center ${
               allMultiReady
-                ? 'bg-white hover:bg-neutral-200 active:scale-[0.99] text-black'
+                ? 'bg-white hover:bg-neutral-200 active:scale-[0.99] text-black cursor-pointer'
                 : 'bg-neutral-850 text-neutral-600 cursor-not-allowed border border-neutral-800'
             }`}
           >
@@ -258,54 +265,60 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
       {/* ─── モーダル: 倍満以上 ＆ 翻・符手動計算 ─── */}
       {showHighOrCustomModal && (
         <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3">
-          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-750 rounded-2xl p-4 flex flex-col gap-3.5 shadow-2xl">
+          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-750 rounded-2xl p-4 flex flex-col gap-3 shadow-2xl">
+            {/* ヘッダー: 和了者名 ＋ 親/子バッジ */}
             <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-              <span className="text-sm font-black text-white">
-                高打点・翻符手動計算 ({currentTargetWinner})
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black text-white tracking-tight">
+                  {currentTargetWinner}
+                </span>
+                {isTargetDealer ? (
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-rose-600 text-white shadow-sm">
+                    親
+                  </span>
+                ) : (
+                  <span className="text-xs font-black px-2 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700">
+                    子
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setShowHighOrCustomModal(false)}
-                className="text-neutral-400 hover:text-white text-base font-bold"
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800 hover:bg-neutral-750 text-neutral-300 font-bold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            {/* 高打点クイック選択 */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-bold text-neutral-400">
-                倍満以上の役
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {highPresets.map((hp) => (
-                  <button
-                    key={hp.label}
-                    type="button"
-                    onClick={() => handleApplyCustom(hp.pts, hp.han, hp.fu)}
-                    className="h-13 rounded-xl bg-neutral-850 hover:bg-amber-600 hover:text-white border border-neutral-700 text-neutral-200 font-black text-xs flex flex-col items-center justify-center transition-all px-1"
-                  >
-                    <span className="text-xs font-bold">{hp.hanFuLabel}</span>
-                    <span className="text-[10px] font-mono opacity-80 whitespace-nowrap">{hp.pointsLabel}</span>
-                  </button>
-                ))}
-              </div>
+            {/* 高打点クイック選択（倍満・三倍満・役満） */}
+            <div className="grid grid-cols-3 gap-2">
+              {highPresets.map((hp) => (
+                <button
+                  key={hp.label}
+                  type="button"
+                  onClick={() => handleApplyCustom(hp.pts, hp.han, hp.fu)}
+                  className="h-14 rounded-xl bg-neutral-950 hover:bg-neutral-800 active:bg-white active:text-black border border-neutral-800 text-neutral-200 font-black flex flex-col items-center justify-center transition-all px-1 shadow-sm"
+                >
+                  <span className="text-sm font-black text-white">{hp.hanFuLabel}</span>
+                  <span className="text-xs font-mono text-neutral-400 mt-0.5 whitespace-nowrap">
+                    {hp.pointsLabel}
+                  </span>
+                </button>
+              ))}
             </div>
 
             {/* 翻・符手動セレクタ */}
-            <div className="flex flex-col gap-2.5 pt-2 border-t border-neutral-800">
-              <span className="text-[11px] font-bold text-neutral-400">
-                翻と符を手動指定
-              </span>
+            <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] font-bold text-neutral-500 block mb-1">
-                    翻 (Han)
+                  <label className="text-xs font-black text-neutral-400 block mb-1">
+                    翻
                   </label>
                   <select
                     value={customHan}
                     onChange={(e) => setCustomHan(Number(e.target.value))}
-                    className="w-full h-10 bg-neutral-950 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                    className="w-full h-12 bg-neutral-950 border border-neutral-700 rounded-xl px-3 text-sm font-black text-white"
                   >
                     {HAN_OPTIONS.map((h) => (
                       <option key={h} value={h}>
@@ -315,13 +328,13 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-neutral-500 block mb-1">
-                    符 (Fu)
+                  <label className="text-xs font-black text-neutral-400 block mb-1">
+                    符
                   </label>
                   <select
                     value={customFu}
                     onChange={(e) => setCustomFu(Number(e.target.value))}
-                    className="w-full h-10 bg-neutral-950 border border-neutral-700 rounded-lg px-2 text-xs font-bold text-white"
+                    className="w-full h-12 bg-neutral-950 border border-neutral-700 rounded-xl px-3 text-sm font-black text-white"
                   >
                     {FU_OPTIONS.map((f) => (
                       <option key={f} value={f}>
@@ -332,72 +345,41 @@ export const ScoreStep: React.FC<ScoreStepProps> = ({
                 </div>
               </div>
 
-              {/* リアルタイム点数プレビュー表示 */}
+              {/* リアルタイム計算プレビュー表示 */}
               {(() => {
                 const isTsumo = winType === 'tsumo';
                 const customScore = calculateScore(customHan, customFu, isTargetDealer, isTsumo);
-                const customRankLabel = (() => {
-                  if (customHan >= 13) return '役満';
-                  if (customHan >= 11) return '三倍満';
-                  if (customHan >= 8) return '倍満';
-                  if (customHan >= 6) return '跳満';
-                  if (
-                    customHan >= 5 ||
-                    (customHan === 4 && customFu >= 40) ||
-                    (customHan === 3 && customFu >= 70) ||
-                    customFu * Math.pow(2, 2 + customHan) >= 2000
-                  ) {
-                    return '満貫';
-                  }
-                  return null;
-                })();
-
-                const buttonLabel = isTsumo
-                  ? isTargetDealer
-                    ? `${customScore.total.toLocaleString()}点 (${customScore.nonDealerPay.toLocaleString()}オール) を適用`
-                    : `${customScore.total.toLocaleString()}点 (${customScore.nonDealerPay.toLocaleString()}/${customScore.dealerPay.toLocaleString()}) を適用`
-                  : `${customScore.total.toLocaleString()}点 を適用`;
 
                 return (
                   <>
-                    <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex flex-col gap-1 shadow-inner">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-neutral-400">
-                        <span>
-                          計算結果 ({isTargetDealer ? '親' : '子'}・{isTsumo ? 'ツモ' : 'ロン'}
-                          {customRankLabel ? ` / ${customRankLabel}` : ''})
-                        </span>
-                        <span className="text-neutral-500 font-mono">
-                          {customHan}翻 {customFu}符
-                        </span>
-                      </div>
-
+                    <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between shadow-inner">
+                      <span className="text-xs font-bold text-neutral-400">
+                        {customHan}翻 {customFu}符
+                      </span>
                       {isTsumo ? (
-                        <div className="flex items-baseline justify-between mt-0.5">
-                          <span className="text-base font-black text-amber-300 font-mono">
+                        <div className="flex items-baseline gap-1.5 font-mono">
+                          <span className="text-base font-black text-white">
                             {isTargetDealer
-                              ? `${customScore.nonDealerPay.toLocaleString()} オール`
-                              : `${customScore.nonDealerPay.toLocaleString()} / ${customScore.dealerPay.toLocaleString()}`}
+                              ? `${customScore.nonDealerPay}オール`
+                              : `${customScore.nonDealerPay}/${customScore.dealerPay}`}
                           </span>
-                          <span className="text-xs font-bold text-neutral-300">
-                            合計 <span className="font-mono text-white text-sm font-black">{customScore.total.toLocaleString()}</span> 点
+                          <span className="text-xs text-neutral-400 font-bold">
+                            ({customScore.total}点)
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-baseline justify-between mt-0.5">
-                          <span className="text-2xl font-black text-amber-300 font-mono tracking-tight">
-                            {customScore.total.toLocaleString()}
-                            <span className="text-xs font-bold text-neutral-300 ml-1">点</span>
-                          </span>
-                        </div>
+                        <span className="text-xl font-black text-white font-mono">
+                          {customScore.total}点
+                        </span>
                       )}
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleApplyCustom(customScore.total, customHan, customFu)}
-                      className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-300 text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-1 mt-0.5"
+                      className="w-full h-12 rounded-xl bg-white hover:bg-neutral-200 active:scale-[0.99] text-black font-black text-sm transition-all shadow-md flex items-center justify-center gap-1 mt-1 cursor-pointer"
                     >
-                      {buttonLabel}
+                      点数を確定する →
                     </button>
                   </>
                 );
