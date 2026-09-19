@@ -7,9 +7,10 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { RotateCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import {
   GameInsert,
@@ -55,126 +56,158 @@ export default function HomePage() {
   const [creating, setCreating] = useState(false);
   const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
+  // キャッシュ更新用状態
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshed, setRefreshed] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      // 5つのテーブル・クエリをPromise.allで一括並列取得
+      const [
+        { data: gData },
+        { data: mData },
+        { data: grpData },
+        { data: gmData },
+        { data: rData },
+      ] = await Promise.all([
+        supabase
+          .from('games')
+          .select('*')
+          .order('played_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('members')
+          .select('*')
+          .eq('is_archived', 0)
+          .order('member_name'),
+        supabase
+          .from('groups')
+          .select('*')
+          .eq('is_archived', 0),
+        supabase
+          .from('group_memberships')
+          .select('group_id, member_id'),
+        supabase
+          .from('rule_templates')
+          .select('*')
+          .eq('is_archived', 0),
+      ]);
+
+      if (gData) setGames(gData);
+      if (mData) setMembers(mData);
+      if (grpData) setGroups(grpData);
+      if (gmData) setGroupMemberships(gmData as GroupMembership[]);
+      if (rData && rData.length > 0) {
+        setRules(rData);
+      }
+
+      // 直前の対局設定（グループ・ルール・メンバー4名）の自動復元
       try {
-        // 5つのテーブル・クエリをPromise.allで一括並列取得
-        const [
-          { data: gData },
-          { data: mData },
-          { data: grpData },
-          { data: gmData },
-          { data: rData },
-        ] = await Promise.all([
-          supabase
-            .from('games')
-            .select('*')
-            .order('played_at', { ascending: false })
-            .limit(30),
-          supabase
-            .from('members')
-            .select('*')
-            .eq('is_archived', 0)
-            .order('member_name'),
-          supabase
-            .from('groups')
-            .select('*')
-            .eq('is_archived', 0),
-          supabase
-            .from('group_memberships')
-            .select('group_id, member_id'),
-          supabase
-            .from('rule_templates')
-            .select('*')
-            .eq('is_archived', 0),
-        ]);
+        let restored = false;
 
-        if (gData) setGames(gData);
-        if (mData) setMembers(mData);
-        if (grpData) setGroups(grpData);
-        if (gmData) setGroupMemberships(gmData as GroupMembership[]);
-        if (rData && rData.length > 0) {
-          setRules(rData);
-        }
-
-        // 直前の対局設定（グループ・ルール・メンバー4名）の自動復元
-        try {
-          let restored = false;
-
-          // 1. localStorage からの復元試行
-          if (typeof window !== 'undefined') {
-            const raw = localStorage.getItem(LAST_GAME_SETUP_KEY);
-            if (raw) {
-              const saved: LastGameSetup = JSON.parse(raw);
-              const groupExists =
-                saved.groupId === 'free' ||
-                grpData?.some((g) => g.group_id === saved.groupId);
-              const ruleExists = rData?.some((r) => r.rule_id === saved.ruleId);
-              const validMembers =
-                Array.isArray(saved.members) &&
-                saved.members.length === 4 &&
-                saved.members.every((mId) =>
-                  mData?.some((m) => m.member_id === mId && m.is_archived === 0)
-                );
-
-              if (groupExists && ruleExists && validMembers) {
-                setSelectedGroupId(saved.groupId);
-                setSelectedRuleId(saved.ruleId);
-                setSelectedMembers(saved.members);
-                restored = true;
-              }
-            }
-          }
-
-          // 2. localStorage に無い場合、DB上の直近対局レコードから復元
-          if (!restored && gData && gData.length > 0) {
-            const latestGame = gData[0];
-            const { data: pData } = await supabase
-              .from('game_participants')
-              .select('seat, member_id')
-              .eq('game_id', latestGame.game_id)
-              .order('seat');
-
-            if (pData && pData.length === 4) {
-              const participantIds = pData.map((p) => p.member_id);
-              const allMembersValid = participantIds.every((mId) =>
+        // 1. localStorage からの復元試行
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem(LAST_GAME_SETUP_KEY);
+          if (raw) {
+            const saved: LastGameSetup = JSON.parse(raw);
+            const groupExists =
+              saved.groupId === 'free' ||
+              grpData?.some((g) => g.group_id === saved.groupId);
+            const ruleExists = rData?.some((r) => r.rule_id === saved.ruleId);
+            const validMembers =
+              Array.isArray(saved.members) &&
+              saved.members.length === 4 &&
+              saved.members.every((mId) =>
                 mData?.some((m) => m.member_id === mId && m.is_archived === 0)
               );
 
-              if (allMembersValid) {
-                const targetGroupId = latestGame.group_id || '';
-                const targetRule =
-                  rData?.find((r) => r.name === latestGame.rule_name_snapshot) ||
-                  rData?.[0];
-                const targetRuleId = targetRule?.rule_id || '';
+            if (groupExists && ruleExists && validMembers) {
+              setSelectedGroupId(saved.groupId);
+              setSelectedRuleId(saved.ruleId);
+              setSelectedMembers(saved.members);
+              restored = true;
+            }
+          }
+        }
 
-                setSelectedGroupId(targetGroupId);
-                if (targetRuleId) setSelectedRuleId(targetRuleId);
-                setSelectedMembers(participantIds);
+        // 2. localStorage に無い場合、DB上の直近対局レコードから復元
+        if (!restored && gData && gData.length > 0) {
+          const latestGame = gData[0];
+          const { data: pData } = await supabase
+            .from('game_participants')
+            .select('seat, member_id')
+            .eq('game_id', latestGame.game_id)
+            .order('seat');
 
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem(
-                    LAST_GAME_SETUP_KEY,
-                    JSON.stringify({
-                      groupId: targetGroupId,
-                      ruleId: targetRuleId,
-                      members: participantIds,
-                    })
-                  );
-                }
+          if (pData && pData.length === 4) {
+            const participantIds = pData.map((p) => p.member_id);
+            const allMembersValid = participantIds.every((mId) =>
+              mData?.some((m) => m.member_id === mId && m.is_archived === 0)
+            );
+
+            if (allMembersValid) {
+              const targetGroupId = latestGame.group_id || '';
+              const targetRule =
+                rData?.find((r) => r.name === latestGame.rule_name_snapshot) ||
+                rData?.[0];
+              const targetRuleId = targetRule?.rule_id || '';
+
+              setSelectedGroupId(targetGroupId);
+              if (targetRuleId) setSelectedRuleId(targetRuleId);
+              setSelectedMembers(participantIds);
+
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(
+                  LAST_GAME_SETUP_KEY,
+                  JSON.stringify({
+                    groupId: targetGroupId,
+                    ruleId: targetRuleId,
+                    members: participantIds,
+                  })
+                );
               }
             }
           }
-        } catch (restoreErr) {
-          console.warn('Failed to restore last game setup:', restoreErr);
         }
-      } finally {
-        setLoading(false);
+      } catch (restoreErr) {
+        console.warn('Failed to restore last game setup:', restoreErr);
       }
+    } finally {
+      setLoading(false);
     }
-
-    loadData();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // キャッシュ・最新データ更新ハンドラ
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      // 1. Cache Storage のクリア
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      // 2. Service Worker の更新チェック
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.update();
+        }
+      }
+      // 3. Supabase 最新データの再取得
+      await loadData();
+      setRefreshed(true);
+      setTimeout(() => setRefreshed(false), 1500);
+    } catch (err) {
+      console.error('Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // 進行中の対局を検知
   const activeGame = games.find((g) => g.status === 'in_progress');
@@ -409,14 +442,20 @@ export default function HomePage() {
     <main className="w-full min-h-screen bg-black text-white max-w-lg mx-auto px-4 py-6 flex flex-col gap-6">
       {/* アプリヘッダー */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-            麻雀スコア管理
-          </h1>
-          <p className="text-xs text-neutral-400 mt-0.5 font-bold">
-            クラウド同期 Webシステム
-          </p>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          麻雀スコア管理
+        </h1>
+
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title="キャッシュ・データを最新化"
+          className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 text-neutral-300 hover:text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-xs shrink-0"
+        >
+          <RotateCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-white' : ''}`} />
+          <span>{refreshing ? '更新中' : refreshed ? '完了' : '更新'}</span>
+        </button>
       </header>
 
       {/* 中断対局の再開案内バナー (mahjong_personal準拠) */}

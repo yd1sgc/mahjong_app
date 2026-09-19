@@ -191,7 +191,7 @@ export default function AggregatePage() {
           <span className="text-xs font-black text-neutral-400">
             対象試合
           </span>
-          <span className="text-xs font-black px-2.5 py-0.5 rounded bg-neutral-800 text-neutral-200 border border-neutral-700 font-mono">
+          <span className="text-xs font-black px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
             {selectedGameIds.length} 試合
           </span>
         </div>
@@ -251,7 +251,7 @@ export default function AggregatePage() {
                     key={g.game_id}
                     className={`flex items-center justify-between p-2 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-neutral-800 text-white border border-neutral-600'
+                        ? 'bg-amber-500/10 text-white border border-amber-500/30'
                         : 'bg-neutral-900/80 text-neutral-400 hover:bg-neutral-850'
                     }`}
                   >
@@ -260,13 +260,13 @@ export default function AggregatePage() {
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleToggleGame(g.game_id)}
-                        className="w-4 h-4 rounded accent-neutral-300 cursor-pointer shrink-0"
+                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer shrink-0"
                       />
-                      <span className="w-8 shrink-0 text-neutral-400 font-mono">#{games.length - idx}</span>
-                      <span className="w-24 shrink-0 font-mono text-neutral-300">{g.played_at.slice(5, 16).replace('T', ' ')}</span>
-                      <span className="text-[11px] text-neutral-500 truncate">{g.rule_name}</span>
+                      <span className="shrink-0 text-neutral-400 font-mono text-[11px]">#{games.length - idx}</span>
+                      <span className="shrink-0 font-mono text-neutral-400 text-[11px]">{g.played_at.slice(5, 10).replace('-', '/')}</span>
+                      <span className="text-xs font-bold text-neutral-200 truncate">{g.rule_name}</span>
                     </div>
-                    <div className="w-28 shrink-0 flex items-center text-[11px]">
+                    <div className="w-24 shrink-0 flex items-center text-[11px] justify-end">
                       <span className="text-neutral-400 shrink-0">1位:</span>
                       <span className="font-bold text-white truncate ml-1">{topPlayer}</span>
                     </div>
@@ -291,13 +291,17 @@ export default function AggregatePage() {
           <div className="flex items-center gap-2 min-w-0">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
-                isZeroSumValid ? 'bg-neutral-400' : 'bg-rose-500 animate-pulse'
+                isZeroSumValid ? 'bg-emerald-400' : 'bg-rose-500 animate-pulse'
               }`}
             />
             <span className="text-xs font-bold truncate">
               {isZeroSumValid ? '検算正常' : '検算不整合'}
             </span>
-            <span className="text-xs font-mono text-neutral-400">
+            <span
+              className={`text-xs font-mono font-bold ${
+                isZeroSumValid ? 'text-emerald-400' : 'text-rose-400'
+              }`}
+            >
               ({totalPtSum > 0 ? `+${totalPtSum.toFixed(1)}` : totalPtSum.toFixed(1)} pt)
             </span>
           </div>
@@ -368,7 +372,7 @@ export default function AggregatePage() {
                   </td>
                   <td
                     className={`py-3 px-4 text-right text-base font-mono ${
-                      isZeroSumValid ? 'text-white' : 'text-rose-400'
+                      isZeroSumValid ? 'text-emerald-400' : 'text-rose-400'
                     }`}
                   >
                     {totalPtSum > 0 ? `+${totalPtSum.toFixed(1)}` : totalPtSum.toFixed(1)} pt
