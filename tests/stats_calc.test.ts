@@ -285,7 +285,7 @@ describe('Layer 5: 成績集計ロジック正本検証 (statsCalc.ts)', () => {
   });
 
   describe('4. calculateRecords (レコード集計)', () => {
-    it('最高得点Top5、最低得点Top5、および2連勝以上の連勝記録が正しく抽出されること', () => {
+    it('最高得点Top5、最低得点Top5、および連勝記録（歴代・現在更新中）が正しく抽出されること', () => {
       const records = calculateRecords(mockGames);
 
       // 最高得点: PlayerA の 45000点 がトップ
@@ -296,10 +296,187 @@ describe('Layer 5: 成績集計ロジック正本検証 (statsCalc.ts)', () => {
       expect(records.bottom5[0].name).toBe('PlayerD');
       expect(records.bottom5[0].score).toBe(10000);
 
-      // 連勝記録: PlayerA が G1, G2 で 2連勝
+      // 歴代連勝記録: PlayerA が G1, G2 で 2連勝
       expect(records.streaks.length).toBe(1);
       expect(records.streaks[0].name).toBe('PlayerA');
       expect(records.streaks[0].maxStreak).toBe(2);
+      expect(records.streaks[0].achievedDate).toBe('2026-01-01');
+
+      // 現在更新中の連勝: PlayerA は直近（G2）まで2連勝が継続中
+      expect(records.activeStreaks.length).toBe(1);
+      expect(records.activeStreaks[0].name).toBe('PlayerA');
+      expect(records.activeStreaks[0].currentStreak).toBe(2);
+      expect(records.activeStreaks[0].lastPlayedAt).toBe('2026-01-01');
+    });
+
+    it('連勝記録が最大連勝とその1つ下（2連勝以上）に絞り込まれ、古い順でソートされること', () => {
+      // 複数プレイヤーの連勝シミュレーション対局
+      const streakGames: GameData[] = [
+        // 2026-01-01: P1 1位
+        {
+          game_id: 'sg1',
+          played_at: '2026-01-01T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm1', name: 'P1', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm2', name: 'P2', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-02: P1 1位 (P1 2連勝)
+        {
+          game_id: 'sg2',
+          played_at: '2026-01-02T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm1', name: 'P1', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm2', name: 'P2', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-03: P1 1位 (P1 3連勝)
+        {
+          game_id: 'sg3',
+          played_at: '2026-01-03T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm1', name: 'P1', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm2', name: 'P2', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-04: P1 1位 (P1 4連勝達成)
+        {
+          game_id: 'sg4',
+          played_at: '2026-01-04T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm1', name: 'P1', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm2', name: 'P2', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-05: P2 1位 (P1 4着で連勝ストップ)
+        {
+          game_id: 'sg5',
+          played_at: '2026-01-05T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm2', name: 'P2', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm1', name: 'P1', final_score: 10000, rank: 4, point: -50 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 30000, rank: 2, point: 10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 20000, rank: 3, point: -10 },
+          ],
+        },
+        // 2026-01-06: P2 1位 (P2 2連勝)
+        {
+          game_id: 'sg6',
+          played_at: '2026-01-06T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm2', name: 'P2', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm1', name: 'P1', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-07: P2 1位 (P2 3連勝達成・現在も更新中)
+        {
+          game_id: 'sg7',
+          played_at: '2026-01-07T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm2', name: 'P2', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm1', name: 'P1', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm3', name: 'P3', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm4', name: 'P4', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        // 2026-01-08: P3が2連勝（過去の記録）を作るが、4連勝の1つ下（3連勝）未満なので除外されるべき
+        {
+          game_id: 'sg8',
+          played_at: '2026-01-08T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm3', name: 'P3', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm1', name: 'P1', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm4', name: 'P4', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm5', name: 'P5', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        {
+          game_id: 'sg9',
+          played_at: '2026-01-09T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm3', name: 'P3', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm1', name: 'P1', final_score: 30000, rank: 2, point: 10 },
+            { seat: 3, member_id: 'm4', name: 'P4', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm5', name: 'P5', final_score: 10000, rank: 4, point: -50 },
+          ],
+        },
+        {
+          game_id: 'sg10',
+          played_at: '2026-01-10T10:00:00Z',
+          group_id: 'grp1',
+          rule_id: 'r1',
+          rule_name: 'M',
+          rule_config: {},
+          participants: [
+            { seat: 1, member_id: 'm1', name: 'P1', final_score: 40000, rank: 1, point: 50 },
+            { seat: 2, member_id: 'm3', name: 'P3', final_score: 10000, rank: 4, point: -50 },
+            { seat: 3, member_id: 'm4', name: 'P4', final_score: 20000, rank: 3, point: -10 },
+            { seat: 4, member_id: 'm5', name: 'P5', final_score: 30000, rank: 2, point: 10 },
+          ],
+        },
+      ];
+
+      const res = calculateRecords(streakGames);
+
+      // 全体最大は P1 の 4連勝。よって足切り閾値は max(2, 4 - 1) = 3連勝。
+      // P3 は 2連勝なので streaks から除外される。
+      expect(res.streaks.length).toBe(2);
+      expect(res.streaks[0].name).toBe('P1');
+      expect(res.streaks[0].maxStreak).toBe(4);
+      expect(res.streaks[1].name).toBe('P2');
+      expect(res.streaks[1].maxStreak).toBe(3);
+
+      // activeStreaks（現在更新中・直近2連勝以上）:
+      // P2 は sg7（2026-01-07）で3連勝して以降対局しておらず、連続1着が維持されているため3連勝中。
+      expect(res.activeStreaks.length).toBe(1);
+      expect(res.activeStreaks[0].name).toBe('P2');
+      expect(res.activeStreaks[0].currentStreak).toBe(3);
     });
   });
 

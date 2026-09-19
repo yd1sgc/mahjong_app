@@ -50,12 +50,15 @@ export const GameHistoryTable: React.FC<GameHistoryTableProps> = ({
                 const formatP = (p?: { name: string; point: number }) => {
                   if (!p) return '-';
                   const ptStr = p.point > 0 ? `+${p.point.toFixed(1)}` : p.point.toFixed(1);
-                  const ptColor = p.point > 0 ? 'text-cyan-400' : p.point < 0 ? 'text-rose-400' : 'text-neutral-400';
+                  const ptColor =
+                    p.point > 0 ? 'text-cyan-400' : p.point < 0 ? 'text-rose-400' : 'text-neutral-400';
                   return (
-                    <span>
-                      <span className="text-white font-bold">{p.name}</span>{' '}
-                      <span className={`font-mono text-[11px] font-bold ${ptColor}`}>({ptStr})</span>
-                    </span>
+                    <div className="flex items-center justify-between gap-1.5 min-w-[90px]">
+                      <span className="text-white font-bold truncate max-w-[55px]">{p.name}</span>
+                      <span className={`font-mono text-[11px] font-bold ${ptColor} w-11 text-right shrink-0`}>
+                        {ptStr}
+                      </span>
+                    </div>
                   );
                 };
 

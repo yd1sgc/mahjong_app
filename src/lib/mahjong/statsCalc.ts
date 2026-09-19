@@ -93,10 +93,23 @@ export interface RoundStatsRow {
   damaAgariRate: number;
 }
 
+export interface ActiveStreakItem {
+  name: string;
+  currentStreak: number;
+  lastPlayedAt: string;
+}
+
+export interface StreakRecordItem {
+  name: string;
+  maxStreak: number;
+  achievedDate?: string;
+}
+
 export interface RecordsData {
   top5: { name: string; score: number; date: string }[];
   bottom5: { name: string; score: number; date: string }[];
-  streaks: { name: string; maxStreak: number }[];
+  streaks: StreakRecordItem[];
+  activeStreaks: ActiveStreakItem[];
 }
 
 /**
@@ -431,7 +444,9 @@ export function calculateRecords(effectiveGames: GameData[]): RecordsData {
   const top5 = [...allScores].sort((a, b) => b.score - a.score).slice(0, 5);
   const bottom5 = [...allScores].sort((a, b) => a.score - b.score).slice(0, 5);
 
-  const streakList: { name: string; maxStreak: number }[] = [];
+  const allStreakList: StreakRecordItem[] = [];
+  const activeStreakList: ActiveStreakItem[] = [];
+
   const playerGamesMap = new Map<string, { played_at: string; rank: number }[]>();
   effectiveGames.forEach((g) => {
     g.participants.forEach((p) => {
@@ -441,25 +456,76 @@ export function calculateRecords(effectiveGames: GameData[]): RecordsData {
   });
 
   playerGamesMap.forEach((gList, name) => {
-    const sorted = gList.sort((a, b) => (a.played_at > b.played_at ? 1 : -1));
+    // 日付昇順（古い順）
+    const sorted = [...gList].sort((a, b) => (a.played_at > b.played_at ? 1 : -1));
+    if (sorted.length === 0) return;
+
+    // 1. 生涯最多連勝と達成日（その連勝に達した対局の日付）
     let maxS = 0;
+    let maxDate = '不明';
     let cur = 0;
     sorted.forEach((r) => {
       if (r.rank === 1) {
         cur += 1;
-        if (cur > maxS) maxS = cur;
+        if (cur > maxS) {
+          maxS = cur;
+          maxDate = r.played_at ? r.played_at.slice(0, 10) : '不明';
+        }
       } else {
         cur = 0;
       }
     });
+
     if (maxS >= 2) {
-      streakList.push({ name, maxStreak: maxS });
+      allStreakList.push({ name, maxStreak: maxS, achievedDate: maxDate });
+    }
+
+    // 2. 現在継続中の連勝（最新対局から過去へ遡る）
+    let currentStreak = 0;
+    const lastPlayedAt = sorted[sorted.length - 1].played_at
+      ? sorted[sorted.length - 1].played_at.slice(0, 10)
+      : '不明';
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].rank === 1) {
+        currentStreak += 1;
+      } else {
+        break;
+      }
+    }
+
+    if (currentStreak >= 2) {
+      activeStreakList.push({ name, currentStreak, lastPlayedAt });
     }
   });
 
-  streakList.sort((a, b) => b.maxStreak - a.maxStreak);
+  // activeStreaks: 連勝数降順 → 最新対局日降順、最大5名
+  activeStreakList.sort((a, b) => {
+    if (b.currentStreak !== a.currentStreak) return b.currentStreak - a.currentStreak;
+    return b.lastPlayedAt.localeCompare(a.lastPlayedAt);
+  });
+  const activeStreaks = activeStreakList.slice(0, 5);
 
-  return { top5, bottom5, streaks: streakList };
+  // streaks (歴代連勝記録):
+  // 1. 全体の中での最大連勝数を取得
+  const overallMaxStreak =
+    allStreakList.length > 0 ? Math.max(...allStreakList.map((s) => s.maxStreak)) : 0;
+
+  // 2. maxStreak と maxStreak - 1 (ただし2以上) の2階層に限定
+  const threshold = Math.max(2, overallMaxStreak - 1);
+  const eligibleStreaks = allStreakList.filter((s) => s.maxStreak >= threshold);
+
+  // 3. 連勝数降順 → 同数の場合は達成日が古い順（先着樹立順）
+  eligibleStreaks.sort((a, b) => {
+    if (b.maxStreak !== a.maxStreak) return b.maxStreak - a.maxStreak;
+    const dateA = a.achievedDate || '';
+    const dateB = b.achievedDate || '';
+    return dateA.localeCompare(dateB);
+  });
+
+  // 4. 上位最大5件（5件未満はそのまま）
+  const streaks = eligibleStreaks.slice(0, 5);
+
+  return { top5, bottom5, streaks, activeStreaks };
 }
 
 /**

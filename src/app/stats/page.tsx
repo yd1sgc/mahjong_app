@@ -220,6 +220,7 @@ export default function StatsPage() {
       top5: rawRecords.top5.filter((r) => !guestNames.has(r.name)),
       bottom5: rawRecords.bottom5.filter((r) => !guestNames.has(r.name)),
       streaks: rawRecords.streaks.filter((r) => !guestNames.has(r.name)),
+      activeStreaks: rawRecords.activeStreaks.filter((r) => !guestNames.has(r.name)),
     };
   }, [rawRecords, includeGuests, guestNames]);
 
