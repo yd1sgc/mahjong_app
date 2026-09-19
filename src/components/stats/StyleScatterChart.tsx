@@ -303,6 +303,41 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
 
   const activeTypeTitle = activePlayer ? getPlayerTypeTitle(activePlayer) : '';
 
+  // スタイル説明文
+  const getPlayerTypeDescription = (player: RoundStatsRow) => {
+    if (chartType === 'agari_houju') {
+      const isHighAgari = player.agariRate >= averages.avgAgariRate;
+      const isLowHouju = player.houjuRate < averages.avgHoujuRate;
+      if (isHighAgari && isLowHouju) return '高いアガリ率と低い放銃率を両立する理想的な好成績スタイル';
+      if (isHighAgari && !isLowHouju) return '高いアガリ率を誇る一方、失点も恐れず踏み込むインファイト型';
+      if (!isHighAgari && isLowHouju) return '徹底した失点回避を貫き、守備力で着順をまとめる受けのスタイル';
+      return '放銃が先行しアガリに結びついていない、我慢の展開が続く状態';
+    }
+
+    if (chartType === 'pca') {
+      const pScore = pcaResult?.players.find((item) => item.name === player.name);
+      if (!pScore) return '';
+      if (pScore.pc1 >= 0 && pScore.pc2 >= 0) return '高い打点力と積極的な局参加を両立する重厚なアグレッシブ派';
+      if (pScore.pc1 < 0 && pScore.pc2 >= 0) return 'スピード仕掛けと手筋を駆使し、手数を稼ぐ実戦的速攻派';
+      if (pScore.pc1 >= 0 && pScore.pc2 < 0) return '面前の手役力を備えつつ、無理な参加を避ける冷静沈着派';
+      return 'リスクを徹底排除し、受けと失点回避に重きを置く守備特化派';
+    }
+
+    // riichi_furo
+    if (player.riichiRate >= averages.avgRiichi && player.furoRate < averages.avgFuro) {
+      return '面前で手役を作り、高打点を狙う重厚な攻めが持ち味';
+    }
+    if (player.riichiRate >= averages.avgRiichi && player.furoRate >= averages.avgFuro) {
+      return '立直と副露を自在に使い分け、積極的にアガリに向かう超攻撃型';
+    }
+    if (player.riichiRate < averages.avgRiichi && player.furoRate >= averages.avgFuro) {
+      return '仕掛けを多用し、打点よりも速度で局を支配するスピード型';
+    }
+    return 'リーチや副露を抑え、ダマテンや守備を重視する堅実型';
+  };
+
+  const activeTypeDescription = activePlayer ? getPlayerTypeDescription(activePlayer) : '';
+
   // 打点の動的閾値（母集団の3分位: 上位1/3・下位1/3）
   const { highThreshold, lowThreshold } = useMemo(() => {
     if (filteredPlayers.length < 3) {
@@ -376,9 +411,6 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
       >
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-black text-white">雀風スタイル分析</h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
-            4象限マップ
-          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-neutral-400 font-mono">
@@ -430,7 +462,7 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
                     : 'text-neutral-400 hover:text-white'
                 }`}
               >
-                主成分分析 (PCA)
+                主成分分析
               </button>
             </div>
 
@@ -829,18 +861,28 @@ export function StyleScatterChart({ roundStats }: StyleScatterChartProps) {
               {/* 選択プレイヤー詳細カード（チャート種類に応じたスタッツ表示） */}
               {activePlayer && (
                 <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="mb-2.5 pb-2 border-b border-neutral-800/80">
+                    {/* 1行目: 名前と局数（両端配置で絶対に被らない） */}
+                    <div className="flex items-center justify-between">
                       <h3 className="text-base font-black text-white">
                         {activePlayer.name}
                       </h3>
-                      <span className="text-xs font-bold text-amber-400">
+                      <span className="text-[11px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
+                        {activePlayer.kyokuCount}局
+                      </span>
+                    </div>
+
+                    {/* 2行目: スタイル名バッジ */}
+                    <div className="mt-1.5 flex items-center">
+                      <span className="text-xs font-bold text-amber-400 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
                         {activeTypeTitle}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">
-                      {activePlayer.kyokuCount}局
-                    </span>
+
+                    {/* 3行目: スタイル解説文 */}
+                    <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
+                      {activeTypeDescription}
+                    </p>
                   </div>
 
                   {chartType === 'pca' ? (
