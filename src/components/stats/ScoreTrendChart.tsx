@@ -1,11 +1,6 @@
-/**
- * 総合ポイント推移グラフコンポーネント (ScoreTrendChart.tsx)
- * 手書きSVG折れ線グラフ、プレイヤー選択チップ、ゼロ線・凡例表示
- */
-
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 
 interface ScoreTrendChartProps {
   allPlayerNames: string[];
@@ -14,13 +9,22 @@ interface ScoreTrendChartProps {
   chartData: { label: string; values: { [name: string]: number } }[];
 }
 
+const COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6'];
+
 export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
   allPlayerNames,
   chartMembers,
   setChartMembers,
   chartData,
 }) => {
-  const colors = ['#f59e0b', '#06b6d4', '#10b981', '#ec4899', '#8b5cf6', '#3b82f6'];
+  // 選択中メンバーごとの固定カラー割り当て
+  const memberColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    chartMembers.forEach((name, idx) => {
+      map.set(name, COLORS[idx % COLORS.length]);
+    });
+    return map;
+  }, [chartMembers]);
 
   // スケール計算
   let minPt = 0;
@@ -33,27 +37,50 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
     });
   });
 
-  const range = Math.max(1, maxPt - minPt);
+  // 上下に適度な余白を持たせる
+  const yMin = Math.min(minPt - 15, -30);
+  const yMax = Math.max(maxPt + 15, 30);
+  const range = Math.max(1, yMax - yMin);
+
   const width = Math.max(340, chartData.length * 36);
-  const height = 180;
-  const padding = { top: 20, bottom: 30, left: 45, right: 20 };
+  const height = 200;
+  const padding = { top: 20, bottom: 28, left: 45, right: 30 };
   const plotW = width - padding.left - padding.right;
   const plotH = height - padding.top - padding.bottom;
 
-  const getY = (val: number) => padding.top + plotH - ((val - minPt) / range) * plotH;
+  const getY = (val: number) => padding.top + plotH - ((val - yMin) / range) * plotH;
   const getX = (idx: number) => padding.left + (idx / Math.max(1, chartData.length - 1)) * plotW;
   const zeroY = getY(0);
+
+  // X軸の表示対象インデックス選定（重なり防止）
+  const visibleXIndices = useMemo(() => {
+    const len = chartData.length;
+    if (len <= 1) return [];
+    if (len <= 10) return Array.from({ length: len }, (_, i) => i);
+    const step = len > 25 ? 5 : len > 15 ? 3 : 2;
+    const indices = new Set<number>();
+    indices.add(0); // 開始
+    for (let i = step; i < len - 1; i += step) {
+      indices.add(i);
+    }
+    indices.add(len - 1); // 最終試合
+    return Array.from(indices).sort((a, b) => a - b);
+  }, [chartData.length]);
 
   return (
     <section className="flex flex-col gap-3 p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xs">
       <h2 className="text-base font-black text-white">総合ポイント推移</h2>
 
-      {/* プレイヤー選択チップ */}
+      {/* プレイヤー選択チップ（名前のみ・担当カラー連動） */}
       <div>
-        <span className="text-[11px] font-black text-neutral-400 block mb-1.5">表示メンバー</span>
+        <span className="text-[11px] font-black text-neutral-400 block mb-1.5">
+          表示メンバー（クリックで表示切替）
+        </span>
         <div className="flex flex-wrap gap-1.5">
           {allPlayerNames.map((name) => {
-            const active = chartMembers.includes(name);
+            const activeColor = memberColorMap.get(name);
+            const isSelected = !!activeColor;
+
             return (
               <button
                 key={name}
@@ -63,13 +90,20 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
                     prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
                   );
                 }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
-                  active
-                    ? 'bg-amber-500 text-black shadow-xs'
-                    : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                  isSelected
+                    ? 'bg-neutral-950 text-white shadow-xs'
+                    : 'bg-neutral-950/60 border border-neutral-800 text-neutral-500 hover:text-neutral-300'
                 }`}
+                style={isSelected ? { borderColor: activeColor, borderWidth: '1px' } : undefined}
               >
-                {name}
+                {isSelected && (
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: activeColor }}
+                  />
+                )}
+                <span>{name}</span>
               </button>
             );
           })}
@@ -78,41 +112,121 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
 
       {/* SVG折れ線グラフ */}
       {chartMembers.length === 0 || chartData.length <= 1 ? (
-        <div className="h-44 flex items-center justify-center text-neutral-500 text-xs font-bold">
+        <div className="h-44 flex items-center justify-center text-neutral-500 text-xs font-bold bg-neutral-950 rounded-xl border border-neutral-800">
           表示対象のメンバーを選択してください。
         </div>
       ) : (
-        <div className="w-full overflow-x-auto pt-2">
-          <svg width={width} height={height} className="bg-neutral-950 rounded-xl border border-neutral-850">
+        <div className="w-full overflow-x-auto">
+          <svg width={width} height={height} className="bg-neutral-950 rounded-xl border border-neutral-800 block">
+            {/* 上下限補助線 */}
+            <line
+              x1={padding.left}
+              y1={padding.top}
+              x2={width - padding.right}
+              y2={padding.top}
+              stroke="#262626"
+              strokeWidth="1"
+            />
+            <line
+              x1={padding.left}
+              y1={height - padding.bottom}
+              x2={width - padding.right}
+              y2={height - padding.bottom}
+              stroke="#262626"
+              strokeWidth="1"
+            />
+
+            {/* 縦目盛グリッド線 */}
+            {visibleXIndices.map((idx) => {
+              if (idx === 0) return null;
+              return (
+                <line
+                  key={idx}
+                  x1={getX(idx)}
+                  y1={padding.top}
+                  x2={getX(idx)}
+                  y2={height - padding.bottom}
+                  stroke="#262626"
+                  strokeDasharray="2 2"
+                />
+              );
+            })}
+
             {/* 0pt 基準線 */}
-            {minPt <= 0 && maxPt >= 0 && (
+            {yMin <= 0 && yMax >= 0 && (
               <line
                 x1={padding.left}
                 y1={zeroY}
                 x2={width - padding.right}
                 y2={zeroY}
-                stroke="#404040"
-                strokeDasharray="3 3"
+                stroke="#525252"
+                strokeDasharray="4 3"
+                strokeWidth="1.2"
               />
             )}
 
-            {/* 軸ラベル */}
-            <text x={padding.left - 6} y={getY(maxPt) + 4} textAnchor="end" fill="#737373" fontSize="10" fontWeight="bold">
-              {maxPt.toFixed(0)}
+            {/* Y軸ラベル */}
+            <text
+              x={padding.left - 6}
+              y={getY(maxPt) + 3}
+              textAnchor="end"
+              fill="#737373"
+              fontSize="9"
+              fontFamily="monospace"
+            >
+              {maxPt > 0 ? `+${maxPt.toFixed(0)}` : maxPt.toFixed(0)}
             </text>
-            <text x={padding.left - 6} y={zeroY + 4} textAnchor="end" fill="#a3a3a3" fontSize="10" fontWeight="bold">
+            <text
+              x={padding.left - 6}
+              y={zeroY + 3}
+              textAnchor="end"
+              fill="#d4d4d4"
+              fontSize="9"
+              fontWeight="bold"
+              fontFamily="monospace"
+            >
               0
             </text>
-            <text x={padding.left - 6} y={getY(minPt) + 4} textAnchor="end" fill="#737373" fontSize="10" fontWeight="bold">
+            <text
+              x={padding.left - 6}
+              y={getY(minPt) + 3}
+              textAnchor="end"
+              fill="#737373"
+              fontSize="9"
+              fontFamily="monospace"
+            >
               {minPt.toFixed(0)}
             </text>
 
+            {/* X軸ラベル */}
+            {visibleXIndices.map((idx) => {
+              const d = chartData[idx];
+              if (!d) return null;
+              return (
+                <text
+                  key={idx}
+                  x={getX(idx)}
+                  y={height - 8}
+                  textAnchor="middle"
+                  fill="#737373"
+                  fontSize="9"
+                  fontFamily="monospace"
+                >
+                  {d.label}
+                </text>
+              );
+            })}
+
             {/* 各プレイヤーの折れ線 */}
-            {chartMembers.map((m, mIdx) => {
-              const color = colors[mIdx % colors.length];
+            {chartMembers.map((m) => {
+              const color = memberColorMap.get(m) || '#ffffff';
               const pts = chartData
                 .map((d, idx) => `${getX(idx)},${getY(d.values[m] || 0)}`)
                 .join(' ');
+
+              const lastScore = chartData[chartData.length - 1]?.values[m] || 0;
+              const lastX = getX(chartData.length - 1);
+              const lastY = getY(lastScore);
 
               return (
                 <g key={m}>
@@ -120,37 +234,31 @@ export const ScoreTrendChart: React.FC<ScoreTrendChartProps> = ({
                     fill="none"
                     stroke={color}
                     strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     points={pts}
                   />
-                  {chartData.length > 0 && (
+                  {/* 各ポイントのドット */}
+                  {chartData.map((d, idx) => (
                     <circle
-                      cx={getX(chartData.length - 1)}
-                      cy={getY(chartData[chartData.length - 1].values[m] || 0)}
-                      r="4"
+                      key={idx}
+                      cx={getX(idx)}
+                      cy={getY(d.values[m] || 0)}
+                      r="1.5"
                       fill={color}
                     />
-                  )}
+                  ))}
+                  {/* 最終試合の円 */}
+                  <circle
+                    cx={lastX}
+                    cy={lastY}
+                    r="3.5"
+                    fill={color}
+                  />
                 </g>
               );
             })}
           </svg>
-
-          {/* 凡例 */}
-          <div className="flex flex-wrap gap-3 mt-2 justify-center">
-            {chartMembers.map((m, idx) => {
-              const color = colors[idx % colors.length];
-              const lastVal = chartData[chartData.length - 1]?.values[m] || 0;
-              return (
-                <div key={m} className="flex items-center gap-1.5 text-xs font-black">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-white">{m}</span>
-                  <span className={lastVal > 0 ? 'text-cyan-400' : lastVal < 0 ? 'text-rose-400' : 'text-neutral-400'}>
-                    ({lastVal.toFixed(1)})
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
     </section>
