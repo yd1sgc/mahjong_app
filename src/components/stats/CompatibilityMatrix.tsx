@@ -68,9 +68,9 @@ export const CompatibilityMatrix: React.FC<CompatibilityMatrixProps> = ({
   return (
     <section className="flex flex-col gap-3 p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-xs">
       <div>
-        <h2 className="text-base font-black text-white">相性マトリクス（直接対決）</h2>
+        <h2 className="text-base font-black text-white">相性マトリクス</h2>
         <p className="text-[11px] text-neutral-400 font-bold mt-0.5">
-          行: 自分 / 列: 相手（同卓時のpt差合計） 青: 得意 / 赤: 苦手
+          行: 自分 / 列: 相手（同卓pt差）
         </p>
       </div>
 

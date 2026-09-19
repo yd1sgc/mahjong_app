@@ -259,7 +259,7 @@ export default function StatsPage() {
             成績集計・分析
           </h1>
           <p className="text-xs text-neutral-400 mt-0.5 font-bold">
-            クラウド同期データ（集計対象: {effectiveGames.length} 試合）
+            集計対象: {effectiveGames.length} 試合
           </p>
         </div>
 
@@ -296,7 +296,7 @@ export default function StatsPage() {
               onChange={(e) => handleGroupChange(e.target.value)}
               className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
             >
-              <option value="all">全グループ (全体)</option>
+              <option value="all">全グループ</option>
               {groups.map((g) => (
                 <option key={g.group_id} value={g.group_id}>
                   {g.group_name}
@@ -315,7 +315,7 @@ export default function StatsPage() {
               onChange={(e) => handleRuleChange(e.target.value)}
               className="w-full h-10 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"
             >
-              <option value="all">全ルール (全体)</option>
+              <option value="all">全ルール</option>
               {ruleOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}

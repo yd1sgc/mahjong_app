@@ -23,9 +23,7 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
   return (
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-black text-white">
-          詳細成績（詳細記録 {detailedGameCount} 試合）
-        </h2>
+        <h2 className="text-base font-black text-white">詳細成績</h2>
       </div>
 
       {/* 5タブセレクター */}

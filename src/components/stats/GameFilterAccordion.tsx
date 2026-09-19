@@ -30,12 +30,12 @@ export const GameFilterAccordion: React.FC<GameFilterAccordionProps> = ({
       <button
         type="button"
         onClick={() => setShowAccordion((prev) => !prev)}
-        className="w-full text-left text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center justify-between py-1.5"
+        className="w-full text-left text-xs font-bold text-neutral-300 hover:text-white flex items-center justify-between py-1.5"
       >
         <span>
-          試合IDで絞り込む（詳細フィルター）
+          試合IDで絞り込み
           {selectedGameIds.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px]">
+            <span className="ml-2 px-2 py-0.5 rounded bg-neutral-800 text-neutral-200 border border-neutral-700 text-[10px]">
               {selectedGameIds.length} 試合選択中
             </span>
           )}

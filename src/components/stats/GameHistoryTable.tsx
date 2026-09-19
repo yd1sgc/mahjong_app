@@ -37,20 +37,27 @@ export const GameHistoryTable: React.FC<GameHistoryTableProps> = ({
               <tr className="border-b border-neutral-800 bg-neutral-950 text-[11px] font-black text-neutral-400">
                 <th className="py-2.5 px-3 text-center w-10">#</th>
                 <th className="py-2.5 px-2.5">日付</th>
-                <th className="py-2.5 px-2.5 text-amber-300">1位</th>
-                <th className="py-2.5 px-2.5 text-cyan-300">2位</th>
-                <th className="py-2.5 px-2.5 text-neutral-300">3位</th>
-                <th className="py-2.5 px-2.5 text-rose-400">4位</th>
+                <th className="py-2.5 px-2.5">1位</th>
+                <th className="py-2.5 px-2.5">2位</th>
+                <th className="py-2.5 px-2.5">3位</th>
+                <th className="py-2.5 px-2.5">4位</th>
                 <th className="py-2.5 px-2 text-center">詳細</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/60">
               {effectiveGames.map((g, idx) => {
                 const pSorted = [...g.participants].sort((a, b) => a.rank - b.rank);
-                const p1 = pSorted[0];
-                const p2 = pSorted[1];
-                const p3 = pSorted[2];
-                const p4 = pSorted[3];
+                const formatP = (p?: { name: string; point: number }) => {
+                  if (!p) return '-';
+                  const ptStr = p.point > 0 ? `+${p.point.toFixed(1)}` : p.point.toFixed(1);
+                  const ptColor = p.point > 0 ? 'text-cyan-400' : p.point < 0 ? 'text-rose-400' : 'text-neutral-400';
+                  return (
+                    <span>
+                      <span className="text-white font-bold">{p.name}</span>{' '}
+                      <span className={`font-mono text-[11px] font-bold ${ptColor}`}>({ptStr})</span>
+                    </span>
+                  );
+                };
 
                 return (
                   <tr
@@ -64,18 +71,10 @@ export const GameHistoryTable: React.FC<GameHistoryTableProps> = ({
                     <td className="py-2.5 px-2.5 font-bold text-neutral-300 font-mono text-[11px]">
                       {g.played_at ? g.played_at.slice(0, 10) : '日付不明'}
                     </td>
-                    <td className="py-2.5 px-2.5 font-black text-amber-300">
-                      {p1 ? `${p1.name} (${p1.point.toFixed(1)})` : '-'}
-                    </td>
-                    <td className="py-2.5 px-2.5 font-bold text-cyan-300">
-                      {p2 ? `${p2.name} (${p2.point.toFixed(1)})` : '-'}
-                    </td>
-                    <td className="py-2.5 px-2.5 font-bold text-neutral-300">
-                      {p3 ? `${p3.name} (${p3.point.toFixed(1)})` : '-'}
-                    </td>
-                    <td className="py-2.5 px-2.5 font-bold text-rose-400">
-                      {p4 ? `${p4.name} (${p4.point.toFixed(1)})` : '-'}
-                    </td>
+                    <td className="py-2.5 px-2.5">{formatP(pSorted[0])}</td>
+                    <td className="py-2.5 px-2.5">{formatP(pSorted[1])}</td>
+                    <td className="py-2.5 px-2.5">{formatP(pSorted[2])}</td>
+                    <td className="py-2.5 px-2.5">{formatP(pSorted[3])}</td>
                     <td className="py-2.5 px-2 text-center">
                       <button
                         type="button"
