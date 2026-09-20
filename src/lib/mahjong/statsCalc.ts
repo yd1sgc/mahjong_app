@@ -272,10 +272,7 @@ export function calculateRoundStats(
 
     const isRyukyoku = r.result_type === 'ryukyoku';
     const isTsumo = r.result_type === 'tsumo';
-
-    // 局コンテキスト（局内に立直者・副露者がいたか判定）
-    const hasRiichiInRound = r.seats.some((s) => s.is_riichi === 1);
-    const hasFuroInRound = r.seats.some((s) => s.is_furo === 1);
+    const winners = r.seats.filter((s) => s.is_winner === 1);
 
     const seatsWithNames = r.seats
       .map((s) => ({
@@ -317,9 +314,10 @@ export function calculateRoundStats(
         if (s.is_riichi === 1) item.riichiHouju += 1;
         if (s.is_furo === 1) item.furoHouju += 1;
 
-        if (hasRiichiInRound) {
+        // 和了者（放銃先）の属性で分類（立直 > 副露 > ダマ の優先順位）
+        if (winners.some((w) => w.is_riichi === 1)) {
           item.beRiichiHouju += 1;
-        } else if (hasFuroInRound) {
+        } else if (winners.some((w) => w.is_furo === 1)) {
           item.beFuroHouju += 1;
         } else {
           item.beDamaHouju += 1;

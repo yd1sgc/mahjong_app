@@ -261,6 +261,95 @@ describe('Layer 5: 成績集計ロジック正本検証 (statsCalc.ts)', () => {
       expect(pB.notenBappu).toBe(-1500);
       expect(pD.notenBappu).toBe(-1500);
     });
+
+    it('被立直放銃・被副露放銃・被ダマ放銃が和了者の属性に基づいて正確に分類されること（同局内他者立直時のダマ放銃を含む）', () => {
+      const houjuTestRounds: RoundData[] = [
+        // R1: PlayerDが立直しているが、和了者はダマのPlayerA。PlayerBが放銃。
+        // → PlayerBの被ダマ放銃が1件（被立直放銃にはならないこと）
+        {
+          round_id: 'hr1',
+          game_id: 'g1',
+          round_index: 0,
+          kyoku_name: '東1局',
+          honba: 0,
+          result_type: 'ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 3900, base_point: 3900, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 1 },
+            { seat: 2, member_id: 'm2', score_delta: -3900, base_point: -3900, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 4, member_id: 'm4', score_delta: -1000, base_point: 0, honba_point: 0, kyotaku_point: -1000, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 1, is_furo: 0, is_tenpai: 1 },
+          ],
+        },
+        // R2: PlayerCが副露して和了。PlayerBが放銃。
+        {
+          round_id: 'hr2',
+          game_id: 'g1',
+          round_index: 1,
+          kyoku_name: '東2局',
+          honba: 0,
+          result_type: 'ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 2, member_id: 'm2', score_delta: -2000, base_point: -2000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 2000, base_point: 2000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 0, is_furo: 1, is_tenpai: 1 },
+            { seat: 4, member_id: 'm4', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+          ],
+        },
+        // R3: PlayerDが立直して和了。PlayerBが放銃。
+        {
+          round_id: 'hr3',
+          game_id: 'g1',
+          round_index: 2,
+          kyoku_name: '東3局',
+          honba: 0,
+          result_type: 'ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 2, member_id: 'm2', score_delta: -8000, base_point: -8000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 4, member_id: 'm4', score_delta: 8000, base_point: 8000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 1, is_furo: 0, is_tenpai: 1 },
+          ],
+        },
+      ];
+
+      const { roundStats } = calculateRoundStats(mockGames, houjuTestRounds);
+      const pB = roundStats.find((s) => s.name === 'PlayerB')!;
+
+      // 3局中3回放銃
+      expect(pB.houjuRate).toBe(100.0);
+      // 各1回ずつ放銃（33.3%ずつ）
+      expect(pB.damaHoujuRate).toBe(33.3);
+      expect(pB.furoHoujuRate).toBe(33.3);
+      expect(pB.riichiHoujuRate).toBe(33.3);
+    });
+
+    it('ダブロン発生時に立直 > 副露 > ダマの優先度で1件集計され、放銃内訳の合計が100%を維持すること', () => {
+      const multiRonRounds: RoundData[] = [
+        // PlayerA（立直）とPlayerC（ダマ）へのダブロンにPlayerBが放銃
+        {
+          round_id: 'mr1',
+          game_id: 'g1',
+          round_index: 0,
+          kyoku_name: '東1局',
+          honba: 0,
+          result_type: 'multi_ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 8000, base_point: 8000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 1, is_furo: 0, is_tenpai: 1 },
+            { seat: 2, member_id: 'm2', score_delta: -12000, base_point: -12000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 4000, base_point: 4000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 1 },
+            { seat: 4, member_id: 'm4', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+          ],
+        },
+      ];
+
+      const { roundStats } = calculateRoundStats(mockGames, multiRonRounds);
+      const pB = roundStats.find((s) => s.name === 'PlayerB')!;
+
+      // 放銃1回に対し、立直優先で被立直放銃が100%
+      expect(pB.riichiHoujuRate).toBe(100.0);
+      expect(pB.furoHoujuRate).toBe(0.0);
+      expect(pB.damaHoujuRate).toBe(0.0);
+    });
   });
 
   describe('3. calculateChartData (推移グラフデータ)', () => {
