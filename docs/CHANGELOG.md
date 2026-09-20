@@ -335,4 +335,25 @@
 - `npm run build`: 全14ルート正常出力完了。
 - 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
 
-
+## Phase 5-S 完了（純粋関数イミュータビリティ完全化 & 放銃集計適正化 & DOM直接参照排除）
+- **放銃統計ロジック適正化（`src/lib/mahjong/statsCalc.ts`）**:
+  - 「局内に立直者がいたか」による誤判定を完全撤廃し、和了者座席の属性（`winners.some(w => w.is_riichi === 1)` 等）を参照する仕様へ改修。
+  - 立直者とダマテン和了者が同局に存在した場合の放銃先（被立直・被副露・ダマ）の分類精度を100%保証。
+- **純粋ドメイン関数イミュータビリティ完全化（`src/lib/mahjong/rules.ts`）**:
+  - `recalculateState` における引数 `roundHistory` のインプレース破壊的変更（ミューテーション）を完全撤廃。
+  - `{ ...r, kyoku_name, starting_riichi_sticks, honba }` による新しいオブジェクト生成へ移行し、React State 不変性規約の完全遵守を確立。
+- **新規対局PIN入力のReact制御コンポーネント化（`src/app/page.tsx`）**:
+  - `document.getElementById('game-pin')` によるDOM直接参照を完全撤廃。
+  - `gamePin` state を新設し、数字4桁制限・正規化を含む制御コンポーネント（Controlled Component）へ完全統一。
+## Phase 5-T 完了（フォルダー構造整理 & テスト配置統一 & ドキュメント刷新）
+- **不要初期アセット削除（`public/`）**:
+  - `create-next-app` 生成の未使用SVG 5種（`file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`）を完全削除。
+- **テストファイル階層・命名規則の統一（`tests/`）**:
+  - 唯一ネストされていた `tests/lib/mahjong/pcaCalc.test.ts` を `tests/pca_calc.test.ts` へ移動し、空ディレクトリ（`tests/lib`）を削除。全11テストファイルを直下スネークケースで統一。
+- **Git除外設定の拡充（`.gitignore`）**:
+  - Cloudflareデプロイ生成物 `.wrangler/` を追記。
+- **正本ドキュメント刷新（`README.md`, `docs/AI_HANDOVER.md`）**:
+  - `README.md` をNext.jsデフォルト文面から「百年麻雀」のシステム概要・技術構成・コマンド・運用仕様に全面刷新。
+  - `docs/AI_HANDOVER.md` のDirectory Structure Mapおよびテスト件数（全155件）の不整合を解消・最新化。
+- `npm test`（Vitest）: 全11ファイル・155件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。

@@ -29,14 +29,16 @@
 
 - `src/`: アプリケーションソースコード
   - `src/app/`: Next.js App Router 画面ルーティング（`/`, `/game`, `/stats`, `/aggregate`, `/manage/*`）
-  - `src/components/`: UIプレゼンテーションコンポーネント
-  - `src/hooks/`: 状態管理・Supabase通信カスタムフック（`useGameDraft`, `useGameData`, `useGameActions`）
+  - `src/components/`: UIプレゼンテーションコンポーネント（対局進行、各種モーダル、成績グラフ・表等）
+  - `src/hooks/`: 状態管理・Supabase通信カスタムフック（`useGame`［統合ファサード］, `useGameDraft`, `useGameData`, `useGameActions`, `useStatsData`）
   - `src/lib/`: 共通ユーティリティ
-    - `src/lib/mahjong/`: 麻雀計算・純粋ドメイン層（`calc.ts`, `rules.ts`, `statsCalc.ts`, `presets.ts`）
+    - `src/lib/mahjong/`: 麻雀計算・純粋ドメイン層（`calc.ts`, `rules.ts`, `statsCalc.ts`, `pcaCalc.ts`, `presets.ts`, `simpleGame.ts`, `ruleDescription.ts`, `validation.ts`）
+    - `src/lib/adminAuth.ts`: 管理PIN認証
     - `src/lib/supabase.ts`: Supabaseクライアント初期化
   - `src/types/`: TypeScript型定義（`mahjong.ts`, `database.ts`）
-- `tests/`: Vitest 自動単体テスト群（全104件・カバレッジ92%超）
-- `scripts/`: 保守・運用スクリプト（`safety_hook.py` 等）
+- `public/`: 静的配信アセット（PWAアプリアイコン `icon.png`, `apple-icon.png`）
+- `tests/`: Vitest 自動単体テスト群（全11ファイル・155件・カバレッジ92%超）
+- `scripts/`: 保守・運用・DBセットアップスクリプト（`safety_hook.py`, `setup_supabase_v2.sql` 等）
 - `docs/`: システム設計・引継・仕様書
   - `docs/AI_HANDOVER.md`: 本引継書（セッション開始時に参照）
   - `docs/CHANGELOG.md`: 過去の全改修履歴アーカイブ（必要時のみ参照）
