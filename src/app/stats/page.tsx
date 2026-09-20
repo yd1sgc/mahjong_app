@@ -33,7 +33,7 @@ export default function StatsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
   const [selectedRuleName, setSelectedRuleName] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>('all');
-  const [includeGuests, setIncludeGuests] = useState<boolean>(true);
+  const [includeGuests, setIncludeGuests] = useState<boolean>(false);
 
   // 詳細試合IDアコーディオンフィルター
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
@@ -112,15 +112,32 @@ export default function StatsPage() {
     setSelectedGameIds([]);
   };
 
-  // 第1段階: グループ・ルール名・年による基本母集団
+  // ゲストメンバーの判定セット（IDおよび名前）
+  const { guestMemberIds, guestNames } = useMemo(() => {
+    const idSet = new Set<string>();
+    const nameSet = new Set<string>();
+    members.forEach((m) => {
+      if (m.is_guest === 1) {
+        idSet.add(m.member_id);
+        nameSet.add(m.member_name);
+      }
+    });
+    return { guestMemberIds: idSet, guestNames: nameSet };
+  }, [members]);
+
+  // 第1段階: グループ・ルール名・年・ゲスト有無による基本母集団
   const baseFilteredGames = useMemo(() => {
     return games.filter((g) => {
       if (selectedGroupId !== 'all' && g.group_id !== selectedGroupId) return false;
       if (selectedRuleName !== 'all' && g.rule_name !== selectedRuleName) return false;
       if (selectedYear !== 'all' && !g.played_at.startsWith(selectedYear)) return false;
+      // ゲスト非表示時は、参加者にゲスト（is_guest === 1）が含まれる対局を除外
+      if (!includeGuests && g.participants.some((p) => guestMemberIds.has(p.member_id))) {
+        return false;
+      }
       return true;
     });
-  }, [games, selectedGroupId, selectedRuleName, selectedYear]);
+  }, [games, selectedGroupId, selectedRuleName, selectedYear, includeGuests, guestMemberIds]);
 
   // 試合ID詳細フィルターで実際に集計対象となる試合群
   const effectiveGames = useMemo(() => {
@@ -148,17 +165,6 @@ export default function StatsPage() {
       prev.includes(id) ? prev.filter((gid) => gid !== id) : [...prev, id]
     );
   };
-
-  // ゲストメンバー名の判定セット
-  const guestNames = useMemo(() => {
-    const set = new Set<string>();
-    members.forEach((m) => {
-      if (m.is_guest === 1) {
-        set.add(m.member_name);
-      }
-    });
-    return set;
-  }, [members]);
 
   // ── 試合成績集計 ──
   const rawGameStats = useMemo(() => {
@@ -353,7 +359,10 @@ export default function StatsPage() {
               <input
                 type="checkbox"
                 checked={includeGuests}
-                onChange={(e) => setIncludeGuests(e.target.checked)}
+                onChange={(e) => {
+                  setIncludeGuests(e.target.checked);
+                  setSelectedGameIds([]);
+                }}
                 className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
               />
               <span>ゲストも表示する</span>
