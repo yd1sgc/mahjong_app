@@ -55,6 +55,7 @@ export default function HomePage() {
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
+  const [gamePin, setGamePin] = useState('1234');
   const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
 
   // キャッシュ更新用状態
@@ -350,7 +351,7 @@ export default function HomePage() {
   const handleCreateGame = async () => {
     if (!validateSelectedPlayers()) return;
 
-    const pin = (document.getElementById('game-pin') as HTMLInputElement)?.value;
+    const pin = gamePin.trim();
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       alert('引き継ぎ用の4桁PIN番号（数字4文字）を入力してください');
       return;
@@ -640,7 +641,8 @@ export default function HomePage() {
                 pattern="[0-9]*"
                 inputMode="numeric"
                 maxLength={4}
-                defaultValue="1234"
+                value={gamePin}
+                onChange={(e) => setGamePin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="4桁の数字 (例: 1234)"
                 className="w-full h-11 bg-neutral-950 border border-neutral-800 rounded-xl px-3 text-sm text-white font-mono font-bold tracking-widest focus:outline-none focus:border-amber-500"
               />

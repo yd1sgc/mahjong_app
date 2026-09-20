@@ -84,11 +84,20 @@ export function recalculateState(
   const honbaPt = detailCfg.honba_pt ?? 300;
   const riichiPt = detailCfg.riichi_pt ?? 1000;
 
+  const updatedRoundHistory: RoundRecord[] = [];
+
   for (const r of roundHistory) {
     const dealer = players[roundIdx % 4];
-    r.kyoku_name = getRoundName(roundIdx);
-    r.starting_riichi_sticks = riichiStick;
-    r.honba = honba;
+    const kyokuName = getRoundName(roundIdx);
+    const startingRiichiSticks = riichiStick;
+    const currentHonba = honba;
+
+    updatedRoundHistory.push({
+      ...r,
+      kyoku_name: kyokuName,
+      starting_riichi_sticks: startingRiichiSticks,
+      honba: currentHonba,
+    });
 
     // 当該局のリーチ宣言棒の供託処理
     const roundRiichi = r.riichi || [];
@@ -295,7 +304,7 @@ export function recalculateState(
     roundIdx,
     honba,
     riichiStick,
-    roundHistory: [...roundHistory],
+    roundHistory: updatedRoundHistory,
     riichiDeclared: [...currentRiichiDeclared],
     furoDeclared: [],
   };

@@ -361,4 +361,36 @@ describe('Layer 2: 局修正・巻き戻し（Undo）と状態再計算の完全
     expect(state.scores['P3']).toBe(25000);
     expect(state.scores['P4']).toBe(25000);
   });
+
+  it('10. 純粋関数規約: 引数roundHistoryおよび内部要素オブジェクトが破壊的変更されないこと', () => {
+    const originalRecord: RoundRecord = {
+      round_id: 'r1',
+      kyoku_name: '未設定局名',
+      honba: 999,
+      starting_riichi_sticks: 999,
+      winner: 'P1',
+      loser: 'P2',
+      win_type: 'ron',
+      score: 8000,
+      riichi: [],
+      tenpai: [],
+    };
+
+    // 引数オブジェクトを完全に凍結（破壊的代入があると TypeError で即座に失敗する）
+    const frozenRecord = Object.freeze({ ...originalRecord });
+    const frozenHistory = Object.freeze([frozenRecord]);
+
+    // 凍結されたオブジェクトを渡しても例外なく計算できること
+    const state = recalculateState(players, 25000, defaultRule, frozenHistory as unknown as RoundRecord[]);
+
+    // 戻り値の roundHistory には計算済みの値が正しくセットされていること
+    expect(state.roundHistory[0].kyoku_name).toBe('東1局');
+    expect(state.roundHistory[0].honba).toBe(0);
+    expect(state.roundHistory[0].starting_riichi_sticks).toBe(0);
+
+    // 引数に渡した元のオブジェクトの値が一切書き換わっていないこと
+    expect(frozenRecord.kyoku_name).toBe('未設定局名');
+    expect(frozenRecord.honba).toBe(999);
+    expect(frozenRecord.starting_riichi_sticks).toBe(999);
+  });
 });
