@@ -340,8 +340,20 @@ export interface Database {
         };
         Returns: boolean;
       };
+      create_game_transaction: {
+        Args: {
+          p_game_id: string;
+          p_group_id: string;
+          p_passcode: string;
+          p_rule_name: string;
+          p_rule_config: Json;
+          p_participants: Json;
+        };
+        Returns: Json;
+      };
       commit_round_transaction: {
         Args: {
+          p_round_id: string;
           p_game_id: string;
           p_round_index: number;
           p_kyoku_name: string;
@@ -349,6 +361,7 @@ export interface Database {
           p_riichi_sticks: number;
           p_result_type: string;
           p_seats: Json;
+          p_yakumans: Json;
         };
         Returns: Json;
       };

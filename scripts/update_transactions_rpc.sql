@@ -1,31 +1,119 @@
 -- ==============================================================================
--- Supabase RPC: アトミックトランザクション関数（P2課題対応）
--- 局確定（commit_round_transaction）、精算（settle_game_transaction）、破棄（abort_game_transaction）
--- 分割INSERTによるデータ破損を防止し、PostgreSQL側で完全アトミック実行
+-- Supabase RPC: ネイティブトランザクション完全配備
+-- 1. create_game_transaction: games と game_participants を不可分登録
+-- 2. commit_round_transaction: rounds, round_seats, yakuman_records を不可分登録
+-- 3. settle_game_transaction: gamesステータスと参加者成績を不可分更新
+-- 4. abort_game_transaction: gamesおよび連鎖データをCASCADE削除
 -- ==============================================================================
 
--- 1. 局確定アトミックトランザクション
-CREATE OR REPLACE FUNCTION public.commit_round_transaction(
+-- 旧シグネチャ関数の削除（競合防止）
+DROP FUNCTION IF EXISTS public.commit_round_transaction(TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB);
+DROP FUNCTION IF EXISTS public.commit_round_transaction(TEXT, TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS public.create_game_transaction(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB);
+
+-- ------------------------------------------------------------------------------
+-- 1. 新規対局作成トランザクション（完全防壁版）
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.create_game_transaction(
     p_game_id TEXT,
-    p_round_index INTEGER,
-    p_kyoku_name TEXT,
-    p_honba INTEGER,
-    p_riichi_sticks INTEGER,
-    p_result_type TEXT,
-    p_seats JSONB
+    p_group_id TEXT,
+    p_passcode TEXT,
+    p_rule_name TEXT,
+    p_rule_config JSONB,
+    p_participants JSONB
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_round_id TEXT;
-    v_seat JSONB;
+    v_part JSONB;
 BEGIN
-    -- 1. round_id の生成
-    v_round_id := gen_random_uuid()::TEXT;
+    -- 参加者は厳格に4名であることを保証
+    IF p_participants IS NULL OR jsonb_array_length(p_participants) <> 4 THEN
+        RAISE EXCEPTION '参加者データは厳格に4名分必要です (received: %)', COALESCE(jsonb_array_length(p_participants), 0);
+    END IF;
 
-    -- 2. rounds レコード作成
+    -- 1. games レコード作成
+    INSERT INTO public.games (
+        game_id,
+        group_id,
+        passcode,
+        rule_name_snapshot,
+        rule_config_snapshot,
+        status,
+        sync_target,
+        is_synced
+    ) VALUES (
+        p_game_id,
+        p_group_id,
+        p_passcode,
+        p_rule_name,
+        p_rule_config,
+        'in_progress',
+        1,
+        1
+    );
+
+    -- 2. game_participants 4席分の一括作成
+    FOR v_part IN SELECT * FROM jsonb_array_elements(p_participants)
+    LOOP
+        INSERT INTO public.game_participants (
+            game_id,
+            seat,
+            member_id,
+            player_name_snapshot,
+            final_score,
+            rank,
+            point,
+            was_group_member
+        ) VALUES (
+            p_game_id,
+            (v_part->>'seat')::INTEGER,
+            v_part->>'member_id',
+            COALESCE(v_part->>'player_name_snapshot', 'Player ' || (v_part->>'seat')),
+            COALESCE(NULLIF(v_part->>'final_score', '')::INTEGER, 25000),
+            COALESCE(NULLIF(v_part->>'rank', '')::INTEGER, (v_part->>'seat')::INTEGER),
+            COALESCE(NULLIF(v_part->>'point', '')::NUMERIC(6,1), 0.0),
+            COALESCE(NULLIF(v_part->>'was_group_member', '')::INTEGER, 1)
+        );
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'game_id', p_game_id);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'create_game_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 2. 局確定トランザクション（完全防壁版）
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.commit_round_transaction(
+    p_round_id TEXT,
+    p_game_id TEXT,
+    p_round_index INTEGER,
+    p_kyoku_name TEXT,
+    p_honba INTEGER,
+    p_riichi_sticks INTEGER,
+    p_result_type TEXT,
+    p_seats JSONB,
+    p_yakumans JSONB DEFAULT '[]'::jsonb
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_seat JSONB;
+    v_yakuman JSONB;
+BEGIN
+    -- 座席データは厳格に4席分であることを保証
+    IF p_seats IS NULL OR jsonb_array_length(p_seats) <> 4 THEN
+        RAISE EXCEPTION '座席データは厳格に4席分必要です (received: %)', COALESCE(jsonb_array_length(p_seats), 0);
+    END IF;
+
+    -- 1. rounds レコード作成（クライアント生成の round_id を厳格に使用）
     INSERT INTO public.rounds (
         round_id,
         game_id,
@@ -35,16 +123,16 @@ BEGIN
         riichi_sticks,
         result_type
     ) VALUES (
-        v_round_id,
+        p_round_id,
         p_game_id,
         p_round_index,
         p_kyoku_name,
-        p_honba,
-        p_riichi_sticks,
+        COALESCE(p_honba, 0),
+        COALESCE(p_riichi_sticks, 0),
         p_result_type
     );
 
-    -- 3. round_seats 一括作成（座席ごとの点数変動・役情報）
+    -- 2. round_seats 一括作成（全整数カラムの安全キャスト）
     FOR v_seat IN SELECT * FROM jsonb_array_elements(p_seats)
     LOOP
         INSERT INTO public.round_seats (
@@ -65,33 +153,53 @@ BEGIN
             is_furo,
             is_tenpai
         ) VALUES (
-            v_round_id,
+            p_round_id,
             (v_seat->>'seat')::INTEGER,
             v_seat->>'member_id',
-            COALESCE((v_seat->>'base_point')::INTEGER, 0),
-            COALESCE((v_seat->>'honba_point')::INTEGER, 0),
-            COALESCE((v_seat->>'kyotaku_point')::INTEGER, 0),
-            COALESCE((v_seat->>'penalty_point')::INTEGER, 0),
-            COALESCE((v_seat->>'score_delta')::INTEGER, 0),
-            COALESCE((v_seat->>'chip_delta')::INTEGER, 0),
-            (v_seat->>'han')::INTEGER,
-            (v_seat->>'fu')::INTEGER,
-            COALESCE((v_seat->>'is_winner')::INTEGER, 0),
-            COALESCE((v_seat->>'is_loser')::INTEGER, 0),
-            COALESCE((v_seat->>'is_riichi')::INTEGER, 0),
-            COALESCE((v_seat->>'is_furo')::INTEGER, 0),
-            COALESCE((v_seat->>'is_tenpai')::INTEGER, 0)
+            COALESCE(NULLIF(v_seat->>'base_point', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'honba_point', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'kyotaku_point', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'penalty_point', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'score_delta', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'chip_delta', '')::INTEGER, 0),
+            NULLIF(v_seat->>'han', '')::INTEGER,
+            NULLIF(v_seat->>'fu', '')::INTEGER,
+            COALESCE(NULLIF(v_seat->>'is_winner', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'is_loser', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'is_riichi', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'is_furo', '')::INTEGER, 0),
+            COALESCE(NULLIF(v_seat->>'is_tenpai', '')::INTEGER, 0)
         );
     END LOOP;
 
-    RETURN jsonb_build_object('success', true, 'round_id', v_round_id);
+    -- 3. yakuman_records 一括作成（役満が存在する場合のみ不可分に実行）
+    IF p_yakumans IS NOT NULL AND jsonb_typeof(p_yakumans) = 'array' THEN
+        FOR v_yakuman IN SELECT * FROM jsonb_array_elements(p_yakumans)
+        LOOP
+            INSERT INTO public.yakuman_records (
+                game_id,
+                round_id,
+                member_id,
+                yakuman_name
+            ) VALUES (
+                p_game_id,
+                p_round_id,
+                v_yakuman->>'member_id',
+                v_yakuman->>'yakuman_name'
+            );
+        END LOOP;
+    END IF;
+
+    RETURN jsonb_build_object('success', true, 'round_id', p_round_id);
 EXCEPTION
     WHEN OTHERS THEN
         RAISE EXCEPTION 'commit_round_transaction failed: %', SQLERRM;
 END;
 $$;
 
--- 2. 対局精算アトミックトランザクション
+-- ------------------------------------------------------------------------------
+-- 3. 対局精算アトミックトランザクション
+-- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.settle_game_transaction(
     p_game_id TEXT,
     p_settlements JSONB
@@ -127,7 +235,9 @@ EXCEPTION
 END;
 $$;
 
--- 3. 対局破棄アトミックトランザクション
+-- ------------------------------------------------------------------------------
+-- 4. 対局破棄アトミックトランザクション
+-- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.abort_game_transaction(
     p_game_id TEXT
 )
@@ -146,7 +256,10 @@ EXCEPTION
 END;
 $$;
 
--- 4. 実行権限の付与
-GRANT EXECUTE ON FUNCTION public.commit_round_transaction(TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB) TO anon, authenticated;
+-- ------------------------------------------------------------------------------
+-- 5. 実行権限の付与
+-- ------------------------------------------------------------------------------
+GRANT EXECUTE ON FUNCTION public.create_game_transaction(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.commit_round_transaction(TEXT, TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.settle_game_transaction(TEXT, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.abort_game_transaction(TEXT) TO anon, authenticated;

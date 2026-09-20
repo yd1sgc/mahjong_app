@@ -18,6 +18,7 @@ import {
   GameRow,
   GroupInsert,
   GroupRow,
+  Json,
   MemberRow,
   RuleTemplateRow,
 } from '@/types/database';
@@ -363,45 +364,33 @@ export default function HomePage() {
       const ruleConfig = currentRule?.config_json || {};
       const effectiveGroupId = await getEffectiveGroupId();
 
-      // 1. games レコード作成
-      const gamePayload: GameInsert = {
-        game_id: gameId,
-        group_id: effectiveGroupId,
-        passcode: pin,
-        rule_name_snapshot: ruleName,
-        rule_config_snapshot: ruleConfig,
-        status: 'in_progress',
-        sync_target: 1,
-        is_synced: 1,
-      };
-      const { error: gErr } = await supabase.from('games').insert(gamePayload);
-
-      if (gErr) {
-        console.error('games insert error:', gErr);
-        throw new Error(gErr.message || JSON.stringify(gErr));
-      }
-
-      // 2. game_participants 作成
-      const participants: GameParticipantInsert[] = selectedMembers.map((mId, idx) => {
+      // 1. game_participants 4席分のペイロード構築
+      const participants = selectedMembers.map((mId, idx) => {
         const mem = members.find((m) => m.member_id === mId);
         return {
-          game_id: gameId,
           seat: idx + 1,
           member_id: mId,
           player_name_snapshot: mem?.member_name || `P${idx + 1}`,
           final_score: 25000,
           rank: idx + 1,
           point: 0.0,
+          was_group_member: 1,
         };
       });
 
-      const { error: pErr } = await supabase
-        .from('game_participants')
-        .insert(participants);
+      // 2. create_game_transaction RPC による不可分登録（1往復・完全アトミック）
+      const { error: rpcErr } = await supabase.rpc('create_game_transaction', {
+        p_game_id: gameId,
+        p_group_id: effectiveGroupId,
+        p_passcode: pin,
+        p_rule_name: ruleName,
+        p_rule_config: ruleConfig as unknown as Json,
+        p_participants: participants as unknown as Json,
+      });
 
-      if (pErr) {
-        console.error('game_participants insert error:', pErr);
-        throw new Error(pErr.message || JSON.stringify(pErr));
+      if (rpcErr) {
+        console.error('create_game_transaction error:', rpcErr);
+        throw new Error(rpcErr.message);
       }
 
       // 3. この端末を記録係としてトークン保存 ＆ 直前設定として保存

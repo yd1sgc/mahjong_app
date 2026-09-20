@@ -305,48 +305,7 @@ export function useGameActions({
           };
         });
 
-        // 1. まず Supabase RPC commit_round_transaction を試行
-        let rpcSuccess = false;
-        try {
-          const { error: rpcErr } = await supabase.rpc('commit_round_transaction', {
-            p_game_id: gameId,
-            p_round_index: roundIndex,
-            p_kyoku_name: newRound.kyoku_name,
-            p_honba: gameState.honba,
-            p_riichi_sticks: gameState.riichiStick,
-            p_result_type: newRound.win_type,
-            p_seats: seatPayloads as unknown as Json,
-          });
-          if (!rpcErr) {
-            rpcSuccess = true;
-          }
-        } catch {
-          rpcSuccess = false;
-        }
-
-        // 2. RPC未配備またはエラー時は通常クエリへフォールバック
-        if (!rpcSuccess) {
-          const { error: rErr } = await supabase.from('rounds').insert({
-            round_id: roundId,
-            game_id: gameId,
-            round_index: roundIndex,
-            kyoku_name: newRound.kyoku_name,
-            honba: gameState.honba,
-            riichi_sticks: gameState.riichiStick,
-            result_type: newRound.win_type,
-          });
-
-          if (rErr) throw new Error(rErr.message);
-
-          const { error: sErr } = await supabase.from('round_seats').insert(seatPayloads);
-          if (sErr) {
-            // ロールバック: round_seats 登録失敗時に rounds レコードを削除して孤立・不整合を防ぐ
-            await supabase.from('rounds').delete().eq('round_id', roundId);
-            throw new Error(`座席データの保存に失敗したためロールバックしました: ${sErr.message}`);
-          }
-        }
-
-        // 3. 役満記録の保存（単一和了またはダブロン）
+        // 1. 役満記録ペイロードの準備（役満和了時）
         const yakumanPayloads: {
           game_id: string;
           round_id: string;
@@ -387,11 +346,22 @@ export function useGameActions({
           });
         }
 
-        if (yakumanPayloads.length > 0) {
-          const { error: yErr } = await supabase.from('yakuman_records').insert(yakumanPayloads);
-          if (yErr) {
-            console.error('Failed to insert yakuman_records:', yErr);
-          }
+        // 2. Supabase RPC commit_round_transaction（完全不可分トランザクション実行）
+        const { error: rpcErr } = await supabase.rpc('commit_round_transaction', {
+          p_round_id: roundId,
+          p_game_id: gameId,
+          p_round_index: roundIndex,
+          p_kyoku_name: newRound.kyoku_name,
+          p_honba: gameState.honba,
+          p_riichi_sticks: gameState.riichiStick,
+          p_result_type: newRound.win_type,
+          p_seats: seatPayloads as unknown as Json,
+          p_yakumans: yakumanPayloads as unknown as Json,
+        });
+
+        if (rpcErr) {
+          console.error('commit_round_transaction error:', rpcErr);
+          throw new Error(`局確定に失敗しました: ${rpcErr.message}`);
         }
 
         clearDraft();
