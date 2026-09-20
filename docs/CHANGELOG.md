@@ -315,4 +315,24 @@
 - `npm run build`: 全11ルート正常出力完了。
 - 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
 
+## Phase 5-R 完了（PostgreSQL ネイティブトランザクション完全配備 & 1リクエスト不可分運用）
+- **新規対局作成トランザクション新設（`create_game_transaction`）**:
+  - `games` と `game_participants`（4席分）を1トランザクションで不可分INSERT。
+  - 参加者数が厳密に4名であることをDB境界で保証。
+  - HTTP通信を2往復から1往復へ半減させ、参加者不足の破損対局を物理的に根絶。
+- **局確定トランザクション改修・完全化（`commit_round_transaction`）**:
+  - クライアント生成の `p_round_id` を明示的に受け取り、`rounds`、`round_seats`、`yakuman_records` すべてに同一IDを付与（round_id乖離バグを完全克服）。
+  - 役満データ `p_yakumans` を引数として受け取り、同一トランザクション内で不可分にINSERT（役満ロストを物理的に根絶）。
+  - 座席データが厳格に4席分であることを検証。
+  - 全整数カラムに `NULLIF(val, '')::INTEGER` による安全キャスト防壁を配備。
+- **クライアントコード純化（`src/app/page.tsx`, `src/hooks/useGameActions.ts`）**:
+  - 旧RPC試行＋通常クエリへのフォールバック（二重構造）を完全削除。
+  - 独立して実行されていた役満別クエリや手動ロールバックを一掃し、RPC呼び出し1回に純化。
+- **実データ・実機検証完了**:
+  - 役満（大三元）を含む局確定、通常局確定、およびCASCADE破棄クリーンアップの全動作を実機で確認完了。
+- `npm test`（Vitest）: 全148件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全14ルート正常出力完了。
+- 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
 
