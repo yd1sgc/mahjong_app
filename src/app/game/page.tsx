@@ -9,6 +9,7 @@ import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGame } from '@/hooks/useGame';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import { ScoreBoard } from '@/components/ScoreBoard';
 import { ActionPanel } from '@/components/ActionPanel';
 import { RoundInputModal } from '@/components/RoundInputModal';
@@ -19,6 +20,7 @@ import { RuleDetailModal } from '@/components/RuleDetailModal';
 import { WinType } from '@/types/mahjong';
 
 function GameContent() {
+  useWakeLock();
   const router = useRouter();
   const searchParams = useSearchParams();
   const gameId = searchParams.get('id') || '';

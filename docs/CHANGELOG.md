@@ -357,3 +357,19 @@
   - `docs/AI_HANDOVER.md` のDirectory Structure Mapおよびテスト件数（全155件）の不整合を解消・最新化。
 - `npm test`（Vitest）: 全11ファイル・155件 ALL PASS。
 - `npx tsc --noEmit`: 型エラー 0件。
+
+## Phase 5-U 完了（対局画面 Screen Wake Lock スリープ防止 & 非同期ライフサイクル制御）
+- **Screen Wake Lock フック実装（`src/hooks/useWakeLock.ts`）**:
+  - `setupWakeLock` として React 非依存の純粋ライフサイクルロジックを分離。
+  - `useRef` / `useState` に頼らずクロージャによるマウント・解放状態管理を行い、対局画面（`GameContent`）の不要な再レンダリングを完全ゼロ化。
+  - 非対応ブラウザガード（`'wakeLock' in navigator`）、SSR/SSGガード（`typeof window === 'undefined'`）、省電力モード拒否（`NotAllowedError`）例外捕捉を徹底。
+  - OS都合の自動解放を `sentinel.onrelease` で検知し内部参照をリセット、ブラウザ復帰時に `visibilitychange`（`document.visibilityState === 'visible'`）で自動再取得。
+  - アンマウント直後に Promise が解決した場合の即時解放・リーク防止ガードを配備。
+- **対局画面への適用（`src/app/game/page.tsx`）**:
+  - `GameContent` 内で `useWakeLock();` を呼出。他画面（`/`, `/stats` 等）やドメイン層（`useGame`）との完全な疎結合を維持。
+- **包括的単体テスト（`tests/wake_lock.test.ts`）**:
+  - Node環境における `globalThis` スタブを用い、マウント時取得・アンマウント時解放・復帰時再取得・多重取得防止・非対応フォールバック・例外ハンドリング・非同期競合制御の全8ケースを検証。
+- `npm test`（Vitest）: 全12ファイル・163件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全14ルート静的エクスポート正常完了。
+
