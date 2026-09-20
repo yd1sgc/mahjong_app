@@ -3,6 +3,9 @@ import {
   validateRuleInput,
   validateMemberInput,
   validateGroupInput,
+  MAX_MEMBER_NAME_LENGTH,
+  MAX_GROUP_NAME_LENGTH,
+  MAX_RULE_NAME_LENGTH,
 } from '../src/lib/mahjong/validation';
 
 describe('Layer 3: ルール・メンバー管理バリデーション検証 (management.test.ts)', () => {
@@ -82,6 +85,47 @@ describe('Layer 3: ルール・メンバー管理バリデーション検証 (ma
       expect(res.valid).toBe(false);
       expect(res.error).toBe('ウマは4名分の数値を指定してください');
     });
+
+    it('文字数上限: 15文字ちょうどは通過し、16文字以上は拒絶すること', () => {
+      // 15文字ちょうど
+      const res15 = validateRuleInput({
+        name: '親族麻雀ルール（過去データ用）',
+        initScore: 25000,
+        returnScore: 30000,
+        uma: [10, 5, -5, -10],
+      });
+      expect(res15.valid).toBe(true);
+
+      // 16文字
+      const res16 = validateRuleInput({
+        name: '親族麻雀ルール（過去データ用）X',
+        initScore: 25000,
+        returnScore: 30000,
+        uma: [10, 5, -5, -10],
+      });
+      expect(res16.valid).toBe(false);
+      expect(res16.error).toBe(`ルール名は${MAX_RULE_NAME_LENGTH}文字以内で入力してください`);
+    });
+
+    it('禁止文字: 絵文字や改行を含むルール名を拒絶すること', () => {
+      const resEmoji = validateRuleInput({
+        name: '麻雀ルール🀄',
+        initScore: 25000,
+        returnScore: 30000,
+        uma: [10, 5, -5, -10],
+      });
+      expect(resEmoji.valid).toBe(false);
+      expect(resEmoji.error).toBe('絵文字は使用できません');
+
+      const resNewline = validateRuleInput({
+        name: 'ルール\nA',
+        initScore: 25000,
+        returnScore: 30000,
+        uma: [10, 5, -5, -10],
+      });
+      expect(resNewline.valid).toBe(false);
+      expect(resNewline.error).toBe('改行や特殊な制御文字は使用できません');
+    });
   });
 
   describe('2. validateMemberInput (メンバー追加・編集の整合性検証)', () => {
@@ -130,6 +174,28 @@ describe('Layer 3: ルール・メンバー管理バリデーション検証 (ma
       expect(resSpace.valid).toBe(false);
       expect(resSpace.error).toBe('メンバー名を入力してください');
     });
+
+    it('文字数上限: 8文字ちょうどは通過し、9文字以上は拒絶すること', () => {
+      // 8文字ちょうど
+      const res8 = validateMemberInput('オッチャンテスト', existingMembers);
+      expect(res8.valid).toBe(true);
+      expect(res8.trimmedName).toBe('オッチャンテスト');
+
+      // 9文字
+      const res9 = validateMemberInput('オッチャンテストX', existingMembers);
+      expect(res9.valid).toBe(false);
+      expect(res9.error).toBe(`メンバー名は${MAX_MEMBER_NAME_LENGTH}文字以内で入力してください`);
+    });
+
+    it('禁止文字: 絵文字や改行を含むメンバー名を拒絶すること', () => {
+      const resEmoji = validateMemberInput('佐藤😀', existingMembers);
+      expect(resEmoji.valid).toBe(false);
+      expect(resEmoji.error).toBe('絵文字は使用できません');
+
+      const resTab = validateMemberInput('佐藤\t太郎', existingMembers);
+      expect(resTab.valid).toBe(false);
+      expect(resTab.error).toBe('改行や特殊な制御文字は使用できません');
+    });
   });
 
   describe('3. validateGroupInput (グループ作成・編集の整合性検証)', () => {
@@ -154,6 +220,28 @@ describe('Layer 3: ルール・メンバー管理バリデーション検証 (ma
       const res = validateGroupInput('   ', existingGroups);
       expect(res.valid).toBe(false);
       expect(res.error).toBe('グループ名を入力してください');
+    });
+
+    it('文字数上限: 10文字ちょうどは通過し、11文字以上は拒絶すること', () => {
+      // 10文字ちょうど
+      const res10 = validateGroupInput('親族麻雀部テスト１０', existingGroups);
+      expect(res10.valid).toBe(true);
+      expect(res10.trimmedName).toBe('親族麻雀部テスト１０');
+
+      // 11文字
+      const res11 = validateGroupInput('親族麻雀部テスト１０Ｘ', existingGroups);
+      expect(res11.valid).toBe(false);
+      expect(res11.error).toBe(`グループ名は${MAX_GROUP_NAME_LENGTH}文字以内で入力してください`);
+    });
+
+    it('禁止文字: 絵文字や改行を含むグループ名を拒絶すること', () => {
+      const resEmoji = validateGroupInput('親族麻雀部🀄', existingGroups);
+      expect(resEmoji.valid).toBe(false);
+      expect(resEmoji.error).toBe('絵文字は使用できません');
+
+      const resNewline = validateGroupInput('親族\n麻雀部', existingGroups);
+      expect(resNewline.valid).toBe(false);
+      expect(resNewline.error).toBe('改行や特殊な制御文字は使用できません');
     });
   });
 });

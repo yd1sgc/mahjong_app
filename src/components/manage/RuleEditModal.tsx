@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { RuleTemplateRow } from '@/types/database';
-import { validateRuleInput } from '@/lib/mahjong/validation';
+import { validateRuleInput, MAX_RULE_NAME_LENGTH } from '@/lib/mahjong/validation';
 import { RuleConfig } from '@/types/mahjong';
 import { AdminPinModal } from '@/components/manage/AdminPinModal';
 import { isAdminAuthenticated } from '@/lib/adminAuth';
@@ -535,6 +535,7 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
                   type="text"
                   value={ruleName}
                   onChange={(e) => setRuleName(e.target.value)}
+                  maxLength={MAX_RULE_NAME_LENGTH}
                   placeholder="例: 親族ルール（飛びなし）"
                   className="w-full h-10 px-3 rounded-xl bg-neutral-950 border border-neutral-700 text-white font-bold text-sm focus:outline-hidden focus:border-amber-500"
                   autoFocus

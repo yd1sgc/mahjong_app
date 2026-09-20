@@ -9,7 +9,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { MemberRow, GroupRow, RuleTemplateRow } from '@/types/database';
-import { validateMemberInput, validateGroupInput } from '@/lib/mahjong/validation';
+import {
+  validateMemberInput,
+  validateGroupInput,
+  MAX_MEMBER_NAME_LENGTH,
+  MAX_GROUP_NAME_LENGTH,
+} from '@/lib/mahjong/validation';
 import { AdminPinModal } from '@/components/manage/AdminPinModal';
 import { isAdminAuthenticated } from '@/lib/adminAuth';
 
@@ -601,6 +606,7 @@ export default function GroupsManagePage() {
                   type="text"
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
+                  maxLength={MAX_MEMBER_NAME_LENGTH}
                   placeholder="例: 佐藤"
                   className="w-full h-11 px-3 rounded-xl bg-neutral-950 border border-neutral-700 text-white font-bold text-sm focus:outline-hidden focus:border-amber-500"
                   autoFocus
@@ -671,6 +677,7 @@ export default function GroupsManagePage() {
                   type="text"
                   value={editMemberName}
                   onChange={(e) => setEditMemberName(e.target.value)}
+                  maxLength={MAX_MEMBER_NAME_LENGTH}
                   className="w-full h-11 px-3 rounded-xl bg-neutral-950 border border-neutral-700 text-white font-bold text-sm focus:outline-hidden focus:border-amber-500"
                   autoFocus
                 />
@@ -804,6 +811,7 @@ export default function GroupsManagePage() {
                   type="text"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
+                  maxLength={MAX_GROUP_NAME_LENGTH}
                   placeholder="例: 親族麻雀部"
                   className="w-full h-11 px-3 rounded-xl bg-neutral-950 border border-neutral-700 text-white font-bold text-sm focus:outline-hidden focus:border-amber-500"
                   autoFocus

@@ -3,6 +3,28 @@
  * ReactやDOM非依存の純粋関数群
  */
 
+export const MAX_MEMBER_NAME_LENGTH = 8;
+export const MAX_GROUP_NAME_LENGTH = 10;
+export const MAX_RULE_NAME_LENGTH = 15;
+
+// 絵文字チェック（Unicode Extended Pictographic）
+const EMOJI_REGEX = /\p{Extended_Pictographic}/u;
+// 改行・タブ等の制御文字チェック
+const CONTROL_CHAR_REGEX = /[\r\n\t\x00-\x1f\x7f]/;
+
+/**
+ * 禁止文字（改行・制御文字・絵文字）が含まれているかを検査する純粋関数
+ */
+export function containsForbiddenChars(text: string): { forbidden: boolean; reason?: string } {
+  if (CONTROL_CHAR_REGEX.test(text)) {
+    return { forbidden: true, reason: '改行や特殊な制御文字は使用できません' };
+  }
+  if (EMOJI_REGEX.test(text)) {
+    return { forbidden: true, reason: '絵文字は使用できません' };
+  }
+  return { forbidden: false };
+}
+
 export interface RuleInputData {
   name: string;
   initScore: number;
@@ -26,6 +48,15 @@ export function validateRuleInput(data: RuleInputData): ValidationResult {
   const trimmedName = data.name ? data.name.trim() : '';
   if (!trimmedName) {
     return { valid: false, error: 'ルール名を入力してください' };
+  }
+
+  const charCheck = containsForbiddenChars(trimmedName);
+  if (charCheck.forbidden) {
+    return { valid: false, error: charCheck.reason };
+  }
+
+  if (trimmedName.length > MAX_RULE_NAME_LENGTH) {
+    return { valid: false, error: `ルール名は${MAX_RULE_NAME_LENGTH}文字以内で入力してください` };
   }
 
   if (typeof data.initScore !== 'number' || typeof data.returnScore !== 'number') {
@@ -66,6 +97,19 @@ export function validateMemberInput(
     return { valid: false, error: 'メンバー名を入力してください', trimmedName: '' };
   }
 
+  const charCheck = containsForbiddenChars(trimmed);
+  if (charCheck.forbidden) {
+    return { valid: false, error: charCheck.reason, trimmedName: trimmed };
+  }
+
+  if (trimmed.length > MAX_MEMBER_NAME_LENGTH) {
+    return {
+      valid: false,
+      error: `メンバー名は${MAX_MEMBER_NAME_LENGTH}文字以内で入力してください`,
+      trimmedName: trimmed,
+    };
+  }
+
   const lower = trimmed.toLowerCase();
   const isDuplicate = existingMembers.some(
     (m) => (!currentMemberId || m.member_id !== currentMemberId) && m.member_name.toLowerCase() === lower
@@ -94,6 +138,19 @@ export function validateGroupInput(
   const trimmed = name ? name.trim() : '';
   if (!trimmed) {
     return { valid: false, error: 'グループ名を入力してください', trimmedName: '' };
+  }
+
+  const charCheck = containsForbiddenChars(trimmed);
+  if (charCheck.forbidden) {
+    return { valid: false, error: charCheck.reason, trimmedName: trimmed };
+  }
+
+  if (trimmed.length > MAX_GROUP_NAME_LENGTH) {
+    return {
+      valid: false,
+      error: `グループ名は${MAX_GROUP_NAME_LENGTH}文字以内で入力してください`,
+      trimmedName: trimmed,
+    };
   }
 
   const lower = trimmed.toLowerCase();
