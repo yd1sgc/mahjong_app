@@ -373,3 +373,27 @@
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全14ルート静的エクスポート正常完了。
 
+## Phase 5-V 完了（実力推定・同卓者分析機能配備 & MMC準拠統計モデル & 単体テスト176件PASS）
+- **純粋ドメイン層実装（`src/lib/mahjong/skillEstimation.ts`）**:
+  - MMC（mahjong-manage.com）準拠の統計モデル（中心極限定理に基づく正規分布・標準誤差推定）を純粋関数として実装。
+  - 誤差関数 `erf(x)` の高精度多項式近似（Abramowitz & Stegun 7.1.26 準拠、最大誤差 1.5e-7）。
+  - 標準正規分布の累積分布関数 `normalCdf(z)` および確率密度関数 `normalPdf(x, mean, se)`。
+  - `calculateSkillEstimation`: 標本平均 $\bar{X}$、不偏標準偏差 $s$、標準誤差 $SE = s / \sqrt{N}$、期待収支達成確率（実力 $\ge 0\text{pt} \sim 5\text{pt}$）、確率密度曲線（$-10\text{pt} \sim +10\text{pt}$、41点）の算出。
+  - `calculateHeadToHeadEstimation`: 指定プレイヤーと同卓した相手を抽出し、同卓時平均pt・平均順位、差分の不偏標準誤差 $SE_d$、対応のある差分検定基準による「相手より強い確率（優位確率）」、同卓時重なり曲線の算出。
+- **UIプレゼンテーション層実装（`src/components/stats/SkillEstimationSection.tsx`）**:
+  - デフォルト折りたたみのアコーディオン構造（ワンタップでオンデマンド展開・初期描画負荷ゼロ）。
+  - ウマ・オカ混在による統計破綻を防ぐ「単一ルール選択制限」（全ルール選択時は注意メッセージを表示し計算を安全にスキップ）。
+  - 分析対象メンバー選択チップ（打荘数降順、タップで主役切り替え）。
+  - トータル実力推定パネル（指標グリッド、達成確率表、0pt破線および自平均ライン付き純粋SVG曲線）。
+  - 同卓者別実力比較カード一覧（同卓数降順、成績対比、優位確率バッジ、自分［シアン］と相手［ローズ］の2曲線重なりSVGグラフ、上位5名＋アコーディオン展開）。
+- **成績画面への組み込み（`src/app/stats/page.tsx`）**:
+  - レコードと相性マトリクスの間に `SkillEstimationSection` を配置。
+- **包括的単体テスト配備（`tests/skillEstimation.test.ts`）**:
+  - 数学理論値検証（erf, normalCdf, normalPdf, 対称性 erf(-x)=-erf(x), 極値飽和）。
+  - MMC実測データ（85戦、5.16pt、35.72）に対する達成確率完全一致検証（90.85%, 85.85%, 79.26%, 71.14%, 61.77%, 51.65%）。
+  - 境界値・エッジケース検証（$N=1$ での不偏分散0・確率二値化、完全同点での50.0%、同卓1戦での100%/0%、不正分散ガード、空配列返却）。
+- `npm test`（Vitest）: 全13ファイル・176件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全14ルート静的エクスポート正常完了。
+- 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
