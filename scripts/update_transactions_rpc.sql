@@ -12,6 +12,8 @@
 DROP FUNCTION IF EXISTS public.commit_round_transaction(TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB);
 DROP FUNCTION IF EXISTS public.commit_round_transaction(TEXT, TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB, JSONB);
 DROP FUNCTION IF EXISTS public.create_game_transaction(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS public.abort_game_transaction(UUID);
+DROP FUNCTION IF EXISTS public.settle_game_transaction(UUID, JSONB);
 
 -- ------------------------------------------------------------------------------
 -- 1. 新規対局作成トランザクション（完全防壁版）

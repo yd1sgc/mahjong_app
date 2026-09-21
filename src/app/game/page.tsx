@@ -155,6 +155,12 @@ function GameContent() {
       const res = await abortGame();
       if (res) {
         router.push('/');
+      } else {
+        setToast({
+          type: 'error',
+          message: '対局の破棄に失敗しました',
+          onRetry: handleConfirmAbort,
+        });
       }
     } finally {
       setSubmitting(false);
