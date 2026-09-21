@@ -426,6 +426,10 @@
 - **SQL資産およびTypeScript型定義の同期（`scripts/update_transactions_rpc.sql`, `src/types/database.ts`）**:
   - 新規RPC 2関数（`update_round_recalculate_transaction`, `undo_round_transaction`）および `settle_game_transaction` の安全キャスト防壁をSQLスクリプトへ集約・Supabase適用確認完了。
   - `database.ts` の `Functions` インターフェースへ引数・戻り値型を完全同期。
+- **過去UUIDシグネチャ重複解消（PGRST203根絶） & UIエラー通知改善**:
+  - 過去フェーズで残存していた `abort_game_transaction(UUID)` および `settle_game_transaction(UUID, JSONB)` をDROPし、型重複によるHTTP 300 Multiple Choices（PGRST203）エラーを根本解消。
+  - `src/app/game/page.tsx` において、対局破棄失敗時に沈黙せずトーストエラーを表示する安全ハンドリングを配備。
+  - 実環境テスト対局を作成し、精算・確定（ゼロサム整合保存）および破棄（CASCADE完全消去）が正常動作することをAPI・実機双方で実証完了。
 - `npm test`（Vitest）: 全13ファイル・178件 ALL PASS。
 - `npx tsc --noEmit`: 型エラー 0件。
 - `npm run build`: 全14ルート静的エクスポート正常完了。
