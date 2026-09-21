@@ -378,6 +378,23 @@ export interface Database {
         };
         Returns: Json;
       };
+      update_round_recalculate_transaction: {
+        Args: {
+          p_game_id: string;
+          p_target_round_id: string;
+          p_rounds: Json;
+          p_seats: Json;
+          p_yakumans?: Json;
+        };
+        Returns: Json;
+      };
+      undo_round_transaction: {
+        Args: {
+          p_game_id: string;
+          p_round_id: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       [_ in never]: never;

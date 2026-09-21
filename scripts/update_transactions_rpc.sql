@@ -1,9 +1,11 @@
 -- ==============================================================================
--- Supabase RPC: ネイティブトランザクション完全配備
+-- Supabase RPC: ネイティブトランザクション完全配備（堅牢防壁版）
 -- 1. create_game_transaction: games と game_participants を不可分登録
 -- 2. commit_round_transaction: rounds, round_seats, yakuman_records を不可分登録
 -- 3. settle_game_transaction: gamesステータスと参加者成績を不可分更新
 -- 4. abort_game_transaction: gamesおよび連鎖データをCASCADE削除
+-- 5. update_round_recalculate_transaction: 局修正時のrounds, round_seats, yakuman_records一括不可分更新
+-- 6. undo_round_transaction: 前局取消時のrounds, yakuman_records不可分削除
 -- ==============================================================================
 
 -- 旧シグネチャ関数の削除（競合防止）
@@ -198,7 +200,7 @@ END;
 $$;
 
 -- ------------------------------------------------------------------------------
--- 3. 対局精算アトミックトランザクション
+-- 3. 対局精算アトミックトランザクション（安全キャスト防壁版）
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.settle_game_transaction(
     p_game_id TEXT,
@@ -216,14 +218,14 @@ BEGIN
     SET status = 'completed'
     WHERE game_id = p_game_id;
 
-    -- 2. 参加者スコア・順位・確定ポイントの更新
+    -- 2. 参加者スコア・順位・確定ポイントの不可分更新
     FOR v_st IN SELECT * FROM jsonb_array_elements(p_settlements)
     LOOP
         UPDATE public.game_participants
         SET
-            final_score = (v_st->>'final_score')::INTEGER,
-            rank = (v_st->>'rank')::INTEGER,
-            point = (v_st->>'point')::NUMERIC(6,1)
+            final_score = COALESCE(NULLIF(v_st->>'final_score', '')::INTEGER, 25000),
+            rank = COALESCE(NULLIF(v_st->>'rank', '')::INTEGER, 1),
+            point = COALESCE(NULLIF(v_st->>'point', '')::NUMERIC(6,1), 0.0)
         WHERE game_id = p_game_id
           AND seat = (v_st->>'seat')::INTEGER;
     END LOOP;
@@ -257,9 +259,177 @@ END;
 $$;
 
 -- ------------------------------------------------------------------------------
--- 5. 実行権限の付与
+-- 5. 局修正アトミックトランザクション（新規配備）
+-- rounds, round_seats の一括UPSERTおよび対象局の役満レコード洗替を1不可分トランザクションで実行
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.update_round_recalculate_transaction(
+    p_game_id TEXT,
+    p_target_round_id TEXT,
+    p_rounds JSONB,
+    p_seats JSONB,
+    p_yakumans JSONB DEFAULT '[]'::jsonb
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_round JSONB;
+    v_seat JSONB;
+    v_yakuman JSONB;
+BEGIN
+    -- 1. rounds レコード群の一括 UPSERT
+    IF p_rounds IS NOT NULL AND jsonb_typeof(p_rounds) = 'array' THEN
+        FOR v_round IN SELECT * FROM jsonb_array_elements(p_rounds)
+        LOOP
+            INSERT INTO public.rounds (
+                round_id,
+                game_id,
+                round_index,
+                kyoku_name,
+                honba,
+                riichi_sticks,
+                result_type
+            ) VALUES (
+                v_round->>'round_id',
+                p_game_id,
+                (v_round->>'round_index')::INTEGER,
+                v_round->>'kyoku_name',
+                COALESCE(NULLIF(v_round->>'honba', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_round->>'riichi_sticks', '')::INTEGER, 0),
+                v_round->>'result_type'
+            )
+            ON CONFLICT (round_id) DO UPDATE SET
+                game_id = EXCLUDED.game_id,
+                round_index = EXCLUDED.round_index,
+                kyoku_name = EXCLUDED.kyoku_name,
+                honba = EXCLUDED.honba,
+                riichi_sticks = EXCLUDED.riichi_sticks,
+                result_type = EXCLUDED.result_type;
+        END LOOP;
+    END IF;
+
+    -- 2. round_seats レコード群の一括 UPSERT
+    IF p_seats IS NOT NULL AND jsonb_typeof(p_seats) = 'array' THEN
+        FOR v_seat IN SELECT * FROM jsonb_array_elements(p_seats)
+        LOOP
+            INSERT INTO public.round_seats (
+                round_id,
+                seat,
+                member_id,
+                base_point,
+                honba_point,
+                kyotaku_point,
+                penalty_point,
+                score_delta,
+                chip_delta,
+                han,
+                fu,
+                is_winner,
+                is_loser,
+                is_riichi,
+                is_furo,
+                is_tenpai
+            ) VALUES (
+                v_seat->>'round_id',
+                (v_seat->>'seat')::INTEGER,
+                v_seat->>'member_id',
+                COALESCE(NULLIF(v_seat->>'base_point', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'honba_point', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'kyotaku_point', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'penalty_point', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'score_delta', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'chip_delta', '')::INTEGER, 0),
+                NULLIF(v_seat->>'han', '')::INTEGER,
+                NULLIF(v_seat->>'fu', '')::INTEGER,
+                COALESCE(NULLIF(v_seat->>'is_winner', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'is_loser', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'is_riichi', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'is_furo', '')::INTEGER, 0),
+                COALESCE(NULLIF(v_seat->>'is_tenpai', '')::INTEGER, 0)
+            )
+            ON CONFLICT (round_id, seat) DO UPDATE SET
+                member_id = EXCLUDED.member_id,
+                base_point = EXCLUDED.base_point,
+                honba_point = EXCLUDED.honba_point,
+                kyotaku_point = EXCLUDED.kyotaku_point,
+                penalty_point = EXCLUDED.penalty_point,
+                score_delta = EXCLUDED.score_delta,
+                chip_delta = EXCLUDED.chip_delta,
+                han = EXCLUDED.han,
+                fu = EXCLUDED.fu,
+                is_winner = EXCLUDED.is_winner,
+                is_loser = EXCLUDED.is_loser,
+                is_riichi = EXCLUDED.is_riichi,
+                is_furo = EXCLUDED.is_furo,
+                is_tenpai = EXCLUDED.is_tenpai;
+        END LOOP;
+    END IF;
+
+    -- 3. 修正対象局の役満レコード洗替（既存削除 ＋ 新規挿入）
+    IF p_target_round_id IS NOT NULL AND p_target_round_id <> '' THEN
+        DELETE FROM public.yakuman_records WHERE round_id = p_target_round_id;
+
+        IF p_yakumans IS NOT NULL AND jsonb_typeof(p_yakumans) = 'array' THEN
+            FOR v_yakuman IN SELECT * FROM jsonb_array_elements(p_yakumans)
+            LOOP
+                INSERT INTO public.yakuman_records (
+                    game_id,
+                    round_id,
+                    member_id,
+                    yakuman_name
+                ) VALUES (
+                    p_game_id,
+                    p_target_round_id,
+                    v_yakuman->>'member_id',
+                    v_yakuman->>'yakuman_name'
+                );
+            END LOOP;
+        END IF;
+    END IF;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'update_round_recalculate_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 6. 前局確定取消アトミックトランザクション（新規配備）
+-- rounds レコードおよび関連役満レコードを安全に不可分削除
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.undo_round_transaction(
+    p_game_id TEXT,
+    p_round_id TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- 役満レコード明示的削除（外部キーCASCADE未定義環境への安全弁）
+    DELETE FROM public.yakuman_records 
+    WHERE round_id = p_round_id;
+
+    -- rounds レコード削除（round_seats はCASCADEにより連鎖削除）
+    DELETE FROM public.rounds 
+    WHERE round_id = p_round_id 
+      AND game_id = p_game_id;
+
+    RETURN jsonb_build_object('success', true);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE EXCEPTION 'undo_round_transaction failed: %', SQLERRM;
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- 7. 実行権限の付与
 -- ------------------------------------------------------------------------------
 GRANT EXECUTE ON FUNCTION public.create_game_transaction(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.commit_round_transaction(TEXT, TEXT, INTEGER, TEXT, INTEGER, INTEGER, TEXT, JSONB, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.settle_game_transaction(TEXT, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.abort_game_transaction(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.update_round_recalculate_transaction(TEXT, TEXT, JSONB, JSONB, JSONB) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.undo_round_transaction(TEXT, TEXT) TO anon, authenticated;

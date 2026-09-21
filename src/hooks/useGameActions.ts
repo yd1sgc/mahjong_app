@@ -437,14 +437,21 @@ export function useGameActions({
         setLoading(true);
         const lastIndex = gameState.roundHistory.length - 1;
 
-        // round_id（主キー）があれば完全一致削除、なければ round_index で削除
-        const deleteQuery = lastRound.round_id
-          ? supabase.from('rounds').delete().eq('round_id', lastRound.round_id)
-          : supabase.from('rounds').delete().eq('game_id', gameId).eq('round_index', lastIndex);
+        // undo_round_transaction RPC による完全不可分削除（役満レコード洗替含む）
+        const targetRoundId = lastRound.round_id;
+        if (!targetRoundId) {
+          throw new Error('削除対象の局IDが見つかりません');
+        }
 
-        const { error: delErr } = await deleteQuery;
+        const { error: rpcErr } = await supabase.rpc('undo_round_transaction', {
+          p_game_id: gameId,
+          p_round_id: targetRoundId,
+        });
 
-        if (delErr) throw new Error(delErr.message);
+        if (rpcErr) {
+          console.error('undo_round_transaction error:', rpcErr);
+          throw new Error(`巻き戻し処理に失敗しました: ${rpcErr.message}`);
+        }
 
         clearRoundDeclarations();
         await fetchGameData();
@@ -497,44 +504,15 @@ export function useGameActions({
         point: s.point,
       }));
 
-      // 1. RPC settle_game_transaction 試行
-      let rpcSuccess = false;
-      try {
-        const { error: rpcErr } = await supabase.rpc('settle_game_transaction', {
-          p_game_id: gameId,
-          p_settlements: settlementPayload as unknown as Json,
-        });
-        if (!rpcErr) {
-          rpcSuccess = true;
-        }
-      } catch {
-        rpcSuccess = false;
-      }
+      // Supabase RPC settle_game_transaction（完全不可分トランザクション実行）
+      const { error: rpcErr } = await supabase.rpc('settle_game_transaction', {
+        p_game_id: gameId,
+        p_settlements: settlementPayload as unknown as Json,
+      });
 
-      // 2. フォールバック
-      if (!rpcSuccess) {
-        const { error: gErr } = await supabase
-          .from('games')
-          .update({
-            status: 'completed',
-          })
-          .eq('game_id', gameId);
-
-        if (gErr) throw new Error(gErr.message);
-
-        for (const s of settlements) {
-          const { error: pErr } = await supabase
-            .from('game_participants')
-            .update({
-              final_score: s.finalScore,
-              rank: s.rank,
-              point: s.point,
-            })
-            .eq('game_id', gameId)
-            .eq('seat', s.seat);
-
-          if (pErr) throw new Error(pErr.message);
-        }
+      if (rpcErr) {
+        console.error('settle_game_transaction error:', rpcErr);
+        throw new Error(`対局終了処理に失敗しました: ${rpcErr.message}`);
       }
 
       clearDraft();
@@ -570,27 +548,14 @@ export function useGameActions({
     try {
       setLoading(true);
 
-      // 1. RPC abort_game_transaction 試行
-      let rpcSuccess = false;
-      try {
-        const { error: rpcErr } = await supabase.rpc('abort_game_transaction', {
-          p_game_id: gameId,
-        });
-        if (!rpcErr) {
-          rpcSuccess = true;
-        }
-      } catch {
-        rpcSuccess = false;
-      }
+      // Supabase RPC abort_game_transaction（完全不可分トランザクション実行）
+      const { error: rpcErr } = await supabase.rpc('abort_game_transaction', {
+        p_game_id: gameId,
+      });
 
-      // 2. フォールバック
-      if (!rpcSuccess) {
-        const { error: delErr } = await supabase
-          .from('games')
-          .delete()
-          .eq('game_id', gameId);
-
-        if (delErr) throw new Error(delErr.message);
+      if (rpcErr) {
+        console.error('abort_game_transaction error:', rpcErr);
+        throw new Error(`対局破棄に失敗しました: ${rpcErr.message}`);
       }
 
       clearDraft();
@@ -705,35 +670,15 @@ export function useGameActions({
           }
         }
 
-        if (roundsToUpsert.length > 0) {
-          const { error: rErr } = await supabase
-            .from('rounds')
-            .upsert(roundsToUpsert, { onConflict: 'round_id' });
-          if (rErr) {
-            throw new Error(`局データの更新に失敗しました: ${rErr.message}`);
-          }
-        }
+        // 3.5. 修正対象局の役満レコードペイロード作成
+        const editYakumanPayloads: {
+          game_id: string;
+          round_id: string;
+          member_id: string;
+          yakuman_name: string;
+        }[] = [];
 
-        if (seatsToUpsert.length > 0) {
-          const { error: sErr } = await supabase
-            .from('round_seats')
-            .upsert(seatsToUpsert, { onConflict: 'round_id,seat' });
-          if (sErr) {
-            throw new Error(`座席データの更新に失敗しました: ${sErr.message}`);
-          }
-        }
-
-        // 3.5. 役満レコードの同期（対象局の既存レコードを削除し、最新内容で再登録）
         if (targetRoundId) {
-          await supabase.from('yakuman_records').delete().eq('round_id', targetRoundId);
-
-          const editYakumanPayloads: {
-            game_id: string;
-            round_id: string;
-            member_id: string;
-            yakuman_name: string;
-          }[] = [];
-
           if (updatedRoundData.win_type === 'ron' || updatedRoundData.win_type === 'tsumo') {
             if (updatedRoundData.winner && updatedRoundData.yakuman_names && updatedRoundData.yakuman_names.length > 0) {
               const winnerPart = participants.find((p) => p.player_name_snapshot === updatedRoundData.winner);
@@ -766,10 +711,20 @@ export function useGameActions({
               }
             });
           }
+        }
 
-          if (editYakumanPayloads.length > 0) {
-            await supabase.from('yakuman_records').insert(editYakumanPayloads);
-          }
+        // 3.6. Supabase RPC update_round_recalculate_transaction（完全不可分トランザクション実行）
+        const { error: rpcErr } = await supabase.rpc('update_round_recalculate_transaction', {
+          p_game_id: gameId,
+          p_target_round_id: targetRoundId || '',
+          p_rounds: roundsToUpsert as unknown as Json,
+          p_seats: seatsToUpsert as unknown as Json,
+          p_yakumans: editYakumanPayloads as unknown as Json,
+        });
+
+        if (rpcErr) {
+          console.error('update_round_recalculate_transaction error:', rpcErr);
+          throw new Error(`局データの更新に失敗しました: ${rpcErr.message}`);
         }
 
         // 4. DB更新が完全に成功した直後にのみ、現在局の未確定ローカルデータ（下書き・副露・立直・履歴）を完全リセット
