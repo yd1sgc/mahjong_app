@@ -414,3 +414,21 @@
 - `npm test`（Vitest）: 全13ファイル・178件 ALL PASS。
 - `npm run build`: 全14ルート静的エクスポート正常完了。
 
+## Phase 5-X 完了（PostgreSQL RPC完全化 & 対局系フォールバック二重構造完全撤廃）
+- **対局精算・破棄フォールバックの完全削除（`src/hooks/useGameActions.ts`）**:
+  - `settleGame` において、RPC失敗時に実行されていたクライアント直接のテーブル更新（`games` 更新 ＋ `game_participants` 4席ループ更新）を完全撤廃。RPC呼び出し単独へ純化し、通信エラー時の部分書き込み・ポイントゼロサム崩壊事故を根絶。
+  - `abortGame` において、RPC失敗時の `games.delete()` フォールバックを完全撤廃。
+- **局修正アトミックRPC新設（`update_round_recalculate_transaction`）**:
+  - 従来クライアントから直列送信されていた4回のリクエスト（`rounds` UPSERT → `round_seats` UPSERT → `yakuman_records` DELETE → `yakuman_records` INSERT）を1回のPostgreSQLトランザクションRPCに集約。
+  - 再計算対象の複数局データおよび役満レコードの洗い替えを単一トランザクション内で不可分に実行し、通信瞬断時の座席欠損・役満消失リスクを物理的にゼロ化。
+- **前局取消アトミックRPC新設（`undo_round_transaction`）**:
+  - クライアント直接の `rounds.delete()` を廃止し、役満レコードの明示的クリーンアップを包含した単一トランザクションRPCへ移行。
+- **SQL資産およびTypeScript型定義の同期（`scripts/update_transactions_rpc.sql`, `src/types/database.ts`）**:
+  - 新規RPC 2関数（`update_round_recalculate_transaction`, `undo_round_transaction`）および `settle_game_transaction` の安全キャスト防壁をSQLスクリプトへ集約・Supabase適用確認完了。
+  - `database.ts` の `Functions` インターフェースへ引数・戻り値型を完全同期。
+- `npm test`（Vitest）: 全13ファイル・178件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全14ルート静的エクスポート正常完了。
+- 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
+
+
