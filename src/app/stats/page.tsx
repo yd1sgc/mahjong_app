@@ -22,6 +22,7 @@ import { StatsDetailsTab } from '@/components/stats/StatsDetailsTab';
 import { StyleScatterChart } from '@/components/stats/StyleScatterChart';
 import { ScoreTrendChart } from '@/components/stats/ScoreTrendChart';
 import { StatsRecords } from '@/components/stats/StatsRecords';
+import { SkillEstimationSection } from '@/components/stats/SkillEstimationSection';
 import { CompatibilityMatrix } from '@/components/stats/CompatibilityMatrix';
 import { GameHistoryTable } from '@/components/stats/GameHistoryTable';
 import { GameDetailModal } from '@/components/stats/GameDetailModal';
@@ -408,6 +409,13 @@ export default function StatsPage() {
 
       {/* ─── レコード ─── */}
       <StatsRecords records={records} yakumanRecords={effectiveYakumanRecords} />
+
+      {/* ─── 実力推定・同卓者分析 ─── */}
+      <SkillEstimationSection
+        selectedRuleName={selectedRuleName}
+        effectiveGames={effectiveGames}
+        allPlayerNames={allPlayerNames}
+      />
 
       {/* ─── 相性マトリクス（直接対決） ─── */}
       <CompatibilityMatrix
