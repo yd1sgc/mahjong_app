@@ -135,4 +135,115 @@ describe('Layer 6: UI・通信層の耐障害性・同期整合性検証 (networ
       expect(validateScoreTotal(invalidScores)).toBe(false);
     });
   });
+
+  describe('4. 非同期フェッチ競合制御（Promise合流・直列化）の整合性検証', () => {
+    it('先行フェッチ実行中に後続要求が届いた場合、先行完了後に必ず最新フェッチが直列実行されること', async () => {
+      let callCount = 0;
+      let activePromise: Promise<void> | null = null;
+      let nextPromise: Promise<void> | null = null;
+      const historyLog: string[] = [];
+
+      // useGameData と同一の Promise 合流・直列化アルゴリズム
+      const fetchQueued = (): Promise<void> => {
+        if (!activePromise) {
+          const promise = (async () => {
+            const currentCall = ++callCount;
+            historyLog.push(`start-${currentCall}`);
+            // 通信遅延（50ms）
+            await new Promise((res) => setTimeout(res, 50));
+            historyLog.push(`end-${currentCall}`);
+            activePromise = null;
+          })();
+          activePromise = promise;
+          return promise;
+        }
+
+        if (nextPromise) {
+          return nextPromise;
+        }
+
+        const np = activePromise
+          .then(() => {
+            nextPromise = null;
+            return fetchQueued();
+          })
+          .catch(() => {
+            nextPromise = null;
+            return fetchQueued();
+          });
+
+        nextPromise = np;
+        return np;
+      };
+
+      // 1. 初回フェッチ（古いデータ取得中）開始
+      const p1 = fetchQueued();
+      expect(callCount).toBe(1);
+
+      // 2. 10ms 後（初回実行中）にコミット後の最新フェッチ要求が届く
+      await new Promise((res) => setTimeout(res, 10));
+      const p2 = fetchQueued();
+
+      // 3. 両方の Promise を待機
+      await Promise.all([p1, p2]);
+
+      // 初回が完了した直後に、2回目の最新フェッチが直列実行されていること
+      expect(callCount).toBe(2);
+      expect(historyLog).toEqual(['start-1', 'end-1', 'start-2', 'end-2']);
+    });
+
+    it('先行フェッチ実行中に3回以上連続で要求が重なった場合でも、最新の1回に集約され計2回で完了すること', async () => {
+      let callCount = 0;
+      let activePromise: Promise<void> | null = null;
+      let nextPromise: Promise<void> | null = null;
+
+      const fetchQueued = (): Promise<void> => {
+        if (!activePromise) {
+          const promise = (async () => {
+            callCount++;
+            await new Promise((res) => setTimeout(res, 40));
+            activePromise = null;
+          })();
+          activePromise = promise;
+          return promise;
+        }
+
+        if (nextPromise) {
+          return nextPromise;
+        }
+
+        const np = activePromise
+          .then(() => {
+            nextPromise = null;
+            return fetchQueued();
+          })
+          .catch(() => {
+            nextPromise = null;
+            return fetchQueued();
+          });
+
+        nextPromise = np;
+        return np;
+      };
+
+      // 初回実行
+      const p1 = fetchQueued();
+
+      // 実行中に 3回 重複要求
+      await new Promise((res) => setTimeout(res, 10));
+      const p2 = fetchQueued();
+      const p3 = fetchQueued();
+      const p4 = fetchQueued();
+
+      // p2, p3, p4 はすべて同一の合流 Promise を共有していること
+      expect(p2).toBe(p3);
+      expect(p3).toBe(p4);
+
+      await Promise.all([p1, p2, p3, p4]);
+
+      // 合計実行回数は 2回（初回 + 予約された最新1回）に抑止されていること
+      expect(callCount).toBe(2);
+    });
+  });
 });
+
