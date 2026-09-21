@@ -80,6 +80,7 @@ export interface RoundStatsRow {
   furoAvgAgari: number;
   damaAvgAgari: number;
   efficiency: number;
+  kyokuShuuchi: number;
   riichiHoujuRate: number;
   furoHoujuRate: number;
   damaHoujuRate: number;
@@ -91,6 +92,17 @@ export interface RoundStatsRow {
   furoAgariRate: number;
   furoHoujuRate2: number;
   damaAgariRate: number;
+  oyaKyoku: number;
+  koKyoku: number;
+  oyaRenchanRate: number;
+  oyaKyokuShuuchi: number;
+  koKyokuShuuchi: number;
+  oyaAgariRate: number;
+  koAgariRate: number;
+  oyaHoujuRate: number;
+  koHoujuRate: number;
+  oyaAvgAgariPt: number;
+  koAvgAgariPt: number;
 }
 
 export interface ActiveStreakItem {
@@ -223,6 +235,18 @@ export function calculateRoundStats(
     beDamaHouju: number;
     kyotakuPoint: number;
     notenBappu: number;
+    scoreDeltaSum: number;
+    oyaKyoku: number;
+    koKyoku: number;
+    oyaScoreDeltaSum: number;
+    koScoreDeltaSum: number;
+    oyaRenchan: number;
+    oyaAgari: number;
+    koAgari: number;
+    oyaAgariPtSum: number;
+    koAgariPtSum: number;
+    oyaHouju: number;
+    koHouju: number;
   }>();
 
   const gPlayerNames = new Map<string, Map<string, string>>();
@@ -261,6 +285,18 @@ export function calculateRoundStats(
         beDamaHouju: 0,
         kyotakuPoint: 0,
         notenBappu: 0,
+        scoreDeltaSum: 0,
+        oyaKyoku: 0,
+        koKyoku: 0,
+        oyaScoreDeltaSum: 0,
+        koScoreDeltaSum: 0,
+        oyaRenchan: 0,
+        oyaAgari: 0,
+        koAgari: 0,
+        oyaAgariPtSum: 0,
+        koAgariPtSum: 0,
+        oyaHouju: 0,
+        koHouju: 0,
       });
     }
     return pMap.get(name)!;
@@ -274,6 +310,9 @@ export function calculateRoundStats(
     const isTsumo = r.result_type === 'tsumo';
     const winners = r.seats.filter((s) => s.is_winner === 1);
 
+    const kyokuMatch = r.kyoku_name.match(/[東南西北](\d)局/);
+    const dealerSeat = kyokuMatch ? parseInt(kyokuMatch[1], 10) : 0;
+
     const seatsWithNames = r.seats
       .map((s) => ({
         ...s,
@@ -286,6 +325,20 @@ export function calculateRoundStats(
     for (const s of seatsWithNames) {
       const item = initPlayer(s.name);
       item.kyoku += 1;
+      item.scoreDeltaSum += (s.score_delta || 0);
+
+      // 親番・子番の判定
+      const isDealer = dealerSeat > 0 && s.seat === dealerSeat;
+      if (isDealer) {
+        item.oyaKyoku += 1;
+        item.oyaScoreDeltaSum += (s.score_delta || 0);
+        if (s.is_winner === 1 || (isRyukyoku && s.is_tenpai === 1)) {
+          item.oyaRenchan += 1;
+        }
+      } else {
+        item.koKyoku += 1;
+        item.koScoreDeltaSum += (s.score_delta || 0);
+      }
 
       // 和了集計 (base_point を使用)
       if (s.is_winner === 1) {
@@ -293,6 +346,14 @@ export function calculateRoundStats(
         if (isTsumo) item.tsumo += 1;
         const bPt = s.base_point || 0;
         item.agariPtSum += bPt;
+
+        if (isDealer) {
+          item.oyaAgari += 1;
+          item.oyaAgariPtSum += bPt;
+        } else {
+          item.koAgari += 1;
+          item.koAgariPtSum += bPt;
+        }
 
         if (s.is_riichi === 1) {
           item.riichiAgari += 1;
@@ -310,6 +371,12 @@ export function calculateRoundStats(
       if (s.is_loser === 1) {
         item.houju += 1;
         item.houjuPtSum += Math.abs(s.base_point || 0);
+
+        if (isDealer) {
+          item.oyaHouju += 1;
+        } else {
+          item.koHouju += 1;
+        }
 
         if (s.is_riichi === 1) item.riichiHouju += 1;
         if (s.is_furo === 1) item.furoHouju += 1;
@@ -359,6 +426,17 @@ export function calculateRoundStats(
     const avgHouju = h > 0 ? Math.round(d.houjuPtSum / h) : 0;
     const efficiency = (avgAgari > 0 && avgHouju > 0) ? Math.round((avgAgari / avgHouju) * 100) / 100 : 0;
 
+    const kyokuShuuchi = k > 0 ? Math.round(d.scoreDeltaSum / k) : 0;
+    const oyaKyokuShuuchi = d.oyaKyoku > 0 ? Math.round(d.oyaScoreDeltaSum / d.oyaKyoku) : 0;
+    const koKyokuShuuchi = d.koKyoku > 0 ? Math.round(d.koScoreDeltaSum / d.koKyoku) : 0;
+    const oyaRenchanRate = d.oyaKyoku > 0 ? Math.round((d.oyaRenchan / d.oyaKyoku) * 1000) / 10 : 0;
+    const oyaAgariRate = d.oyaKyoku > 0 ? Math.round((d.oyaAgari / d.oyaKyoku) * 1000) / 10 : 0;
+    const koAgariRate = d.koKyoku > 0 ? Math.round((d.koAgari / d.koKyoku) * 1000) / 10 : 0;
+    const oyaHoujuRate = d.oyaKyoku > 0 ? Math.round((d.oyaHouju / d.oyaKyoku) * 1000) / 10 : 0;
+    const koHoujuRate = d.koKyoku > 0 ? Math.round((d.koHouju / d.koKyoku) * 1000) / 10 : 0;
+    const oyaAvgAgariPt = d.oyaAgari > 0 ? Math.round(d.oyaAgariPtSum / d.oyaAgari) : 0;
+    const koAvgAgariPt = d.koAgari > 0 ? Math.round(d.koAgariPtSum / d.koAgari) : 0;
+
     return {
       name,
       kyokuCount: k,
@@ -374,6 +452,7 @@ export function calculateRoundStats(
       furoAvgAgari: d.furoAgari > 0 ? Math.round(d.furoAgariPtSum / d.furoAgari) : 0,
       damaAvgAgari: d.damaAgari > 0 ? Math.round(d.damaAgariPtSum / d.damaAgari) : 0,
       efficiency,
+      kyokuShuuchi,
       riichiHoujuRate: h > 0 ? Math.round((d.beRiichiHouju / h) * 1000) / 10 : 0,
       furoHoujuRate: h > 0 ? Math.round((d.beFuroHouju / h) * 1000) / 10 : 0,
       damaHoujuRate: h > 0 ? Math.round((d.beDamaHouju / h) * 1000) / 10 : 0,
@@ -385,6 +464,17 @@ export function calculateRoundStats(
       furoAgariRate: fCount > 0 ? Math.round((d.furoAgari / fCount) * 1000) / 10 : 0,
       furoHoujuRate2: fCount > 0 ? Math.round((d.furoHouju / fCount) * 1000) / 10 : 0,
       damaAgariRate: w > 0 ? Math.round((d.damaAgari / w) * 1000) / 10 : 0,
+      oyaKyoku: d.oyaKyoku,
+      koKyoku: d.koKyoku,
+      oyaRenchanRate,
+      oyaKyokuShuuchi,
+      koKyokuShuuchi,
+      oyaAgariRate,
+      koAgariRate,
+      oyaHoujuRate,
+      koHoujuRate,
+      oyaAvgAgariPt,
+      koAvgAgariPt,
     };
   }).sort((a, b) => b.agariRate - a.agariRate);
 

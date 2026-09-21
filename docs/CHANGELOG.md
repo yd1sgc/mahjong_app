@@ -397,3 +397,20 @@
 - `npm run build`: 全14ルート静的エクスポート正常完了。
 - 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
 
+## Phase 5-W 完了（成績集計「局収支」列追加 & 「親子」詳細タブ新設 & 単体テスト178件PASS）
+- **純粋ドメイン層改修（`src/lib/mahjong/statsCalc.ts`）**:
+  - `RoundStatsRow` に新規12項目を追加（`kyokuShuuchi`, `oyaKyoku`, `koKyoku`, `oyaRenchanRate`, `oyaKyokuShuuchi`, `koKyokuShuuchi`, `oyaAgariRate`, `koAgariRate`, `oyaHoujuRate`, `koHoujuRate`, `oyaAvgAgariPt`, `koAvgAgariPt`）。
+  - `calculateRoundStats`: `kyoku_name` から正規表現（`/[東南西北](\d)局/`）で親番座席（`seat === k`）を判定。
+  - 局収支（全局平均得失点 `score_delta / kyoku`）、親番局収支、子番局収支を算出。
+  - 親連荘率（親和了または流局親聴牌による連荘率）、親子別の和了率・放銃率・平均打点を厳密に集計。
+- **UIプレゼンテーション層改修（`src/components/stats/StatsDetailsTab.tsx`, `src/app/stats/page.tsx`）**:
+  - 詳細成績タブセレクターを 6タブ（基本・打点・守備・立直・副露・**親子**）へ拡張。
+  - 「打点」タブ: 打点効率の右隣に「局収支」列を追加（プラス: シアン、マイナス: ローズ、0: ニュートラル）。
+  - 「親子」タブ: 代替案A（1段・横スクロール・12列表示）を実装。他のタブと行の高さを完全に揃え、画面のガタつきを排除。
+    - 列構成: `名前` | `親局` | `子局` | `連荘率` | `親局収支` | `子局収支` | `親和了` | `子和了` | `親放銃` | `子放銃` | `親平均点` | `子平均点`
+- **包括的単体テスト配備（`tests/stats_calc.test.ts`, `tests/pca_calc.test.ts`）**:
+  - 局収支の四捨五入計算検証。
+  - 親番・子番判定、親和了・流局親聴牌の連荘判定、親子別指標の算出検証。
+- `npm test`（Vitest）: 全13ファイル・178件 ALL PASS。
+- `npm run build`: 全14ルート静的エクスポート正常完了。
+

@@ -42,8 +42,8 @@ export default function StatsPage() {
   // 試合成績ソート
   const [sortBy, setSortBy] = useState<'totalPt' | 'okaNashiPt' | 'avgRank' | 'games'>('totalPt');
 
-  // 詳細成績タブ (basic, datan, syubi, riichi, furo)
-  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'datan' | 'syubi' | 'riichi' | 'furo'>('basic');
+  // 詳細成績タブ (basic, datan, syubi, riichi, furo, oyako)
+  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'datan' | 'syubi' | 'riichi' | 'furo' | 'oyako'>('basic');
 
   // グラフ用選択プレイヤー
   const [chartMembers, setChartMembers] = useState<string[]>([]);

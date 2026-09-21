@@ -10,8 +10,8 @@ import { RoundStatsRow } from '@/lib/mahjong/statsCalc';
 interface StatsDetailsTabProps {
   roundStats: RoundStatsRow[];
   detailedGameCount: number;
-  activeDetailTab: 'basic' | 'datan' | 'syubi' | 'riichi' | 'furo';
-  setActiveDetailTab: (tab: 'basic' | 'datan' | 'syubi' | 'riichi' | 'furo') => void;
+  activeDetailTab: 'basic' | 'datan' | 'syubi' | 'riichi' | 'furo' | 'oyako';
+  setActiveDetailTab: (tab: 'basic' | 'datan' | 'syubi' | 'riichi' | 'furo' | 'oyako') => void;
 }
 
 export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
@@ -26,8 +26,8 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
         <h2 className="text-base font-black text-white">詳細成績</h2>
       </div>
 
-      {/* 5タブセレクター */}
-      <div className="grid grid-cols-5 gap-1 bg-neutral-900 p-1 rounded-xl border border-neutral-800">
+      {/* 6タブセレクター */}
+      <div className="grid grid-cols-6 gap-1 bg-neutral-900 p-1 rounded-xl border border-neutral-800">
         {(
           [
             { id: 'basic', label: '基本' },
@@ -35,6 +35,7 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
             { id: 'syubi', label: '守備' },
             { id: 'riichi', label: '立直' },
             { id: 'furo', label: '副露' },
+            { id: 'oyako', label: '親子' },
           ] as const
         ).map((tab) => (
           <button
@@ -81,6 +82,7 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                     <th className="py-2.5 px-2.5 text-right">副露平均打点</th>
                     <th className="py-2.5 px-2.5 text-right">ダマ平均打点</th>
                     <th className="py-2.5 px-2.5 text-center">打点効率</th>
+                    <th className="py-2.5 px-2.5 text-right">局収支</th>
                   </>
                 )}
                 {activeDetailTab === 'syubi' && (
@@ -105,6 +107,21 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                     <th className="py-2.5 px-2 text-center">副露和了率</th>
                     <th className="py-2.5 px-2 text-center">副露放銃率</th>
                     <th className="py-2.5 px-2 text-center">ダマ和了率</th>
+                  </>
+                )}
+                {activeDetailTab === 'oyako' && (
+                  <>
+                    <th className="py-2.5 px-2 text-center">親局</th>
+                    <th className="py-2.5 px-2 text-center">子局</th>
+                    <th className="py-2.5 px-2 text-center">連荘率</th>
+                    <th className="py-2.5 px-2.5 text-right">親局収支</th>
+                    <th className="py-2.5 px-2.5 text-right">子局収支</th>
+                    <th className="py-2.5 px-2 text-center">親和了</th>
+                    <th className="py-2.5 px-2 text-center">子和了</th>
+                    <th className="py-2.5 px-2 text-center">親放銃</th>
+                    <th className="py-2.5 px-2 text-center">子放銃</th>
+                    <th className="py-2.5 px-2.5 text-right">親平均点</th>
+                    <th className="py-2.5 px-2.5 text-right">子平均点</th>
                   </>
                 )}
               </tr>
@@ -138,6 +155,15 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                       <td className="py-2.5 px-2.5 text-right font-bold font-mono text-neutral-300">{r.furoAvgAgari.toLocaleString()}</td>
                       <td className="py-2.5 px-2.5 text-right font-bold font-mono text-neutral-300">{r.damaAvgAgari.toLocaleString()}</td>
                       <td className="py-2.5 px-2.5 text-center font-bold font-mono text-neutral-300">{r.efficiency.toFixed(2)}</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold font-mono">
+                        <span className={
+                          r.kyokuShuuchi > 0 ? 'text-cyan-400 font-black' :
+                          r.kyokuShuuchi < 0 ? 'text-rose-400 font-black' :
+                          'text-neutral-500'
+                        }>
+                          {r.kyokuShuuchi > 0 ? `+${r.kyokuShuuchi.toLocaleString()}` : r.kyokuShuuchi.toLocaleString()}
+                        </span>
+                      </td>
                     </>
                   )}
                   {activeDetailTab === 'syubi' && (
@@ -162,6 +188,37 @@ export const StatsDetailsTab: React.FC<StatsDetailsTabProps> = ({
                       <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.furoAgariRate.toFixed(1)}%</td>
                       <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.furoHoujuRate2.toFixed(1)}%</td>
                       <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.damaAgariRate.toFixed(1)}%</td>
+                    </>
+                  )}
+                  {activeDetailTab === 'oyako' && (
+                    <>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.oyaKyoku}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.koKyoku}</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.oyaRenchanRate.toFixed(1)}%</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold font-mono">
+                        <span className={
+                          r.oyaKyokuShuuchi > 0 ? 'text-cyan-400 font-black' :
+                          r.oyaKyokuShuuchi < 0 ? 'text-rose-400 font-black' :
+                          'text-neutral-500'
+                        }>
+                          {r.oyaKyokuShuuchi > 0 ? `+${r.oyaKyokuShuuchi.toLocaleString()}` : r.oyaKyokuShuuchi.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2.5 text-right font-bold font-mono">
+                        <span className={
+                          r.koKyokuShuuchi > 0 ? 'text-cyan-400 font-black' :
+                          r.koKyokuShuuchi < 0 ? 'text-rose-400 font-black' :
+                          'text-neutral-500'
+                        }>
+                          {r.koKyokuShuuchi > 0 ? `+${r.koKyokuShuuchi.toLocaleString()}` : r.koKyokuShuuchi.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.oyaAgariRate.toFixed(1)}%</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.koAgariRate.toFixed(1)}%</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.oyaHoujuRate.toFixed(1)}%</td>
+                      <td className="py-2.5 px-2 text-center font-bold text-neutral-300">{r.koHoujuRate.toFixed(1)}%</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold font-mono text-neutral-300">{r.oyaAvgAgariPt.toLocaleString()}</td>
+                      <td className="py-2.5 px-2.5 text-right font-bold font-mono text-neutral-300">{r.koAvgAgariPt.toLocaleString()}</td>
                     </>
                   )}
                 </tr>

@@ -350,6 +350,104 @@ describe('Layer 5: 成績集計ロジック正本検証 (statsCalc.ts)', () => {
       expect(pB.furoHoujuRate).toBe(0.0);
       expect(pB.damaHoujuRate).toBe(0.0);
     });
+
+    it('局収支（kyokuShuuchi）が全局のscore_delta合計から正確に四捨五入整数で算出されること', () => {
+      const { roundStats } = calculateRoundStats(mockGames, mockRounds);
+      const pA = roundStats.find((s) => s.name === 'PlayerA')!;
+      const pB = roundStats.find((s) => s.name === 'PlayerB')!;
+
+      // PlayerA: R1 (+9300) + R2 (+1500) = +10800 / 2局 = +5400
+      expect(pA.kyokuShuuchi).toBe(5400);
+
+      // PlayerB: R1 (-8300) + R2 (-1500) = -9800 / 2局 = -4900
+      expect(pB.kyokuShuuchi).toBe(-4900);
+    });
+
+    it('親番・子番がkyoku_nameから正確に判定され、親子別成績（局数・連荘率・局収支・和了率・放銃率・平均点）が算出されること', () => {
+      // 3局のモック
+      // R1: 東1局 (親: seat 1 = PlayerA) → PlayerA和了 (親満 12000点、PlayerB放銃)
+      // R2: 東1局 1本場 (親: seat 1 = PlayerA) → 流局 (PlayerAテンパイ +1500, PlayerB/C/Dノーテン -500/ノーテン罰符)
+      // R3: 東2局 (親: seat 2 = PlayerB) → PlayerAがPlayerBから子満 8000点和了 (PlayerB親被弾)
+      const oyakoTestRounds: RoundData[] = [
+        {
+          round_id: 'or1',
+          game_id: 'g1',
+          round_index: 0,
+          kyoku_name: '東1局',
+          honba: 0,
+          result_type: 'ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 12000, base_point: 12000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 1 },
+            { seat: 2, member_id: 'm2', score_delta: -12000, base_point: -12000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 4, member_id: 'm4', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+          ],
+        },
+        {
+          round_id: 'or2',
+          game_id: 'g1',
+          round_index: 1,
+          kyoku_name: '東1局 1本場',
+          honba: 1,
+          result_type: 'ryukyoku',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 3000, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 1 },
+            { seat: 2, member_id: 'm2', score_delta: -1000, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: -1000, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 4, member_id: 'm4', score_delta: -1000, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+          ],
+        },
+        {
+          round_id: 'or3',
+          game_id: 'g1',
+          round_index: 2,
+          kyoku_name: '東2局',
+          honba: 0,
+          result_type: 'ron',
+          seats: [
+            { seat: 1, member_id: 'm1', score_delta: 8000, base_point: 8000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 1, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 1 },
+            { seat: 2, member_id: 'm2', score_delta: -8000, base_point: -8000, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 1, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 3, member_id: 'm3', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+            { seat: 4, member_id: 'm4', score_delta: 0, base_point: 0, honba_point: 0, kyotaku_point: 0, penalty_point: 0, is_winner: 0, is_loser: 0, is_riichi: 0, is_furo: 0, is_tenpai: 0 },
+          ],
+        },
+      ];
+
+      const { roundStats } = calculateRoundStats(mockGames, oyakoTestRounds);
+      const pA = roundStats.find((s) => s.name === 'PlayerA')!;
+      const pB = roundStats.find((s) => s.name === 'PlayerB')!;
+
+      // PlayerAの親子指標
+      // 親局: 2局 (R1, R2), 子局: 1局 (R3)
+      expect(pA.oyaKyoku).toBe(2);
+      expect(pA.koKyoku).toBe(1);
+      // 連荘率: R1(和了)+R2(流局テンパイ) で 2/2 = 100.0%
+      expect(pA.oyaRenchanRate).toBe(100.0);
+      // 親局収支: (+12000 + +3000) / 2 = +7500
+      expect(pA.oyaKyokuShuuchi).toBe(7500);
+      // 子局収支: +8000 / 1 = +8000
+      expect(pA.koKyokuShuuchi).toBe(8000);
+      // 親和了率: 1/2 = 50.0%, 子和了率: 1/1 = 100.0%
+      expect(pA.oyaAgariRate).toBe(50.0);
+      expect(pA.koAgariRate).toBe(100.0);
+      // 親平均打点: 12000, 子平均打点: 8000
+      expect(pA.oyaAvgAgariPt).toBe(12000);
+      expect(pA.koAvgAgariPt).toBe(8000);
+
+      // PlayerBの親子指標
+      // 親局: 1局 (R3), 子局: 2局 (R1, R2)
+      expect(pB.oyaKyoku).toBe(1);
+      expect(pB.koKyoku).toBe(2);
+      // 連荘率: R3で放銃したため連荘ゼロ = 0.0%
+      expect(pB.oyaRenchanRate).toBe(0.0);
+      // 親局収支: -8000 / 1 = -8000
+      expect(pB.oyaKyokuShuuchi).toBe(-8000);
+      // 子局収支: (-12000 + -1000) / 2 = -6500
+      expect(pB.koKyokuShuuchi).toBe(-6500);
+      // 親放銃率: 1/1 = 100.0%, 子放銃率: 1/2 = 50.0%
+      expect(pB.oyaHoujuRate).toBe(100.0);
+      expect(pB.koHoujuRate).toBe(50.0);
+    });
   });
 
   describe('3. calculateChartData (推移グラフデータ)', () => {
