@@ -520,6 +520,165 @@ export interface ComputedRoundSeatDetail {
   fu?: number | null;
 }
 
+export interface ComputeRoundSeatDetailsParams {
+  players: string[];
+  round: RoundRecord;
+  startRiichiSticks: number;
+  startHonba: number;
+  scoresBefore: Record<string, number>;
+  scoresAfter: Record<string, number>;
+  ruleConfig: RuleConfig;
+  furoPlayers?: string[];
+  defaultHan?: number;
+  defaultFu?: number;
+}
+
+/**
+ * 1局のスコア変動前後の差分から、各座席の詳細内訳（素点・本場・供託・罰符）を純粋計算する関数
+ * basePoint + honbaPoint + kyotakuPoint + penaltyPoint === scoreDelta を恒等式として100%保証
+ */
+export function computeRoundSeatDetails({
+  players,
+  round,
+  startRiichiSticks,
+  startHonba,
+  scoresBefore,
+  scoresAfter,
+  ruleConfig,
+  furoPlayers,
+  defaultHan,
+  defaultFu,
+}: ComputeRoundSeatDetailsParams): ComputedRoundSeatDetail[] {
+  const detailCfg = ruleConfig.detail || {};
+  const honbaPt = detailCfg.honba_pt ?? 300;
+  const riichiPt = detailCfg.riichi_pt ?? 1000;
+  const bappu = detailCfg.noten_bappu_pt ?? 3000;
+
+  const winType = round.win_type;
+  const winner = round.winner || '';
+  const loser = round.loser || '';
+  const score = round.score || 0;
+  const roundRiichi = round.riichi || [];
+  const multiWins = round.multi_wins || [];
+  const winNames = multiWins.map((w) => w.winner);
+  const closestWinner =
+    winType === 'multi_ron' ? getClosestWinner(players, loser, winNames) : '';
+
+  // 当該局で新たにリーチ棒を出した人数と、場に集まった総供託点
+  const roundRiichiCount = roundRiichi.length;
+  const totalKyotaku = (startRiichiSticks + roundRiichiCount) * riichiPt;
+
+  return players.map((p, idx) => {
+    const seat = idx + 1;
+    const isWin =
+      winType === 'multi_ron'
+        ? multiWins.some((w) => w.winner === p)
+        : winner === p;
+    const isLose = loser === p;
+    const isRiichi = roundRiichi.includes(p);
+    const isTenpai = (round.tenpai || []).includes(p);
+    const effectiveFuro = furoPlayers ?? (round.furo || []);
+    const isFuro = effectiveFuro.includes(p);
+
+    const scoreDelta = (scoresAfter[p] ?? 0) - (scoresBefore[p] ?? 0);
+
+    let basePoint = 0;
+    let honbaPoint = 0;
+    let kyotakuPoint = 0;
+    let penaltyPoint = 0;
+
+    if (winType === 'ron') {
+      if (isWin) {
+        basePoint = score;
+        honbaPoint = startHonba * honbaPt;
+        // 和了者は場の総供託点を全回収。自身が立直していた場合は供託-1000点と相殺された純収支
+        kyotakuPoint = totalKyotaku - (isRiichi ? riichiPt : 0);
+      } else if (isLose) {
+        basePoint = -score;
+        honbaPoint = -startHonba * honbaPt;
+        kyotakuPoint = isRiichi ? -riichiPt : 0;
+      } else {
+        kyotakuPoint = isRiichi ? -riichiPt : 0;
+      }
+    } else if (winType === 'tsumo') {
+      if (isWin) {
+        basePoint = score;
+        honbaPoint = startHonba * honbaPt;
+        kyotakuPoint = totalKyotaku - (isRiichi ? riichiPt : 0);
+      } else {
+        kyotakuPoint = isRiichi ? -riichiPt : 0;
+        const honbaEach = -startHonba * Math.floor(honbaPt / 3);
+        honbaPoint = honbaEach;
+        basePoint = scoreDelta - honbaPoint - kyotakuPoint;
+      }
+    } else if (winType === 'multi_ron') {
+      if (isWin) {
+        const myWin = multiWins.find((w) => w.winner === p);
+        basePoint = myWin?.points_data?.total ?? 0;
+        honbaPoint = startHonba * honbaPt;
+        if (p === closestWinner) {
+          kyotakuPoint = totalKyotaku - (isRiichi ? riichiPt : 0);
+        } else {
+          kyotakuPoint = isRiichi ? -riichiPt : 0;
+        }
+      } else if (isLose) {
+        const totalBase = multiWins.reduce((sum, w) => sum + (w.points_data?.total ?? 0), 0);
+        basePoint = -totalBase;
+        honbaPoint = -multiWins.length * (startHonba * honbaPt);
+        kyotakuPoint = isRiichi ? -riichiPt : 0;
+      } else {
+        kyotakuPoint = isRiichi ? -riichiPt : 0;
+      }
+    } else if (winType === 'ryukyoku') {
+      kyotakuPoint = isRiichi ? -riichiPt : 0;
+      const tenpaiList = round.tenpai || [];
+      const nT = tenpaiList.length;
+      const nN = 4 - nT;
+      if (nT > 0 && nT < 4) {
+        if (isTenpai) {
+          penaltyPoint = Math.floor(bappu / nT);
+        } else {
+          penaltyPoint = -Math.floor(bappu / nN);
+        }
+      }
+    } else if (winType === 'mid_ryukyoku') {
+      kyotakuPoint = isRiichi ? -riichiPt : 0;
+    } else if (winType === 'chombo') {
+      penaltyPoint = scoreDelta;
+    }
+
+    let hanVal: number | null = null;
+    let fuVal: number | null = null;
+    if (isWin) {
+      if (winType === 'multi_ron') {
+        const myWin = multiWins.find((w) => w.winner === p);
+        hanVal = myWin?.points_data?.han ?? null;
+        fuVal = myWin?.points_data?.fu ?? null;
+      } else {
+        hanVal = round.han ?? defaultHan ?? null;
+        fuVal = round.fu ?? defaultFu ?? null;
+      }
+    }
+
+    return {
+      seat,
+      player: p,
+      basePoint,
+      honbaPoint,
+      kyotakuPoint,
+      penaltyPoint,
+      scoreDelta,
+      isWinner: isWin,
+      isLoser: isLose,
+      isRiichi,
+      isFuro,
+      isTenpai,
+      han: hanVal,
+      fu: fuVal,
+    };
+  });
+}
+
 export interface ComputedRoundDetail {
   roundId?: string;
   roundIndex: number;
@@ -734,96 +893,15 @@ export function computeAllRoundsDetails(
 
     const scoresAfter = { ...scores };
 
-    // 座席ごとの詳細収支（RoundSeatInsertにマッピング可能）を算出
-    const multiWins = r.multi_wins || [];
-    const winNames = multiWins.map((w) => w.winner);
-    const closestWinner =
-      winType === 'multi_ron' ? getClosestWinner(players, loser, winNames) : '';
-
-    const seatDetails: ComputedRoundSeatDetail[] = players.map((p, idx) => {
-      const seat = idx + 1;
-      const isWin =
-        winType === 'multi_ron'
-          ? multiWins.some((w) => w.winner === p)
-          : winner === p;
-      const isLose = loser === p;
-      const isRiichi = roundRiichi.includes(p);
-      const isTenpai = (r.tenpai || []).includes(p);
-      const isFuro = (r.furo || []).includes(p);
-
-      const scoreDelta = (scoresAfter[p] ?? 0) - (scoresBefore[p] ?? 0);
-
-      let basePt = 0;
-      let honbaPoint = 0;
-      let kyotakuPoint = 0;
-
-      if (winType === 'ron') {
-        if (isWin) {
-          basePt = score;
-          honbaPoint = startHonba * honbaPt;
-          kyotakuPoint = startRiichi * riichiPt;
-        } else if (isLose) {
-          basePt = -score;
-          honbaPoint = -startHonba * honbaPt;
-        }
-      } else if (winType === 'tsumo') {
-        if (isWin) {
-          basePt = score;
-          honbaPoint = startHonba * honbaPt;
-          kyotakuPoint = startRiichi * riichiPt;
-        } else {
-          const riichiDeduct = isRiichi ? -riichiPt : 0;
-          const payTotal = scoreDelta - riichiDeduct;
-          const honbaEach = -startHonba * Math.floor(honbaPt / 3);
-          honbaPoint = honbaEach;
-          basePt = payTotal - honbaEach;
-        }
-      } else if (winType === 'multi_ron') {
-        if (isWin) {
-          const myWin = multiWins.find((w) => w.winner === p);
-          basePt = myWin?.points_data?.total ?? 0;
-          honbaPoint = startHonba * honbaPt;
-          if (p === closestWinner) {
-            kyotakuPoint = startRiichi * riichiPt;
-          }
-        } else if (isLose) {
-          const totalBase = multiWins.reduce((sum, w) => sum + (w.points_data?.total ?? 0), 0);
-          basePt = -totalBase;
-          honbaPoint = -multiWins.length * (startHonba * honbaPt);
-        }
-      } else {
-        basePt = scoreDelta;
-      }
-
-      let hanVal: number | null = null;
-      let fuVal: number | null = null;
-      if (isWin) {
-        if (winType === 'multi_ron') {
-          const myWin = multiWins.find((w) => w.winner === p);
-          hanVal = myWin?.points_data?.han ?? null;
-          fuVal = myWin?.points_data?.fu ?? null;
-        } else {
-          hanVal = r.han ?? null;
-          fuVal = r.fu ?? null;
-        }
-      }
-
-      return {
-        seat,
-        player: p,
-        basePoint: basePt,
-        honbaPoint,
-        kyotakuPoint,
-        penaltyPoint: 0,
-        scoreDelta,
-        isWinner: isWin,
-        isLoser: isLose,
-        isRiichi,
-        isFuro,
-        isTenpai,
-        han: hanVal,
-        fu: fuVal,
-      };
+    // 座席ごとの詳細収支を純粋共通関数で決定論的に算出
+    const seatDetails = computeRoundSeatDetails({
+      players,
+      round: r,
+      startRiichiSticks: startRiichi,
+      startHonba,
+      scoresBefore,
+      scoresAfter,
+      ruleConfig,
     });
 
     results.push({

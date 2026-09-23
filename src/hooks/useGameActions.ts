@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import {
   calculateGameSettlement,
   computeAllRoundsDetails,
+  computeRoundSeatDetails,
   getClosestWinner,
   recalculateState,
   canDeclareRiichi,
@@ -205,103 +206,40 @@ export function useGameActions({
           tempHistory
         );
 
-        const honbaPt = ruleConfig.detail?.honba_pt ?? 300;
-        const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
+        const computedSeats = computeRoundSeatDetails({
+          players,
+          round: newRound,
+          startRiichiSticks: gameState.riichiStick,
+          startHonba: gameState.honba,
+          scoresBefore: currentScores,
+          scoresAfter: nextSnapshot.scores,
+          ruleConfig,
+          furoPlayers: furoDeclared,
+          defaultHan: han,
+          defaultFu: fu,
+        });
 
-        const multiWins = newRound.multi_wins || [];
-        const winNames = multiWins.map((w) => w.winner);
-        const closestWinner =
-          newRound.win_type === 'multi_ron'
-            ? getClosestWinner(players, newRound.loser || '', winNames)
-            : '';
-
-        const seatPayloads: RoundSeatInsert[] = players.map((p, idx) => {
-          const seat = idx + 1;
-          const part = participants.find((pt) => pt.seat === seat);
-          const memberId = part?.member_id || p;
-
-          const isWinner =
-            newRound.win_type === 'multi_ron'
-              ? multiWins.some((w) => w.winner === p) ? 1 : 0
-              : newRound.winner === p ? 1 : 0;
-          const isLoser = newRound.loser === p ? 1 : 0;
-          const isRiichi = newRound.riichi.includes(p) ? 1 : 0;
-          const isTenpai = (newRound.tenpai || []).includes(p) ? 1 : 0;
-          const isFuro = furoDeclared.includes(p) ? 1 : 0;
-
-          const scoreDelta = (nextSnapshot.scores[p] ?? 0) - (currentScores[p] ?? 0);
-
-          let basePoint = 0;
-          let honbaPoint = 0;
-          let kyotakuPoint = 0;
-
-          if (newRound.win_type === 'ron') {
-            if (isWinner) {
-              basePoint = newRound.score;
-              honbaPoint = gameState.honba * honbaPt;
-              kyotakuPoint = gameState.riichiStick * riichiPt;
-            } else if (isLoser) {
-              basePoint = -newRound.score;
-              honbaPoint = -gameState.honba * honbaPt;
-            }
-          } else if (newRound.win_type === 'tsumo') {
-            if (isWinner) {
-              basePoint = newRound.score;
-              honbaPoint = gameState.honba * honbaPt;
-              kyotakuPoint = gameState.riichiStick * riichiPt;
-            } else {
-              const riichiDeduct = isRiichi ? -riichiPt : 0;
-              const payTotal = scoreDelta - riichiDeduct;
-              const honbaEach = -gameState.honba * Math.floor(honbaPt / 3);
-              honbaPoint = honbaEach;
-              basePoint = payTotal - honbaEach;
-            }
-          } else if (newRound.win_type === 'multi_ron') {
-            if (isWinner) {
-              const myWin = multiWins.find((w) => w.winner === p);
-              basePoint = myWin?.points_data?.total ?? 0;
-              honbaPoint = gameState.honba * honbaPt;
-              if (p === closestWinner) {
-                kyotakuPoint = gameState.riichiStick * riichiPt;
-              }
-            } else if (isLoser) {
-              const totalBase = multiWins.reduce((sum, w) => sum + (w.points_data?.total ?? 0), 0);
-              basePoint = -totalBase;
-              honbaPoint = -multiWins.length * (gameState.honba * honbaPt);
-            }
-          } else if (
-            newRound.win_type === 'chombo' ||
-            newRound.win_type === 'ryukyoku' ||
-            newRound.win_type === 'mid_ryukyoku'
-          ) {
-            basePoint = scoreDelta;
-          }
+        const seatPayloads: RoundSeatInsert[] = computedSeats.map((s) => {
+          const part = participants.find((pt) => pt.seat === s.seat);
+          const memberId = part?.member_id || s.player;
 
           return {
             round_id: roundId,
-            seat,
+            seat: s.seat,
             member_id: memberId,
-            base_point: basePoint,
-            honba_point: honbaPoint,
-            kyotaku_point: kyotakuPoint,
-            penalty_point: 0,
-            score_delta: scoreDelta,
+            base_point: s.basePoint,
+            honba_point: s.honbaPoint,
+            kyotaku_point: s.kyotakuPoint,
+            penalty_point: s.penaltyPoint,
+            score_delta: s.scoreDelta,
             chip_delta: 0,
-            han: isWinner
-              ? (newRound.win_type === 'multi_ron'
-                  ? multiWins.find((w) => w.winner === p)?.points_data?.han ?? null
-                  : han ?? null)
-              : null,
-            fu: isWinner
-              ? (newRound.win_type === 'multi_ron'
-                  ? multiWins.find((w) => w.winner === p)?.points_data?.fu ?? null
-                  : fu ?? null)
-              : null,
-            is_winner: isWinner,
-            is_loser: isLoser,
-            is_riichi: isRiichi,
-            is_furo: isFuro,
-            is_tenpai: isTenpai,
+            han: s.han ?? null,
+            fu: s.fu ?? null,
+            is_winner: s.isWinner ? 1 : 0,
+            is_loser: s.isLoser ? 1 : 0,
+            is_riichi: s.isRiichi ? 1 : 0,
+            is_furo: s.isFuro ? 1 : 0,
+            is_tenpai: s.isTenpai ? 1 : 0,
           };
         });
 
