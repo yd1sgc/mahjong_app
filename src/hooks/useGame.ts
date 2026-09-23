@@ -127,6 +127,7 @@ export function useGame(gameId: string) {
     players,
     participants,
     ruleConfig,
+    baseState,
     gameState,
     isRecorder,
     setIsRecorder,

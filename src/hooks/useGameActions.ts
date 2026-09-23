@@ -42,6 +42,7 @@ interface UseGameActionsProps {
   players: string[];
   participants: GameParticipantRow[];
   ruleConfig: RuleConfig;
+  baseState: GameStateSnapshot | null;
   gameState: GameStateSnapshot | null;
   isRecorder: boolean;
   setIsRecorder: React.Dispatch<React.SetStateAction<boolean>>;
@@ -75,6 +76,7 @@ export function useGameActions({
   players,
   participants,
   ruleConfig,
+  baseState,
   gameState,
   isRecorder,
   setIsRecorder,
@@ -190,15 +192,15 @@ export function useGameActions({
   // 4. 局結果の確定（コミット）
   const commitRound = useCallback(
     async (newRound: RoundRecord, han?: number, fu?: number): Promise<boolean> => {
-      if (!gameState || !game || !isRecorder) return false;
+      if (!baseState || !game || !isRecorder) return false;
 
       try {
         setLoading(true);
         const roundId = crypto.randomUUID();
-        const roundIndex = gameState.roundHistory.length;
+        const roundIndex = baseState.roundHistory.length;
 
-        const currentScores = gameState.scores;
-        const tempHistory = [...gameState.roundHistory, newRound];
+        const currentScores = baseState.scores;
+        const tempHistory = [...baseState.roundHistory, newRound];
         const nextSnapshot = recalculateState(
           players,
           ruleConfig.basic?.init_score ?? 25000,
@@ -209,8 +211,8 @@ export function useGameActions({
         const computedSeats = computeRoundSeatDetails({
           players,
           round: newRound,
-          startRiichiSticks: gameState.riichiStick,
-          startHonba: gameState.honba,
+          startRiichiSticks: baseState.riichiStick,
+          startHonba: baseState.honba,
           scoresBefore: currentScores,
           scoresAfter: nextSnapshot.scores,
           ruleConfig,
@@ -290,8 +292,8 @@ export function useGameActions({
           p_game_id: gameId,
           p_round_index: roundIndex,
           p_kyoku_name: newRound.kyoku_name,
-          p_honba: gameState.honba,
-          p_riichi_sticks: gameState.riichiStick,
+          p_honba: baseState.honba,
+          p_riichi_sticks: baseState.riichiStick,
           p_result_type: newRound.win_type,
           p_seats: seatPayloads as unknown as Json,
           p_yakumans: yakumanPayloads as unknown as Json,
@@ -316,7 +318,7 @@ export function useGameActions({
       }
     },
     [
-      gameState,
+      baseState,
       game,
       isRecorder,
       gameId,

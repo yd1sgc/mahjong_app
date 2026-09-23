@@ -285,4 +285,63 @@ describe('computeRoundSeatDetails (内訳整合性恒等式検証)', () => {
       }
     }
   });
+
+  it('局中に立直宣言がある場合でも、baseState から算出すれば恒等式が100%成立する', () => {
+    // 局前状態: 第0局（局履歴なし）
+    const baseHistory: RoundRecord[] = [];
+    const baseState = recalculateState(players, 25000, ruleConfig, baseHistory);
+    expect(baseState.scores['PlayerA']).toBe(25000);
+    expect(baseState.riichiStick).toBe(0);
+
+    // 局中に PlayerA が立直宣言（gameState は仮減点・仮加算される）
+    const riichiDeclared = ['PlayerA'];
+    const midGameState = recalculateState(players, 25000, ruleConfig, baseHistory, riichiDeclared);
+    expect(midGameState.scores['PlayerA']).toBe(24000);
+    expect(midGameState.riichiStick).toBe(1);
+
+    // 局結果: PlayerB が PlayerC から 3900 出和了、PlayerA は立直
+    const newRound: RoundRecord = {
+      round_index: 0,
+      kyoku_name: '東1局',
+      honba: 0,
+      win_type: 'ron',
+      winner: 'PlayerB',
+      loser: 'PlayerC',
+      score: 3900,
+      riichi: ['PlayerA'],
+      tenpai: ['PlayerA'],
+    };
+
+    // 確定後のスナップショット（baseHistory + newRound）
+    const nextSnapshot = recalculateState(players, 25000, ruleConfig, [...baseHistory, newRound]);
+
+    // 【修正後のロジック】baseState を基準にして差分を算出
+    const details = computeRoundSeatDetails({
+      players,
+      round: newRound,
+      startRiichiSticks: baseState.riichiStick, // 0本
+      startHonba: baseState.honba,             // 0本場
+      scoresBefore: baseState.scores,          // 25000点
+      scoresAfter: nextSnapshot.scores,        // PlayerA: 24000, PlayerB: 29900
+      ruleConfig,
+    });
+
+    // 全座席の内訳恒等式が成立することを検証
+    for (const s of details) {
+      const sum = s.basePoint + s.honbaPoint + s.kyotakuPoint + s.penaltyPoint;
+      expect(sum).toBe(s.scoreDelta);
+    }
+
+    // PlayerA (立直者): scoreDelta が 0 ではなく正しく -1000 となり、kyotakuPoint と一致すること
+    const seatA = details.find((d) => d.player === 'PlayerA')!;
+    expect(seatA.scoreDelta).toBe(-1000);
+    expect(seatA.kyotakuPoint).toBe(-1000);
+    expect(seatA.basePoint).toBe(0);
+
+    // PlayerB (和了者): 供託棒1本（1000点）のみ回収し、scoreDelta が +4900 となること
+    const seatB = details.find((d) => d.player === 'PlayerB')!;
+    expect(seatB.scoreDelta).toBe(4900);
+    expect(seatB.basePoint).toBe(3900);
+    expect(seatB.kyotakuPoint).toBe(1000);
+  });
 });
