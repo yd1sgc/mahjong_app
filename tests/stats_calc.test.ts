@@ -248,6 +248,32 @@ describe('Layer 5: 成績集計ロジック正本検証 (statsCalc.ts)', () => {
       expect(pD.kyotakuPoint).toBe(-1000); // リーチ棒1本供託
     });
 
+    it('終局時に場に残った供託リーチ棒がトップ（1位）のkyotakuPointに正しく加算され、全体ゼロサムになること', () => {
+      // R2でPlayerBがリーチをかけて流局終了した場合（場に供託棒1本残り）
+      const roundsWithRem: RoundData[] = [
+        mockRounds[0],
+        {
+          ...mockRounds[1],
+          seats: mockRounds[1].seats.map((s) =>
+            s.seat === 2 ? { ...s, is_riichi: 1, kyotaku_point: -1000 } : s
+          ),
+        },
+      ];
+      const { roundStats } = calculateRoundStats(mockGames, roundsWithRem);
+      // g1のトップはPlayerA
+      const pA = roundStats.find((s) => s.name === 'PlayerA')!;
+      // R1獲得 1000 + 終局時トップ取り 1000 = 2000
+      expect(pA.kyotakuPoint).toBe(2000);
+
+      // PlayerB: R2でリーチ供託 -1000
+      const pB = roundStats.find((s) => s.name === 'PlayerB')!;
+      expect(pB.kyotakuPoint).toBe(-1000);
+
+      // 全体ゼロサム検証
+      const sum = roundStats.reduce((acc, s) => acc + s.kyotakuPoint, 0);
+      expect(sum).toBe(0);
+    });
+
     it('流局テンパイ料（notenBappu）が場3000点配分仕様（2人テンパイ各+1500/-1500）に厳密準拠していること', () => {
       const { roundStats } = calculateRoundStats(mockGames, mockRounds);
 

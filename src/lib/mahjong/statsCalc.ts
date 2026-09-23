@@ -415,6 +415,43 @@ export function calculateRoundStats(
     }
   }
 
+  // 終局時に場に残った供託棒（トップ取り）の加算
+  const roundsByGame = new Map<string, RoundData[]>();
+  for (const r of targetRounds) {
+    if (!roundsByGame.has(r.game_id)) {
+      roundsByGame.set(r.game_id, []);
+    }
+    roundsByGame.get(r.game_id)!.push(r);
+  }
+
+  for (const g of effectiveGames) {
+    const gRounds = roundsByGame.get(g.game_id);
+    if (!gRounds || gRounds.length === 0) continue;
+
+    gRounds.sort((a, b) => a.round_index - b.round_index);
+
+    let riichiSticks = 0;
+    for (const r of gRounds) {
+      const riichiCount = r.seats.filter((s) => s.is_riichi === 1).length;
+      riichiSticks += riichiCount;
+
+      const hasWinner = r.seats.some((s) => s.is_winner === 1) || ['ron', 'tsumo', 'multi_ron'].includes(r.result_type);
+      if (hasWinner) {
+        riichiSticks = 0;
+      }
+    }
+
+    if (riichiSticks > 0) {
+      const riichiPt = g.rule_config?.detail?.riichi_pt ?? 1000;
+      const stickBonus = riichiSticks * riichiPt;
+      const topParticipant = g.participants.find((p) => p.rank === 1);
+      if (topParticipant) {
+        const topItem = initPlayer(topParticipant.name);
+        topItem.kyotakuPoint += stickBonus;
+      }
+    }
+  }
+
   const rows: RoundStatsRow[] = Array.from(pMap.entries()).map(([name, d]) => {
     const k = d.kyoku;
     const w = d.agari;

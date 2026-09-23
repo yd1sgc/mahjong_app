@@ -917,11 +917,20 @@ export function computeAllRoundsDetails(
     });
 
     // 次局の本場・親番進行
-    if (dealerContinues) {
+    if (winType === 'chombo') {
+      // チョンボ時は本場・局数を据え置き（ノーカウント）
+    } else if (winType === 'ryukyoku' || winType === 'mid_ryukyoku') {
       honba += 1;
+      if (!dealerContinues) {
+        roundIdx += 1;
+      }
     } else {
-      honba = 0;
-      roundIdx += 1;
+      if (dealerContinues) {
+        honba += 1;
+      } else {
+        roundIdx += 1;
+        honba = 0;
+      }
     }
   }
 
