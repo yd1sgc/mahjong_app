@@ -1,206 +1,69 @@
 /**
  * ホーム画面：対局開始・中断再開・成績・管理導線
  * mahjong_personal 準拠：中断対局の自動検知バナー・目的別大ボタン・絵文字なし
- * 
+ *
  * グループ未選択初期化・フリー対局・ルール自動連動・メンバー絞り込み・重複除外対応
+ * データ取得・対局作成・簡易保存は useHome に委譲する
  */
 
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RotateCw } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import {
-  GameInsert,
-  GameParticipantInsert,
-  GameRow,
-  GroupInsert,
-  GroupRow,
-  Json,
-  MemberRow,
-  RuleTemplateRow,
-} from '@/types/database';
+import { RuleTemplateRow } from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
 import { RuleConfig } from '@/types/mahjong';
-
-interface GroupMembership {
-  group_id: string;
-  member_id: string;
-}
-
-const LAST_GAME_SETUP_KEY = 'mahjong_last_game_setup';
-
-interface LastGameSetup {
-  groupId: string;
-  ruleId: string;
-  members: string[];
-}
+import { useHome } from '@/hooks/useHome';
 
 export default function HomePage() {
   const router = useRouter();
-  const [games, setGames] = useState<GameRow[]>([]);
-  const [members, setMembers] = useState<MemberRow[]>([]);
-  const [groups, setGroups] = useState<GroupRow[]>([]);
-  const [groupMemberships, setGroupMemberships] = useState<GroupMembership[]>([]);
-  const [rules, setRules] = useState<RuleTemplateRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    games,
+    members,
+    groups,
+    rules,
+    selectedGroupId,
+    selectedRuleId,
+    selectedMembers,
+    setSelectedRuleId,
+    setSelectedMembers,
+    handleGroupChange,
+    resetSetup,
+    rotateSeats,
+    getAvailableMembersForSeat,
+    isReadyToCreate,
+    simpleGameGroupId,
+    loadData,
+    saveCurrentSetup,
+    createGame,
+    persistSimpleGame,
+  } = useHome();
 
-  // 新規対局モーダル用状態
   const [showNewGameModal, setShowNewGameModal] = useState(false);
   const [showSimpleModal, setShowSimpleModal] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(''); // 初期値: '' (未選択)
-  const [selectedRuleId, setSelectedRuleId] = useState<string>('');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(['', '', '', '']);
   const [creating, setCreating] = useState(false);
   const [gamePin, setGamePin] = useState('1234');
   const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
-
-  // キャッシュ更新用状態
   const [refreshing, setRefreshing] = useState(false);
   const [refreshed, setRefreshed] = useState(false);
 
-  const loadData = useCallback(async () => {
-    try {
-      // 5つのテーブル・クエリをPromise.allで一括並列取得
-      const [
-        { data: gData },
-        { data: mData },
-        { data: grpData },
-        { data: gmData },
-        { data: rData },
-      ] = await Promise.all([
-        supabase
-          .from('games')
-          .select('*')
-          .order('played_at', { ascending: false })
-          .limit(30),
-        supabase
-          .from('members')
-          .select('*')
-          .eq('is_archived', 0)
-          .order('member_name'),
-        supabase
-          .from('groups')
-          .select('*')
-          .eq('is_archived', 0),
-        supabase
-          .from('group_memberships')
-          .select('group_id, member_id'),
-        supabase
-          .from('rule_templates')
-          .select('*')
-          .eq('is_archived', 0),
-      ]);
-
-      if (gData) setGames(gData);
-      if (mData) setMembers(mData);
-      if (grpData) setGroups(grpData);
-      if (gmData) setGroupMemberships(gmData as GroupMembership[]);
-      if (rData && rData.length > 0) {
-        setRules(rData);
-      }
-
-      // 直前の対局設定（グループ・ルール・メンバー4名）の自動復元
-      try {
-        let restored = false;
-
-        // 1. localStorage からの復元試行
-        if (typeof window !== 'undefined') {
-          const raw = localStorage.getItem(LAST_GAME_SETUP_KEY);
-          if (raw) {
-            const saved: LastGameSetup = JSON.parse(raw);
-            const groupExists =
-              saved.groupId === 'free' ||
-              grpData?.some((g) => g.group_id === saved.groupId);
-            const ruleExists = rData?.some((r) => r.rule_id === saved.ruleId);
-            const validMembers =
-              Array.isArray(saved.members) &&
-              saved.members.length === 4 &&
-              saved.members.every((mId) =>
-                mData?.some((m) => m.member_id === mId && m.is_archived === 0)
-              );
-
-            if (groupExists && ruleExists && validMembers) {
-              setSelectedGroupId(saved.groupId);
-              setSelectedRuleId(saved.ruleId);
-              setSelectedMembers(saved.members);
-              restored = true;
-            }
-          }
-        }
-
-        // 2. localStorage に無い場合、DB上の直近対局レコードから復元
-        if (!restored && gData && gData.length > 0) {
-          const latestGame = gData[0];
-          const { data: pData } = await supabase
-            .from('game_participants')
-            .select('seat, member_id')
-            .eq('game_id', latestGame.game_id)
-            .order('seat');
-
-          if (pData && pData.length === 4) {
-            const participantIds = pData.map((p) => p.member_id);
-            const allMembersValid = participantIds.every((mId) =>
-              mData?.some((m) => m.member_id === mId && m.is_archived === 0)
-            );
-
-            if (allMembersValid) {
-              const targetGroupId = latestGame.group_id || '';
-              const targetRule =
-                rData?.find((r) => r.name === latestGame.rule_name_snapshot) ||
-                rData?.[0];
-              const targetRuleId = targetRule?.rule_id || '';
-
-              setSelectedGroupId(targetGroupId);
-              if (targetRuleId) setSelectedRuleId(targetRuleId);
-              setSelectedMembers(participantIds);
-
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(
-                  LAST_GAME_SETUP_KEY,
-                  JSON.stringify({
-                    groupId: targetGroupId,
-                    ruleId: targetRuleId,
-                    members: participantIds,
-                  })
-                );
-              }
-            }
-          }
-        }
-      } catch (restoreErr) {
-        console.warn('Failed to restore last game setup:', restoreErr);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // キャッシュ・最新データ更新ハンドラ
   const handleRefresh = async () => {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      // 1. Cache Storage のクリア
       if (typeof window !== 'undefined' && 'caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
       }
-      // 2. Service Worker の更新チェック
       if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const reg of registrations) {
           await reg.update();
         }
       }
-      // 3. Supabase 最新データの再取得
       await loadData();
       setRefreshed(true);
       setTimeout(() => setRefreshed(false), 1500);
@@ -211,104 +74,8 @@ export default function HomePage() {
     }
   };
 
-  // 進行中の対局を検知
   const activeGame = games.find((g) => g.status === 'in_progress');
 
-  // グループ変更ハンドラ (ルール自動反映 ＆ メンバー所属整合性検証)
-  const handleGroupChange = (newGroupId: string) => {
-    setSelectedGroupId(newGroupId);
-
-    // グループ未選択（'' または 'free'）の場合はリセット・全メンバー解放
-    if (!newGroupId || newGroupId === 'free') {
-      if (rules.length > 0 && !selectedRuleId) {
-        setSelectedRuleId(rules[0].rule_id);
-      }
-      return;
-    }
-
-    // 1. グループの既定ルールを反映
-    const targetGroup = groups.find((g) => g.group_id === newGroupId);
-    if (targetGroup?.default_rule_id) {
-      setSelectedRuleId(targetGroup.default_rule_id);
-    }
-
-    // 2. 現在選択済みのメンバーが、変更先グループに所属しているか検証
-    // 所属していない（外部・別グループの）メンバーは選択解除
-    const groupMemberIds = groupMemberships
-      .filter((gm) => gm.group_id === newGroupId)
-      .map((gm) => gm.member_id);
-
-    setSelectedMembers((prev) =>
-      prev.map((mId) => {
-        if (!mId) return '';
-        return groupMemberIds.includes(mId) ? mId : '';
-      })
-    );
-  };
-
-  // 座席ごとの選択可能メンバー候補を取得
-  const getAvailableMembersForSeat = (seatIdx: number): MemberRow[] => {
-    // 他の座席で既に選択されているメンバーID一覧
-    const chosenInOtherSeats = selectedMembers.filter((_, idx) => idx !== seatIdx && Boolean(_));
-
-    let pool: MemberRow[] = [];
-    if (!selectedGroupId || selectedGroupId === 'free') {
-      // グループ未選択またはフリー対局: 全メンバー
-      pool = members;
-    } else {
-      // 特定グループ選択時: そのグループの所属メンバーのみ
-      const allowedMemberIds = groupMemberships
-        .filter((gm) => gm.group_id === selectedGroupId)
-        .map((gm) => gm.member_id);
-      pool = members.filter((m) => allowedMemberIds.includes(m.member_id));
-    }
-
-    return pool.filter((m) => !chosenInOtherSeats.includes(m.member_id));
-  };
-
-  // フリー対局用の有効な group_id を取得（無ければ自動生成）
-  const getEffectiveGroupId = async (): Promise<string> => {
-    if (selectedGroupId && selectedGroupId !== 'free') {
-      return selectedGroupId;
-    }
-
-    // フリー対局用グループを探索
-    let freeGrp = groups.find(
-      (g) => g.display_id === 'free' || g.group_name === 'フリー対局'
-    );
-
-    if (!freeGrp) {
-      // 存在しなければ自動作成
-      const newId = crypto.randomUUID();
-      const defaultRuleId = rules[0]?.rule_id || '';
-      try {
-        const groupPayload: GroupInsert = {
-          group_id: newId,
-          display_id: 'free',
-          group_name: 'フリー対局',
-          default_rule_id: defaultRuleId,
-          is_archived: 0,
-        };
-        const { data, error } = await supabase
-          .from('groups')
-          .insert(groupPayload)
-          .select()
-          .single();
-
-        if (!error && data) {
-          setGroups((prev) => [...prev, data]);
-          return data.group_id;
-        }
-      } catch {
-        // フォールバック
-      }
-      return groups[0]?.group_id || newId;
-    }
-
-    return freeGrp.group_id;
-  };
-
-  // プレイヤー選択の検証
   const validateSelectedPlayers = (): boolean => {
     if (!selectedGroupId) {
       alert('グループを選択してください');
@@ -326,28 +93,13 @@ export default function HomePage() {
     return true;
   };
 
-  // 結果のみ入力モード開始
   const handleStartSimpleGame = () => {
     if (!validateSelectedPlayers()) return;
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(
-          LAST_GAME_SETUP_KEY,
-          JSON.stringify({
-            groupId: selectedGroupId,
-            ruleId: selectedRuleId,
-            members: selectedMembers,
-          })
-        );
-      } catch {
-        // ignore
-      }
-    }
+    saveCurrentSetup();
     setShowNewGameModal(false);
     setShowSimpleModal(true);
   };
 
-  // 新規対局作成処理（詳細入力）
   const handleCreateGame = async () => {
     if (!validateSelectedPlayers()) return;
 
@@ -359,59 +111,7 @@ export default function HomePage() {
 
     try {
       setCreating(true);
-      const gameId = crypto.randomUUID();
-      const currentRule = rules.find((r) => r.rule_id === selectedRuleId);
-      const ruleName = currentRule?.name || '標準ルール';
-      const ruleConfig = currentRule?.config_json || {};
-      const effectiveGroupId = await getEffectiveGroupId();
-
-      // 1. game_participants 4席分のペイロード構築
-      const participants = selectedMembers.map((mId, idx) => {
-        const mem = members.find((m) => m.member_id === mId);
-        return {
-          seat: idx + 1,
-          member_id: mId,
-          player_name_snapshot: mem?.member_name || `P${idx + 1}`,
-          final_score: 25000,
-          rank: idx + 1,
-          point: 0.0,
-          was_group_member: 1,
-        };
-      });
-
-      // 2. create_game_transaction RPC による不可分登録（1往復・完全アトミック）
-      const { error: rpcErr } = await supabase.rpc('create_game_transaction', {
-        p_game_id: gameId,
-        p_group_id: effectiveGroupId,
-        p_passcode: pin,
-        p_rule_name: ruleName,
-        p_rule_config: ruleConfig as unknown as Json,
-        p_participants: participants as unknown as Json,
-      });
-
-      if (rpcErr) {
-        console.error('create_game_transaction error:', rpcErr);
-        throw new Error(rpcErr.message);
-      }
-
-      // 3. この端末を記録係としてトークン保存 ＆ 直前設定として保存
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`mahjong_recorder_${gameId}`, pin);
-        try {
-          localStorage.setItem(
-            LAST_GAME_SETUP_KEY,
-            JSON.stringify({
-              groupId: selectedGroupId,
-              ruleId: selectedRuleId,
-              members: selectedMembers,
-            })
-          );
-        } catch {
-          // ignore
-        }
-      }
-
-      // 対局画面へ遷移
+      const gameId = await createGame(pin);
       router.push(`/game?id=${gameId}`);
     } catch (e: unknown) {
       console.error(e);
@@ -422,15 +122,8 @@ export default function HomePage() {
     }
   };
 
-  const isReadyToCreate = Boolean(
-    selectedGroupId &&
-    selectedRuleId &&
-    selectedMembers.filter(Boolean).length === 4
-  );
-
   return (
     <main className="w-full min-h-screen bg-black text-white max-w-lg mx-auto px-4 py-6 flex flex-col gap-6">
-      {/* アプリヘッダー */}
       <header className="flex items-center justify-between border-b border-neutral-800 pb-3">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
           麻雀スコア管理
@@ -448,7 +141,6 @@ export default function HomePage() {
         </button>
       </header>
 
-      {/* 中断対局の再開案内バナー (mahjong_personal準拠) */}
       {activeGame && (
         <div className="p-4 rounded-2xl bg-amber-950/40 border-2 border-amber-500/60 shadow-lg flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
@@ -473,9 +165,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* メインアクションボタン群 */}
       <div className="flex flex-col gap-3">
-        {/* 1段目: 対局を始める */}
         <button
           type="button"
           onClick={() => {
@@ -486,7 +176,6 @@ export default function HomePage() {
           対局を始める
         </button>
 
-        {/* 2段目: 成績を見る */}
         <Link
           href="/stats"
           className="h-14 sm:h-16 rounded-xl bg-neutral-900 hover:bg-neutral-850 active:scale-[0.98] border border-neutral-800 hover:border-neutral-700 text-neutral-100 font-black text-base transition-all flex items-center justify-center shadow-xs"
@@ -494,7 +183,6 @@ export default function HomePage() {
           成績を見る
         </Link>
 
-        {/* 3段目: 左にルール管理、右にグループ管理 */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
             href="/manage/rules"
@@ -511,7 +199,6 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* 4段目: 左にデータ管理、右に合計集計 */}
         <div className="grid grid-cols-2 gap-2.5">
           <Link
             href="/manage/system"
@@ -529,7 +216,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* 新規対局モーダル */}
       {showNewGameModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs">
           <div className="w-full max-w-lg bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col gap-4 max-h-[92dvh] overflow-y-auto">
@@ -546,11 +232,7 @@ export default function HomePage() {
                 {selectedGroupId && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedGroupId('');
-                      setSelectedRuleId('');
-                      setSelectedMembers(['', '', '', '']);
-                    }}
+                    onClick={resetSetup}
                     className="text-[11px] font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-750 transition-colors"
                   >
                     リセット
@@ -566,7 +248,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* グループ選択 (初期未選択 ＋ フリー対局選択肢) */}
             <div>
               <label className="text-xs font-black text-neutral-300 block mb-1.5">
                 対局グループ
@@ -594,7 +275,6 @@ export default function HomePage() {
               </select>
             </div>
 
-            {/* ルール選択 (グループ選択時に自動セット・変更可能) */}
             <div>
               <label className="text-xs font-black text-neutral-300 block mb-1.5">
                 対局ルール
@@ -630,7 +310,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 4桁PIN入力 */}
             <div>
               <label className="text-xs font-black text-neutral-300 block mb-1.5">
                 引き継ぎ用4桁PIN番号
@@ -648,7 +327,6 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 4名プレイヤー選択 (グループ絞り込み ＆ 重複除外) */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-black text-neutral-300">
@@ -657,10 +335,7 @@ export default function HomePage() {
                 {selectedMembers.filter(Boolean).length === 4 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      // 時計回りに1席ローテーション: [東, 南, 西, 北] -> [南, 西, 北, 東]
-                      setSelectedMembers(([e, s, w, n]) => [s, w, n, e]);
-                    }}
+                    onClick={rotateSeats}
                     className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
                     title="4名の座順を時計回りに1席ずらします"
                   >
@@ -753,11 +428,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 結果のみ入力モーダル */}
       <SimpleGameInputModal
         isOpen={showSimpleModal}
         onClose={() => setShowSimpleModal(false)}
-        groupId={selectedGroupId === 'free' ? groups.find(g => g.display_id === 'free')?.group_id || groups[0]?.group_id : selectedGroupId}
+        groupId={simpleGameGroupId}
         ruleName={rules.find((r) => r.rule_id === selectedRuleId)?.name || '標準ルール'}
         ruleConfig={((rules.find((r) => r.rule_id === selectedRuleId)?.config_json as unknown as RuleConfig) || {}) as RuleConfig}
         players={selectedMembers.map((mId, idx) => {
@@ -768,9 +442,9 @@ export default function HomePage() {
             playerName: mem?.member_name || `P${idx + 1}`,
           };
         })}
+        onPersist={persistSimpleGame}
       />
 
-      {/* 詳細ルール確認モーダル */}
       {detailModalRule && (
         <RuleDetailModal
           ruleName={detailModalRule.name}

@@ -2,10 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { RuleConfig } from '@/types/mahjong';
 import { calculateGameSettlement } from '@/lib/mahjong/rules';
-import { buildSimpleGamePayload, validateSimpleGameScores } from '@/lib/mahjong/simpleGame';
+import {
+  buildSimpleGamePayload,
+  SimpleGamePayload,
+} from '@/lib/mahjong/simpleGame';
 
 interface PlayerInfo {
   seat: number; // 1: 東, 2: 南, 3: 西, 4: 北
@@ -20,6 +22,7 @@ interface SimpleGameInputModalProps {
   ruleName: string;
   ruleConfig: RuleConfig;
   players: PlayerInfo[];
+  onPersist: (payload: SimpleGamePayload) => Promise<void>;
 }
 
 const SEAT_LABELS = ['東家 (起家)', '南家', '西家', '北家'];
@@ -31,6 +34,7 @@ export function SimpleGameInputModal({
   ruleName,
   ruleConfig,
   players,
+  onPersist,
 }: SimpleGameInputModalProps) {
   // 各プレイヤーの持ち点（初期値25,000点）
   const [scores, setScores] = useState<Record<number, number>>({
@@ -118,19 +122,7 @@ export function SimpleGameInputModal({
         })),
       });
 
-      // 1. games レコード作成
-      const { error: gErr } = await supabase.from('games').insert(payload.game);
-      if (gErr) throw new Error(gErr.message || JSON.stringify(gErr));
-
-      // 2. game_participants レコード作成
-      const { error: pErr } = await supabase.from('game_participants').insert(
-        payload.participants
-      );
-      if (pErr) {
-        // ロールバック: game_participants 登録失敗時に games レコードを削除して孤立・不整合を防ぐ
-        await supabase.from('games').delete().eq('game_id', gameId);
-        throw new Error(`参加者データの保存に失敗したためロールバックしました: ${pErr.message || JSON.stringify(pErr)}`);
-      }
+      await onPersist(payload);
 
       // 完了結果の表示
       const resList = payload.participants

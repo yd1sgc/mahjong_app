@@ -22,6 +22,7 @@ import {
 } from '@/types/database';
 import { GameData, RoundData } from '@/lib/mahjong/statsCalc';
 import { RuleConfig } from '@/types/mahjong';
+import { fetchAllRows } from '@/lib/supabasePagination';
 
 export interface YakumanDisplayItem {
   id: string;
@@ -46,23 +47,6 @@ export interface UseStatsDataReturn {
   refetch: () => Promise<void>;
 }
 
-// Supabase (PostgREST) の1,000行取得上限を安全に突破する自動ページネーションヘルパー
-async function fetchAllRows<T>(
-  fetcher: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>
-): Promise<T[]> {
-  const PAGE_SIZE = 1000;
-  let allRows: T[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await fetcher(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    allRows = allRows.concat(data);
-    if (data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-  return allRows;
-}
 
 export function useStatsData(): UseStatsDataReturn {
   const [games, setGames] = useState<GameData[]>([]);

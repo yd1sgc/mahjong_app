@@ -7,20 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
-import { GameRow, GameParticipantRow } from '@/types/database';
-
-interface GameItem {
-  game_id: string;
-  played_at: string;
-  rule_name: string;
-  participants: {
-    name: string;
-    rank: number;
-    point: number;
-    score: number;
-  }[];
-}
+import { useAggregateData, GameItem } from '@/hooks/useAggregateData';
 
 interface PlayerAggregate {
   name: string;
@@ -31,63 +18,21 @@ interface PlayerAggregate {
 }
 
 export default function AggregatePage() {
-  const [games, setGames] = useState<GameItem[]>([]);
+  const { games, loading, error } = useAggregateData();
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const [showGameList, setShowGameList] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // 初期選択: 直近4試合（または存在する全試合）
   useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        // games 取得 (played_at 降順)
-        const { data: gData } = await supabase
-          .from('games')
-          .select('*')
-          .order('played_at', { ascending: false });
-
-        // game_participants 取得
-        const { data: pData } = await supabase
-          .from('game_participants')
-          .select('*');
-
-        const gList: GameRow[] = gData || [];
-        const pList: GameParticipantRow[] = pData || [];
-
-        const mapped: GameItem[] = gList.map((g) => {
-          const parts = pList
-            .filter((p) => p.game_id === g.game_id)
-            .sort((a, b) => a.rank - b.rank)
-            .map((p) => ({
-              name: p.player_name_snapshot,
-              rank: p.rank,
-              point: Number(p.point),
-              score: p.final_score,
-            }));
-
-          return {
-            game_id: g.game_id,
-            played_at: g.played_at || '',
-            rule_name: g.rule_name_snapshot || '標準ルール',
-            participants: parts,
-          };
-        });
-
-        setGames(mapped);
-
-        // 初期選択: 直近4試合（または存在する全試合）
-        const initialCount = Math.min(4, mapped.length);
-        const initialSelected = mapped.slice(0, initialCount).map((g) => g.game_id);
-        setSelectedGameIds(initialSelected);
-      } finally {
-        setLoading(false);
-      }
+    if (!loading && games.length > 0 && !hasInitialized) {
+      const initialCount = Math.min(4, games.length);
+      setSelectedGameIds(games.slice(0, initialCount).map((g) => g.game_id));
+      setHasInitialized(true);
     }
-
-    loadData();
-  }, []);
+  }, [loading, games, hasInitialized]);
 
   // 直近N試合選択
   const handleSelectRecent = (n: number) => {

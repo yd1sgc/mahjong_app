@@ -435,4 +435,24 @@
 - `npm run build`: 全14ルート静的エクスポート正常完了。
 - 本番反映（`https://mahjong-app.yd1sgc.workers.dev`）デプロイ完了。
 
+## Phase 5-Y 完了（ホーム・簡易記録・合計集計のデータアクセス層分離 & PostgRESTページネーション共通化）
+- **PostgREST ページネーション共通ヘルパー新設（`src/lib/supabasePagination.ts`）**:
+  - `fetchAllRows<T>` を純粋モジュールとして切り出し、PostgREST（Supabase）の 1,000行取得上限（max-rows）を安全に突破する自動分割取得ロジックを一元化。
+- **成績データフックの統合（`src/hooks/useStatsData.ts`）**:
+  - プライベートな `fetchAllRows` を削除し、共通モジュールからのインポートに統合。
+- **合計集計データフック新設 & 欠落バグ予防（`src/hooks/useAggregateData.ts`, `src/app/aggregate/page.tsx`）**:
+  - `games` および `game_participants` の取得を `useAggregateData` フックへカプセル化。
+  - `game_participants` の取得に `fetchAllRows` を適用し、250対局（1,000席）を超えた際に古い対局の参加者データが欠落して集計が崩れる構造的リスクを根本解消。
+  - 合計集計画面（`page.tsx`）内の直接 Supabase 呼び出しを全廃。
+- **ホーム・簡易入力データアクセスフック配備（`src/hooks/useHome.ts`, `src/app/page.tsx`, `src/components/SimpleGameInputModal.tsx`）**:
+  - ホーム画面の初期マスタ取得・対局作成RPC（`create_game_transaction`）・直前対局設定復元・席ローテーション・簡易記録保存（`persistSimpleGame`）を `useHome` へ集約。
+  - 画面側コンポーネントをUI表示とフォームハンドリングに純化。
+- **管理CRUDアーキテクチャ方針確定**:
+  - `/manage/groups`, `/manage/rules`, `/manage/system` については、KISS原則・Reactライフサイクル安全性・管理者PIN認証フローとの親和性を考慮し、不要なインダイレクションを招くフック化を行わず、現状の素朴な直列CRUD実装を最適として維持決定。
+- **包括的単体テスト配備（`tests/supabasePagination.test.ts`）**:
+  - 0件、1ページ内終了、複数ページ分割結合、境界値、エラー送出時の挙動を検証する単体テスト全6件を配備。
+- `npm test`（Vitest）: 全15ファイル・192件 ALL PASS。
+- `npx tsc --noEmit`: 型エラー 0件。
+- `npm run build`: 全14ルート静的エクスポート正常完了。
+
 
