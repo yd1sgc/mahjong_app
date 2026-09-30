@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, GripVertical } from 'lucide-react';
 import { RuleTemplateRow } from '@/types/database';
 import { SimpleGameInputModal } from '@/components/SimpleGameInputModal';
 import { RuleDetailModal } from '@/components/RuleDetailModal';
@@ -49,6 +49,94 @@ export default function HomePage() {
   const [detailModalRule, setDetailModalRule] = useState<RuleTemplateRow | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshed, setRefreshed] = useState(false);
+
+  const [swapSourceIdx, setSwapSourceIdx] = useState<number | null>(null);
+  const [dragSourceIdx, setDragSourceIdx] = useState<number | null>(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
+  const pointerStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  const swapSeats = (idxA: number, idxB: number) => {
+    if (idxA === idxB) return;
+    setSelectedMembers((prev) => {
+      const next = [...prev];
+      const tmp = next[idxA];
+      next[idxA] = next[idxB];
+      next[idxB] = tmp;
+      return next;
+    });
+  };
+
+  const handleSeatTap = (idx: number) => {
+    if (swapSourceIdx === null) {
+      setSwapSourceIdx(idx);
+    } else if (swapSourceIdx === idx) {
+      setSwapSourceIdx(null);
+    } else {
+      swapSeats(swapSourceIdx, idx);
+      setSwapSourceIdx(null);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, idx: number) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+    setDragSourceIdx(idx);
+    setDropTargetIdx(null);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (dragSourceIdx === null) return;
+    const elem = document.elementFromPoint(e.clientX, e.clientY);
+    const seatElem = elem?.closest('[data-seat-idx]');
+    if (seatElem) {
+      const targetIdx = Number(seatElem.getAttribute('data-seat-idx'));
+      if (!isNaN(targetIdx) && targetIdx !== dragSourceIdx) {
+        setDropTargetIdx(targetIdx);
+        return;
+      }
+    }
+    setDropTargetIdx(null);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent, idx: number) => {
+    if (dragSourceIdx === null) return;
+    const startPos = pointerStartPosRef.current;
+    const isTap =
+      startPos &&
+      Math.hypot(e.clientX - startPos.x, e.clientY - startPos.y) < 6;
+
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+
+    if (isTap) {
+      handleSeatTap(idx);
+    } else {
+      const elem = document.elementFromPoint(e.clientX, e.clientY);
+      const seatElem = elem?.closest('[data-seat-idx]');
+      if (seatElem) {
+        const targetIdx = Number(seatElem.getAttribute('data-seat-idx'));
+        if (!isNaN(targetIdx) && targetIdx !== dragSourceIdx) {
+          swapSeats(dragSourceIdx, targetIdx);
+          setSwapSourceIdx(null);
+        }
+      }
+    }
+
+    setDragSourceIdx(null);
+    setDropTargetIdx(null);
+    pointerStartPosRef.current = null;
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setDragSourceIdx(null);
+    setDropTargetIdx(null);
+    pointerStartPosRef.current = null;
+  };
 
   const handleRefresh = async () => {
     if (refreshing) return;
@@ -232,7 +320,10 @@ export default function HomePage() {
                 {selectedGroupId && (
                   <button
                     type="button"
-                    onClick={resetSetup}
+                    onClick={() => {
+                      resetSetup();
+                      setSwapSourceIdx(null);
+                    }}
                     className="text-[11px] font-bold text-neutral-400 hover:text-white px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-750 transition-colors"
                   >
                     リセット
@@ -240,7 +331,10 @@ export default function HomePage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => setShowNewGameModal(false)}
+                  onClick={() => {
+                    setShowNewGameModal(false);
+                    setSwapSourceIdx(null);
+                  }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-800 text-neutral-400 hover:text-white text-sm font-bold"
                 >
                   ✕
@@ -330,7 +424,7 @@ export default function HomePage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-black text-neutral-300">
-                  対局者 (東・南・西・北の座順)
+                  対局者
                 </label>
                 {selectedMembers.filter(Boolean).length === 4 && (
                   <button
@@ -339,7 +433,7 @@ export default function HomePage() {
                     className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
                     title="4名の座順を時計回りに1席ずらします"
                   >
-                    席をローテーション
+                    ローテーション
                   </button>
                 )}
               </div>
@@ -352,19 +446,61 @@ export default function HomePage() {
                 <div className="grid grid-cols-2 gap-2">
                   {['東家 (起家)', '南家', '西家', '北家'].map((seatLabel, idx) => {
                     const availableMembers = getAvailableMembersForSeat(idx);
+                    const isDragging = dragSourceIdx === idx;
+                    const isDropTarget = dropTargetIdx === idx;
+                    const isSelected = swapSourceIdx === idx;
 
                     return (
-                      <div key={idx} className="flex flex-col gap-1">
-                        <span className="text-[11px] text-neutral-400 font-bold">
-                          {seatLabel}
-                        </span>
+                      <div
+                        key={idx}
+                        data-seat-idx={idx}
+                        className={`flex flex-col gap-1.5 p-2 rounded-xl border transition-all ${
+                          isDragging
+                            ? 'opacity-40 border-amber-500 scale-[0.98]'
+                            : isDropTarget
+                            ? 'border-dashed border-amber-400 bg-amber-500/10 scale-[1.02]'
+                            : isSelected
+                            ? 'border-amber-500 ring-2 ring-amber-500/40 bg-neutral-900'
+                            : 'border-neutral-800 bg-neutral-950/60'
+                        }`}
+                      >
+                        <div
+                          onPointerDown={(e) => handlePointerDown(e, idx)}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={(e) => handlePointerUp(e, idx)}
+                          onPointerCancel={handlePointerCancel}
+                          className="h-8 flex items-center justify-between px-1 rounded-lg cursor-grab active:cursor-grabbing select-none touch-none hover:bg-neutral-850/60 transition-colors"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <GripVertical
+                              className={`w-3.5 h-3.5 ${
+                                isSelected ? 'text-amber-400' : 'text-neutral-500'
+                              }`}
+                            />
+                            <span
+                              className={`text-xs font-bold ${
+                                isSelected ? 'text-amber-300' : 'text-neutral-300'
+                              }`}
+                            >
+                              {seatLabel}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <span className="text-[10px] text-amber-400 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded">
+                              入替元
+                            </span>
+                          )}
+                        </div>
+
                         <select
                           value={selectedMembers[idx]}
                           onChange={(e) => {
                             const next = [...selectedMembers];
                             next[idx] = e.target.value;
                             setSelectedMembers(next);
+                            setSwapSourceIdx(null);
                           }}
+                          onPointerDown={(e) => e.stopPropagation()}
                           className={`h-11 bg-neutral-950 border rounded-lg px-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500 ${
                             selectedMembers[idx]
                               ? 'border-neutral-700 text-white'
@@ -384,10 +520,6 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-
-            <p className="text-[11px] font-semibold text-neutral-500">
-              ※ 作成した端末が最初の「記録係」になります。他端末へは画面上の4桁PINでいつでも交代できます。
-            </p>
 
             <div className="flex flex-col gap-2 pt-2 border-t border-neutral-800">
               <div className="flex gap-2">
