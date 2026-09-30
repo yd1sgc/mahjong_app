@@ -138,30 +138,25 @@ export const ScoreBoard: React.FC<ScoreBoardProps> = ({
                 </div>
 
                 {/* 下段: 点数または点差表示 (高さ固定・重なり防止・10万点超自動適正化) */}
-                <div className="h-9 flex items-end justify-between leading-none w-full">
+                <div className="h-9 flex items-end justify-end leading-none w-full">
                   {inDiffMode ? (
-                    <>
-                      <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400 pb-0.5 shrink-0">
-                        {score.toLocaleString()}
-                      </span>
-                      <span
-                        className={`text-2xl sm:text-3xl font-black font-mono tracking-tight leading-none truncate ${
-                          diffValue >= 0 ? 'text-cyan-400' : 'text-rose-500'
-                        }`}
-                      >
-                        {diffValue >= 0 ? `+${diffValue.toLocaleString()}` : diffValue.toLocaleString()}
-                      </span>
-                    </>
+                    <span
+                      className={`${
+                        Math.abs(diffValue) >= 100000 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'
+                      } font-black font-mono tracking-tight leading-none ${
+                        diffValue >= 0 ? 'text-cyan-400' : 'text-rose-500'
+                      }`}
+                    >
+                      {diffValue >= 0 ? `+${diffValue.toLocaleString()}` : diffValue.toLocaleString()}
+                    </span>
                   ) : (
-                    <div className="w-full flex items-end justify-end">
-                      <span
-                        className={`${
-                          Math.abs(score) >= 100000 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'
-                        } font-black font-mono tracking-tight text-white leading-none`}
-                      >
-                        {score.toLocaleString()}
-                      </span>
-                    </div>
+                    <span
+                      className={`${
+                        Math.abs(score) >= 100000 ? 'text-3xl sm:text-4xl' : 'text-4xl sm:text-5xl'
+                      } font-black font-mono tracking-tight text-white leading-none`}
+                    >
+                      {score.toLocaleString()}
+                    </span>
                   )}
                 </div>
               </button>
