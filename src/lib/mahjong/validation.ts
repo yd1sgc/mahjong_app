@@ -3,7 +3,7 @@
  * ReactやDOM非依存の純粋関数群
  */
 
-export const MAX_MEMBER_NAME_LENGTH = 8;
+export const MAX_MEMBER_NAME_LENGTH = 6;
 export const MAX_GROUP_NAME_LENGTH = 10;
 export const MAX_RULE_NAME_LENGTH = 15;
 

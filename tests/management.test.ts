@@ -175,16 +175,16 @@ describe('Layer 3: ルール・メンバー管理バリデーション検証 (ma
       expect(resSpace.error).toBe('メンバー名を入力してください');
     });
 
-    it('文字数上限: 8文字ちょうどは通過し、9文字以上は拒絶すること', () => {
-      // 8文字ちょうど
-      const res8 = validateMemberInput('オッチャンテスト', existingMembers);
-      expect(res8.valid).toBe(true);
-      expect(res8.trimmedName).toBe('オッチャンテスト');
+    it('文字数上限: 6文字ちょうどは通過し、7文字以上は拒絶すること', () => {
+      // 6文字ちょうど
+      const res6 = validateMemberInput('長谷川健一郎', existingMembers);
+      expect(res6.valid).toBe(true);
+      expect(res6.trimmedName).toBe('長谷川健一郎');
 
-      // 9文字
-      const res9 = validateMemberInput('オッチャンテストX', existingMembers);
-      expect(res9.valid).toBe(false);
-      expect(res9.error).toBe(`メンバー名は${MAX_MEMBER_NAME_LENGTH}文字以内で入力してください`);
+      // 7文字
+      const res7 = validateMemberInput('長谷川健一郎X', existingMembers);
+      expect(res7.valid).toBe(false);
+      expect(res7.error).toBe(`メンバー名は${MAX_MEMBER_NAME_LENGTH}文字以内で入力してください`);
     });
 
     it('禁止文字: 絵文字や改行を含むメンバー名を拒絶すること', () => {
