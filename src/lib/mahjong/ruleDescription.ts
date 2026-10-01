@@ -47,6 +47,21 @@ export function generateRuleDescription(config?: RuleConfig | null): RuleDescrip
     seisan.push(`レート・換算メモ：${rateNote.trim()}`);
   }
 
+  const tobiPt = detail.tobi_pt ?? 0;
+  if (tobiPt > 0) {
+    const multiStr = detail.tobi_multi_winner === 'split' ? '均等配分' : '頭ハネ';
+    const notenMap: Record<string, string> = {
+      none: 'なし',
+      split: '聴牌者均等配分',
+      atama_hane: '最寄り聴牌者総取り',
+      top: 'トップ総取り',
+    };
+    const notenStr = notenMap[detail.tobi_noten_rule || 'none'] || 'なし';
+    seisan.push(`飛び賞：${tobiPt}pt (ダブロン時: ${multiStr} / 罰符トビ時: ${notenStr})`);
+  } else {
+    seisan.push('飛び賞：なし');
+  }
+
   // 2. 基本・アリアリルール
   const kuitanStr = detail.kuitan !== false ? 'あり' : 'なし';
   const atozukeStr = detail.atozuke !== false ? 'あり' : 'なし';

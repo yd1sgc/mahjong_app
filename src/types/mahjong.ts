@@ -38,6 +38,12 @@ export interface DetailRuleConfig {
   renchan_rule?: 'tenpai' | 'agari' | 'noten';
   /** 飛び終了条件 ('under_zero': 0点未満, 'zero_or_less': 0点以下, 'none': トビなし) */
   tobi_end?: 'under_zero' | 'zero_or_less' | 'none';
+  /** 飛び賞ポイント (0: なし, 10, 20, 30 等) デフォルト: 0 */
+  tobi_pt?: number;
+  /** 複数和了（ダブロン等）時の飛び賞配分 ('atama_hane': 頭ハネ, 'split': 均等配分) デフォルト: 'atama_hane' */
+  tobi_multi_winner?: 'atama_hane' | 'split';
+  /** ノーテン罰符でトビが発生した場合の扱い ('none': なし, 'split': 聴牌者均等配分, 'atama_hane': 最も近い聴牌者総取り, 'top': トップ総取り) デフォルト: 'none' */
+  tobi_noten_rule?: 'none' | 'split' | 'atama_hane' | 'top';
   /** 西入・延長条件 ('under_30000': 30000点未満で延長, 'none' | 'fixed_nan4': 南4局で打ち切り) */
   west_extension?: 'under_30000' | 'none' | 'fixed_nan4';
   /** サドンデス設定（互換用エイリアス） */

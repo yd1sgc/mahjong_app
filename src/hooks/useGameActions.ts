@@ -430,11 +430,16 @@ export function useGameActions({
 
     try {
       setLoading(true);
+      const lastRound =
+        gameState.roundHistory.length > 0
+          ? gameState.roundHistory[gameState.roundHistory.length - 1]
+          : undefined;
       const settlements = calculateGameSettlement(
         players,
         gameState.scores,
         ruleConfig,
-        gameState.riichiStick
+        gameState.riichiStick,
+        lastRound
       );
 
       const settlementPayload = settlements.map((s) => ({

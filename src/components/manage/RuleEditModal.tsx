@@ -70,6 +70,9 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
   const [chomboPt, setChomboPt] = useState(20);
   const [dubron, setDubron] = useState<'atama_hane_kyotaku' | 'atama_hane' | 'split'>('atama_hane_kyotaku');
   const [kyushu, setKyushu] = useState<'renchan' | 'ryukyoku' | 'none'>('renchan');
+  const [tobiPt, setTobiPt] = useState(0);
+  const [tobiMultiWinner, setTobiMultiWinner] = useState<'atama_hane' | 'split'>('atama_hane');
+  const [tobiNotenRule, setTobiNotenRule] = useState<'none' | 'split' | 'atama_hane' | 'top'>('none');
 
   // タブ3: 手役・取り決め
   const [kuitan, setKuitan] = useState(true);
@@ -160,6 +163,17 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
           ? 'none'
           : 'renchan'
       );
+      setTobiPt(typeof detail.tobi_pt === 'number' ? detail.tobi_pt : 0);
+      setTobiMultiWinner(detail.tobi_multi_winner === 'split' ? 'split' : 'atama_hane');
+      setTobiNotenRule(
+        detail.tobi_noten_rule === 'split'
+          ? 'split'
+          : detail.tobi_noten_rule === 'atama_hane'
+          ? 'atama_hane'
+          : detail.tobi_noten_rule === 'top'
+          ? 'top'
+          : 'none'
+      );
 
       // 手役・取り決め
       setKuitan(detail.kuitan !== false);
@@ -204,6 +218,9 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
       setChomboPt(20);
       setDubron('atama_hane_kyotaku');
       setKyushu('renchan');
+      setTobiPt(0);
+      setTobiMultiWinner('atama_hane');
+      setTobiNotenRule('none');
       setKuitan(true);
       setAkaDora('3枚');
       setAtozuke(true);
@@ -280,6 +297,17 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
         ? 'none'
         : 'renchan'
     );
+    setTobiPt(typeof detail.tobi_pt === 'number' ? detail.tobi_pt : 0);
+    setTobiMultiWinner(detail.tobi_multi_winner === 'split' ? 'split' : 'atama_hane');
+    setTobiNotenRule(
+      detail.tobi_noten_rule === 'split'
+        ? 'split'
+        : detail.tobi_noten_rule === 'atama_hane'
+        ? 'atama_hane'
+        : detail.tobi_noten_rule === 'top'
+        ? 'top'
+        : 'none'
+    );
     setKuitan(detail.kuitan !== false);
     setAkaDora(typeof detail.aka_dora === 'string' ? detail.aka_dora : '3枚');
     setAtozuke(detail.atozuke !== false);
@@ -330,6 +358,9 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
           ...(existingConfig.detail || {}),
           renchan_rule: renchanRule,
           tobi_end: tobiEnd,
+          tobi_pt: tobiPt,
+          tobi_multi_winner: tobiMultiWinner,
+          tobi_noten_rule: tobiNotenRule,
           sudden_death: suddenDeath,
           west_extension: suddenDeath === 'west' ? 'under_30000' : 'none',
           agari_yame: agariYame,
@@ -654,6 +685,63 @@ export const RuleEditModal: React.FC<RuleEditModalProps> = ({
                     <option value="zero_or_less">0点以下で終了</option>
                     <option value="none">トビなし（続行）</option>
                   </select>
+                </div>
+              </div>
+
+              {/* 飛び賞（トビ賞）設定ブロック */}
+              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-amber-400">
+                    飛び賞（トビ賞）設定
+                  </label>
+                  <span className="text-[10px] text-neutral-400 font-bold font-mono">
+                    {tobiPt > 0 ? `${tobiPt} pt` : 'なし (0 pt)'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-neutral-400">
+                      飛び賞ポイント
+                    </label>
+                    <input
+                      type="number"
+                      step={5}
+                      min={0}
+                      value={tobiPt}
+                      onChange={(e) => setTobiPt(Math.max(0, Number(e.target.value)))}
+                      className="w-full h-9 px-2 text-center rounded-lg bg-neutral-900 border border-neutral-700 text-white font-bold text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-neutral-400">
+                      ダブロン時
+                    </label>
+                    <select
+                      value={tobiMultiWinner}
+                      onChange={(e) => setTobiMultiWinner(e.target.value as 'atama_hane' | 'split')}
+                      disabled={tobiPt === 0}
+                      className="w-full h-9 px-1 rounded-lg bg-neutral-900 border border-neutral-700 text-white font-bold text-xs disabled:opacity-40"
+                    >
+                      <option value="atama_hane">頭ハネ（総取り）</option>
+                      <option value="split">均等配分（折半）</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-neutral-400">
+                      ノーテン罰符トビ
+                    </label>
+                    <select
+                      value={tobiNotenRule}
+                      onChange={(e) => setTobiNotenRule(e.target.value as 'none' | 'split' | 'atama_hane' | 'top')}
+                      disabled={tobiPt === 0}
+                      className="w-full h-9 px-1 rounded-lg bg-neutral-900 border border-neutral-700 text-white font-bold text-xs disabled:opacity-40"
+                    >
+                      <option value="none">なし（不発生）</option>
+                      <option value="split">聴牌者で配分</option>
+                      <option value="atama_hane">最寄り聴牌者</option>
+                      <option value="top">トップ総取り</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

@@ -420,9 +420,22 @@ function GameContent() {
                       >
                         {s.rank}
                       </span>
-                      <span className="font-black text-base text-white truncate max-w-[110px] sm:max-w-[140px]">
-                        {s.player}
-                      </span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-black text-base text-white truncate max-w-[110px] sm:max-w-[140px]">
+                          {s.player}
+                        </span>
+                        {s.tobiPoint !== undefined && s.tobiPoint !== 0 && (
+                          <span
+                            className={`text-[10px] font-bold font-mono px-1 py-0.2 rounded w-fit ${
+                              s.tobiPoint > 0
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            }`}
+                          >
+                            トビ賞 {s.tobiPoint > 0 ? `+${s.tobiPoint.toFixed(1)}` : s.tobiPoint.toFixed(1)}pt
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0 font-mono text-right">

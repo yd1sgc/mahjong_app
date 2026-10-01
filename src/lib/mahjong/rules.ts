@@ -10,7 +10,7 @@ import {
   RoundRecord,
   RuleConfig,
 } from '@/types/mahjong';
-import { roundUp100, calcPoint } from './calc';
+import { roundUp100, calcPoint, roundTo1Decimal } from './calc';
 
 /**
  * 局インデックスから現在の親プレイヤーを取得
@@ -431,7 +431,172 @@ export interface SettlementPlayerResult {
   finalScore: number; // 供託加算後の最終素点
   rawScore: number; // 供託加算前の素点
   rank: number; // 1〜4
-  point: number; // ウマオカ計算後の確定pt (例: 58.0)
+  point: number; // ウマオカ・飛び賞計算後の確定pt (例: 58.0)
+  tobiPoint?: number; // 飛び賞による移動pt (例: +10.0, -10.0, 0.0)
+}
+
+/**
+ * 基準プレイヤーから見てツモ順（下流）が近い順にプレイヤー配列をソートする純粋関数
+ */
+export function sortByTurnDistance(
+  players: string[],
+  basePlayer: string,
+  targetPlayers: string[]
+): string[] {
+  if (!basePlayer || targetPlayers.length === 0) return [...targetPlayers];
+  const baseIdx = players.indexOf(basePlayer);
+  if (baseIdx === -1) return [...targetPlayers];
+
+  const distance = (p: string) => {
+    const idx = players.indexOf(p);
+    if (idx === -1) return 999;
+    return (idx - baseIdx + players.length) % players.length;
+  };
+
+  return [...targetPlayers].sort((a, b) => distance(a) - distance(b));
+}
+
+/**
+ * 端数を上家優先で 0.1pt ずつ配分する純粋ヘルパー関数
+ */
+function distributeSplitPoints(
+  totalPt: number,
+  orderedRecipients: string[]
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (orderedRecipients.length === 0 || totalPt <= 0) return result;
+
+  const count = orderedRecipients.length;
+  const baseShare = Math.floor((totalPt / count) * 10) / 10;
+  let remainingTenths = Math.round((totalPt - baseShare * count) * 10);
+
+  for (const p of orderedRecipients) {
+    let share = baseShare;
+    if (remainingTenths > 0) {
+      share = Math.round((share + 0.1) * 10) / 10;
+      remainingTenths -= 1;
+    }
+    result[p] = (result[p] ?? 0) + share;
+  }
+  return result;
+}
+
+/**
+ * 終局時の飛び賞移動ポイントを算出する純粋関数
+ *
+ * @param players 座順プレイヤー配列（東・南・西・北）
+ * @param scores 最終素点マップ
+ * @param ruleConfig ルール設定
+ * @param lastRound 直前局の確定データ
+ * @param topPlayer 暫定1位（トップ）のプレイヤー名
+ * @returns 各プレイヤーの飛び賞増減ptマップ（ゼロサム保証）
+ */
+export function calculateTobiBonus(
+  players: string[],
+  scores: Record<string, number>,
+  ruleConfig: RuleConfig = {},
+  lastRound?: RoundRecord,
+  topPlayer?: string
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const p of players) {
+    result[p] = 0;
+  }
+
+  const detailCfg = ruleConfig.detail || {};
+  const tobiPt = detailCfg.tobi_pt ?? 0;
+  if (tobiPt <= 0 || !lastRound) {
+    return result;
+  }
+
+  // トビ判定基準: zero_or_less の場合は <= 0, それ以外（under_zero / none）は < 0
+  const tobiEnd = detailCfg.tobi_end ?? 'under_zero';
+  const isTobi = (score: number) =>
+    tobiEnd === 'zero_or_less' ? score <= 0 : score < 0;
+
+  // 箱下のプレイヤーを特定
+  const tobiPlayers = players.filter((p) => isTobi(scores[p] ?? 25000));
+  if (tobiPlayers.length === 0) {
+    return result;
+  }
+
+  const multiWinnerRule = detailCfg.tobi_multi_winner ?? 'atama_hane';
+  const notenRule = detailCfg.tobi_noten_rule ?? 'none';
+  const winType = lastRound.win_type;
+
+  for (const loser of tobiPlayers) {
+    let recipients: string[] = [];
+    let distributionMode: 'single' | 'split' = 'single';
+
+    if (winType === 'ron') {
+      const winner = lastRound.winner || '';
+      if (winner && players.includes(winner)) {
+        recipients = [winner];
+      }
+    } else if (winType === 'tsumo') {
+      const winner = lastRound.winner || '';
+      if (winner && players.includes(winner)) {
+        recipients = [winner];
+      }
+    } else if (winType === 'multi_ron') {
+      const winners = (lastRound.multi_wins || [])
+        .map((w) => w.winner)
+        .filter((w) => w && players.includes(w));
+      if (winners.length === 0 && lastRound.winner && players.includes(lastRound.winner)) {
+        winners.push(lastRound.winner);
+      }
+
+      if (winners.length > 0) {
+        if (multiWinnerRule === 'split') {
+          recipients = sortByTurnDistance(players, loser, winners);
+          distributionMode = 'split';
+        } else {
+          const closest = getClosestWinner(players, loser, winners);
+          if (closest) recipients = [closest];
+        }
+      }
+    } else if (winType === 'ryukyoku' || winType === 'mid_ryukyoku') {
+      if (notenRule === 'none') {
+        continue;
+      } else if (notenRule === 'top') {
+        const top = topPlayer || players[0];
+        if (top && players.includes(top)) {
+          recipients = [top];
+        }
+      } else if (notenRule === 'atama_hane') {
+        const tenpaiList = (lastRound.tenpai || []).filter((p) => players.includes(p));
+        if (tenpaiList.length > 0) {
+          const sorted = sortByTurnDistance(players, loser, tenpaiList);
+          recipients = [sorted[0]];
+        }
+      } else if (notenRule === 'split') {
+        const tenpaiList = (lastRound.tenpai || []).filter((p) => players.includes(p));
+        if (tenpaiList.length > 0) {
+          recipients = sortByTurnDistance(players, loser, tenpaiList);
+          distributionMode = 'split';
+        }
+      }
+    }
+
+    if (recipients.length === 0) {
+      continue;
+    }
+
+    // 飛んだプレイヤーから徴収
+    result[loser] = Math.round((result[loser] - tobiPt) * 10) / 10;
+
+    if (distributionMode === 'single') {
+      const recipient = recipients[0];
+      result[recipient] = Math.round((result[recipient] + tobiPt) * 10) / 10;
+    } else {
+      const shares = distributeSplitPoints(tobiPt, recipients);
+      for (const [p, share] of Object.entries(shares)) {
+        result[p] = Math.round((result[p] + share) * 10) / 10;
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -439,13 +604,15 @@ export interface SettlementPlayerResult {
  * 1. 供託リーチ棒のトップ加算
  * 2. 素点降順・同点起家優先による順位決定 (1〜4位)
  * 3. calcPoint によるウマオカポイント算出
- * 4. 合計0.0ptにするための端数（0.1pt）ゼロサム調整（トップで吸収）
+ * 4. 飛び賞の計算・合算
+ * 5. 合計0.0ptにするための端数（0.1pt）ゼロサム調整（トップで吸収）
  */
 export function calculateGameSettlement(
   players: string[],
   scores: Record<string, number>,
   ruleConfig: RuleConfig = {},
-  remainingRiichiSticks: number = 0
+  remainingRiichiSticks: number = 0,
+  lastRound?: RoundRecord
 ): SettlementPlayerResult[] {
   const riichiPt = ruleConfig.detail?.riichi_pt ?? 1000;
   const stickBonus = remainingRiichiSticks * riichiPt;
@@ -479,18 +646,32 @@ export function calculateGameSettlement(
     return a.seat - b.seat;
   });
 
-  // 4. ポイント計算
+  const topPlayer = rawList[0]?.player;
+
+  // 4. 飛び賞の計算
+  const tobiBonusMap = calculateTobiBonus(
+    players,
+    scores,
+    ruleConfig,
+    lastRound,
+    topPlayer
+  );
+
+  // 5. ポイント計算（ウマオカ + 飛び賞）
   const results: SettlementPlayerResult[] = rawList.map((item, idx) => {
     const rank = idx + 1;
-    const pt = calcPoint(item.finalScore, rank, ruleConfig);
+    const basePt = calcPoint(item.finalScore, rank, ruleConfig);
+    const tobiPt = tobiBonusMap[item.player] ?? 0;
+    const totalPt = roundTo1Decimal(basePt + tobiPt);
     return {
       ...item,
       rank,
-      point: pt,
+      point: totalPt,
+      tobiPoint: tobiPt,
     };
   });
 
-  // 5. ゼロ和検算（端数調整）
+  // 6. ゼロ和検算（端数調整）
   const totalPt = results.reduce((sum, r) => sum + r.point, 0);
   const roundedDiff = Math.round(totalPt * 10) / 10;
   if (Math.abs(roundedDiff) > 0.0001 && results.length > 0) {

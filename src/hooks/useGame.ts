@@ -103,11 +103,16 @@ export function useGame(gameId: string) {
 
   const settlement = useMemo(() => {
     if (!gameState) return null;
+    const lastRound =
+      gameState.roundHistory.length > 0
+        ? gameState.roundHistory[gameState.roundHistory.length - 1]
+        : undefined;
     return calculateGameSettlement(
       players,
       gameState.scores,
       ruleConfig,
-      gameState.riichiStick
+      gameState.riichiStick,
+      lastRound
     );
   }, [gameState, players, ruleConfig]);
 
